@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Music Playlist Manager - Enterprise Edition</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="advanced-styles.css">
+</head>
+<body>
+    <!-- Background Animation -->
+    <div class="background-animation" id="bgAnimation"></div>
+
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <i class="fas fa-headphones"></i>
+                <h1>MusicVault</h1>
+                <span class="badge-pro">ENTERPRISE</span>
+            </div>
+
+            <nav>
+                <div class="nav-section">
+                    <div class="nav-title">Library</div>
+                    <div class="nav-item active" onclick="showAllGenres()">
+                        <i class="fas fa-th-large"></i>
+                        <span>All Genres</span>
+                    </div>
+                    <div class="nav-item">
+                        <i class="fas fa-star"></i>
+                        <span>Favorites</span>
+                    </div>
+                    <div class="nav-item">
+                        <i class="fas fa-clock"></i>
+                        <span>Recently Played</span>
+                    </div>
+                    <div class="nav-item" onclick="showSmartPlaylists()">
+                        <i class="fas fa-brain"></i>
+                        <span>Smart Playlists</span>
+                    </div>
+                </div>
+
+                <div class="nav-section">
+                    <div class="nav-title">Management</div>
+                    <div class="nav-item" onclick="openContentManager()">
+                        <i class="fas fa-upload"></i>
+                        <span>Upload Music</span>
+                    </div>
+                    <div class="nav-item" onclick="openBatchEditor()">
+                        <i class="fas fa-edit"></i>
+                        <span>Batch Editor</span>
+                    </div>
+                    <div class="nav-item" onclick="showSearchHistory()">
+                        <i class="fas fa-history"></i>
+                        <span>Search History</span>
+                    </div>
+                </div>
+
+                <div class="nav-section">
+                    <div class="nav-title">Genres</div>
+                    <div class="genre-list" id="genreList">
+                        <!-- Dynamically populated -->
+                    </div>
+                </div>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="header">
+                <div class="breadcrumb" id="breadcrumb">
+                    <span>Library</span>
+                </div>
+                <div class="page-title">
+                    <h2 id="pageTitle">All Genres</h2>
+                    <div class="music-wave">
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                        <div class="wave-bar"></div>
+                    </div>
+                </div>
+                <p class="page-subtitle" id="pageSubtitle">Explore your music collection</p>
+            </div>
+
+            <div class="stats-bar" id="statsBar">
+                <!-- Dynamically populated -->
+            </div>
+
+            <!-- Advanced Search Bar -->
+            <div class="search-container advanced-search">
+                <i class="fas fa-search search-icon"></i>
+                <input 
+                    type="text" 
+                    class="search-box" 
+                    id="searchInput"
+                    placeholder="Search by title, artist, album, tags, mood..."
+                    autocomplete="off"
+                >
+                <button class="btn-filter" id="advancedFilterBtn" title="Advanced Filters">
+                    <i class="fas fa-sliders-h"></i>
+                </button>
+                <i class="fas fa-times clear-search" id="clearSearch"></i>
+            </div>
+
+            <!-- Advanced Filter Panel -->
+            <div class="filter-panel" id="filterPanel">
+                <div class="filter-group">
+                    <label>Year Range</label>
+                    <div class="range-inputs">
+                        <input type="number" id="yearFrom" placeholder="From" min="1900" max="2100">
+                        <span>to</span>
+                        <input type="number" id="yearTo" placeholder="To" min="1900" max="2100">
+                    </div>
+                </div>
+
+                <div class="filter-group">
+                    <label>BPM Range</label>
+                    <div class="range-inputs">
+                        <input type="number" id="bpmFrom" placeholder="From" min="0" max="300">
+                        <span>to</span>
+                        <input type="number" id="bpmTo" placeholder="To" min="0" max="300">
+                    </div>
+                </div>
+
+                <div class="filter-group">
+                    <label>Mood</label>
+                    <select id="moodFilter" multiple>
+                        <option value="Epic">Epic</option>
+                        <option value="Energetic">Energetic</option>
+                        <option value="Calm">Calm</option>
+                        <option value="Melancholic">Melancholic</option>
+                        <option value="Happy">Happy</option>
+                        <option value="Aggressive">Aggressive</option>
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label>Tags</label>
+                    <div class="tags-input" id="tagsFilter">
+                        <input type="text" placeholder="Add tag and press Enter" id="tagInput">
+                        <div class="selected-tags" id="selectedTags"></div>
+                    </div>
+                </div>
+
+                <div class="filter-actions">
+                    <button class="btn btn-primary" onclick="applyFilters()">
+                        <i class="fas fa-check"></i> Apply Filters
+                    </button>
+                    <button class="btn" onclick="clearFilters()">
+                        <i class="fas fa-times"></i> Clear
+                    </button>
+                </div>
+            </div>
+
+            <!-- Toolbar -->
+            <div class="toolbar">
+                <div class="toolbar-left">
+                    <div class="btn active" id="sortName">
+                        <i class="fas fa-sort-alpha-down"></i>
+                        <span>Name</span>
+                    </div>
+                    <div class="btn" id="sortTracks">
+                        <i class="fas fa-music"></i>
+                        <span>Tracks</span>
+                    </div>
+                    <div class="btn" id="sortYear">
+                        <i class="fas fa-calendar"></i>
+                        <span>Year</span>
+                    </div>
+                    <div class="btn" id="sortBPM">
+                        <i class="fas fa-drum"></i>
+                        <span>BPM</span>
+                    </div>
+                </div>
+                <div class="toolbar-right">
+                    <div class="btn active" id="gridViewBtn">
+                        <i class="fas fa-th"></i>
+                    </div>
+                    <div class="btn" id="listViewBtn">
+                        <i class="fas fa-list"></i>
+                    </div>
+                    <div class="theme-toggle" id="themeToggle">
+                        <i class="fas fa-moon"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="folder-grid" id="folderGrid">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>Loading your music library...</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Content Management Modal -->
+    <div class="modal" id="contentManagerModal">
+        <div class="modal-content large">
+            <div class="modal-header">
+                <h3><i class="fas fa-upload"></i> Content Manager</h3>
+                <button class="modal-close" onclick="closeContentManager()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="upload-section">
+                    <div class="drop-zone" id="dropZone">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <h4>Drag & Drop MP3 Files Here</h4>
+                        <p>or click to browse</p>
+                        <input type="file" id="fileInput" multiple accept="audio/mp3,audio/mpeg" style="display: none;">
+                        <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
+                            <i class="fas fa-folder-open"></i> Browse Files
+                        </button>
+                    </div>
+
+                    <div class="upload-queue" id="uploadQueue" style="display: none;">
+                        <h4>Upload Queue</h4>
+                        <div id="fileList"></div>
+                        <div class="upload-actions">
+                            <button class="btn btn-primary" onclick="startUpload()">
+                                <i class="fas fa-upload"></i> Start Upload
+                            </button>
+                            <button class="btn" onclick="clearQueue()">
+                                <i class="fas fa-trash"></i> Clear Queue
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="metadata-extraction">
+                    <h4><i class="fas fa-magic"></i> Auto-Extract Metadata</h4>
+                    <div class="extraction-options">
+                        <label>
+                            <input type="checkbox" id="extractTags" checked>
+                            Extract ID3 Tags
+                        </label>
+                        <label>
+                            <input type="checkbox" id="extractCover" checked>
+                            Extract Album Art
+                        </label>
+                        <label>
+                            <input type="checkbox" id="detectBPM">
+                            Auto-detect BPM
+                        </label>
+                        <label>
+                            <input type="checkbox" id="detectDuplicates" checked>
+                            Check for Duplicates
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Batch Editor Modal -->
+    <div class="modal" id="batchEditorModal">
+        <div class="modal-content large">
+            <div class="modal-header">
+                <h3><i class="fas fa-edit"></i> Batch Editor</h3>
+                <button class="modal-close" onclick="closeBatchEditor()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="batch-selection">
+                    <h4>Select Tracks</h4>
+                    <div class="batch-filters">
+                        <select id="batchPlaylist">
+                            <option value="">All Playlists</option>
+                        </select>
+                        <button class="btn" onclick="selectAllTracks()">
+                            <i class="fas fa-check-double"></i> Select All
+                        </button>
+                        <button class="btn" onclick="deselectAllTracks()">
+                            <i class="fas fa-times"></i> Deselect All
+                        </button>
+                    </div>
+                    <div class="track-list" id="batchTrackList">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+
+                <div class="batch-operations">
+                    <h4>Batch Operations</h4>
+                    <div class="operation-group">
+                        <label>Set Genre</label>
+                        <input type="text" id="batchGenre" placeholder="Genre">
+                    </div>
+                    <div class="operation-group">
+                        <label>Set Mood</label>
+                        <input type="text" id="batchMood" placeholder="Mood">
+                    </div>
+                    <div class="operation-group">
+                        <label>Add Tags</label>
+                        <input type="text" id="batchTags" placeholder="Comma separated tags">
+                    </div>
+                    <div class="operation-group">
+                        <label>Set Year</label>
+                        <input type="number" id="batchYear" placeholder="Year">
+                    </div>
+                    <button class="btn btn-primary" onclick="applyBatchEdit()">
+                        <i class="fas fa-save"></i> Apply to Selected Tracks
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Music Player -->
+    <div class="music-player" id="musicPlayer">
+        <div class="player-track-info">
+            <img src="https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=400&fit=crop" alt="Album Cover" class="player-cover" id="playerCover">
+            <div class="player-details">
+                <div class="player-title" id="playerTitle">No track selected</div>
+                <div class="player-artist" id="playerArtist">Select a track to start</div>
+            </div>
+        </div>
+        
+        <div class="player-controls">
+            <button class="control-btn" id="prevBtn" title="Previous">
+                <i class="fas fa-step-backward"></i>
+            </button>
+            <button class="control-btn play-btn-main" id="playBtn" title="Play">
+                <i class="fas fa-play"></i>
+            </button>
+            <button class="control-btn" id="nextBtn" title="Next">
+                <i class="fas fa-step-forward"></i>
+            </button>
+        </div>
+        
+        <div class="player-progress">
+            <span class="time" id="currentTime">0:00</span>
+            <div class="progress-bar" id="progressBar">
+                <div class="progress-fill" id="progressFill"></div>
+                <div class="progress-handle" id="progressHandle"></div>
+            </div>
+            <span class="time" id="totalTime">0:00</span>
+        </div>
+        
+        <div class="player-volume">
+            <button class="control-btn" id="volumeBtn" title="Volume">
+                <i class="fas fa-volume-up"></i>
+            </button>
+            <div class="volume-bar" id="volumeBar">
+                <div class="volume-fill" id="volumeFill"></div>
+            </div>
+            <button class="control-btn" id="shuffleBtn" title="Shuffle">
+                <i class="fas fa-random"></i>
+            </button>
+            <button class="control-btn" id="repeatBtn" title="Repeat">
+                <i class="fas fa-repeat"></i>
+            </button>
+            <button class="control-btn" id="playlistBtn" title="Current Playlist">
+                <i class="fas fa-list-ul"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Audio Element -->
+    <audio id="audioPlayer"></audio>
+
+    <script src="script.js"></script>
+    <script src="advanced-features.js"></script>
+</body>
+</html>

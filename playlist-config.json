@@ -1,0 +1,104 @@
+{
+  "library": {
+    "name": "My Music Collection",
+    "musicRoot": "music",
+    "folders": [
+      {
+        "id": "classic-rock",
+        "name": "Classic Rock",
+        "icon": "fa-guitar",
+        "color": "#3b82f6",
+        "description": "Timeless rock anthems",
+        "path": "music/classic-rock",
+        "subfolders": [
+          {
+            "id": "70s-anthems",
+            "name": "70s Anthems",
+            "path": "music/classic-rock/70s",
+            "description": "Led Zeppelin, Queen, Pink Floyd",
+            "coverImage": "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=400&fit=crop"
+          },
+          {
+            "id": "80s-rock-hits",
+            "name": "80s Rock Hits",
+            "path": "music/classic-rock/80s",
+            "description": "AC/DC, Guns N' Roses, U2",
+            "coverImage": "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&h=400&fit=crop"
+          },
+          {
+            "id": "90s-grunge",
+            "name": "90s Grunge",
+            "path": "music/classic-rock/90s-grunge",
+            "description": "Nirvana, Pearl Jam, Soundgarden",
+            "coverImage": "https://images.unsplash.com/photo-1520523839897-bd0b52f945a0?w=400&h=400&fit=crop"
+          }
+        ]
+      },
+      {
+        "id": "electronic",
+        "name": "Electronic",
+        "icon": "fa-waveform-lines",
+        "color": "#a855f7",
+        "description": "Electronic & EDM beats",
+        "path": "music/electronic",
+        "subfolders": [
+          {
+            "id": "house",
+            "name": "House Essentials",
+            "path": "music/electronic/house",
+            "description": "Daft Punk, Calvin Harris, Deadmau5",
+            "coverImage": "https://images.unsplash.com/photo-1571266028243-d220c2925fee?w=400&h=400&fit=crop"
+          },
+          {
+            "id": "ambient",
+            "name": "Ambient Chill",
+            "path": "music/electronic/ambient",
+            "description": "Tycho, Boards of Canada, Aphex Twin",
+            "coverImage": "https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=400&h=400&fit=crop"
+          }
+        ]
+      },
+      {
+        "id": "jazz",
+        "name": "Jazz",
+        "icon": "fa-saxophone",
+        "color": "#f97316",
+        "description": "Smooth jazz vibes",
+        "path": "music/jazz",
+        "subfolders": [
+          {
+            "id": "smooth-jazz",
+            "name": "Smooth Jazz",
+            "path": "music/jazz/smooth",
+            "description": "Miles Davis, John Coltrane, Bill Evans",
+            "coverImage": "https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=400&h=400&fit=crop"
+          },
+          {
+            "id": "bebop",
+            "name": "Bebop Classics",
+            "path": "music/jazz/bebop",
+            "description": "Charlie Parker, Dizzy Gillespie, Thelonious Monk",
+            "coverImage": "https://images.unsplash.com/photo-1510915228340-29c85a43dcfe?w=400&h=400&fit=crop"
+          }
+        ]
+      },
+      {
+        "id": "hip-hop",
+        "name": "Hip Hop",
+        "icon": "fa-microphone",
+        "color": "#10b981",
+        "description": "Urban beats & rhymes",
+        "path": "music/hip-hop",
+        "subfolders": [
+          {
+            "id": "golden-age",
+            "name": "Golden Age",
+            "path": "music/hip-hop/golden-age",
+            "description": "Wu-Tang Clan, Nas, A Tribe Called Quest",
+            "coverImage": "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=400&h=400&fit=crop"
+          }
+        ]
+      }
+    ]
+  }
+}

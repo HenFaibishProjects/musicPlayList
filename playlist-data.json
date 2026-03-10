@@ -1,0 +1,432 @@
+{
+  "library": {
+    "name": "My Music Collection",
+    "musicRoot": "music",
+    "folders": [
+      {
+        "id": "classic-rock",
+        "name": "Classic Rock",
+        "icon": "fa-guitar",
+        "color": "#3b82f6",
+        "description": "Timeless rock anthems",
+        "subfolders": [
+          {
+            "id": "70s-anthems",
+            "name": "70s Anthems",
+            "artists": "Led Zeppelin, Queen, Pink Floyd",
+            "trackCount": 5,
+            "duration": "25h 30m",
+            "images": [
+              "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=400&fit=crop",
+              "https://images.unsplash.com/photo-1514320291840-2e0a9bf2a9ae?w=400&h=400&fit=crop",
+              "https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=400&h=400&fit=crop",
+              "https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=400&h=400&fit=crop"
+            ],
+            "link": "#",
+            "tracks": [
+              {
+                "id": 1,
+                "title": "Stairway to Heaven",
+                "artist": "Led Zeppelin",
+                "album": "Led Zeppelin IV",
+                "duration": "8:02",
+                "year": 1971,
+                "bpm": 82,
+                "mood": "Epic",
+                "tags": ["rock", "classic", "guitar solo", "legendary"],
+                "file": "music/classic-rock/stairway-to-heaven.mp3",
+                "cover": "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=400&fit=crop"
+              },
+              {
+                "id": 2,
+                "title": "Bohemian Rhapsody",
+                "artist": "Queen",
+                "album": "A Night at the Opera",
+                "duration": "5:55",
+                "year": 1975,
+                "bpm": 76,
+                "mood": "Epic",
+                "tags": ["rock", "opera", "classic", "masterpiece"],
+                "file": "music/classic-rock/bohemian-rhapsody.mp3",
+                "cover": "https://images.unsplash.com/photo-1514320291840-2e0a9bf2a9ae?w=400&h=400&fit=crop"
+              },
+              {
+                "id": 3,
+                "title": "Comfortably Numb",
+                "artist": "Pink Floyd",
+                "album": "The Wall",
+                "duration": "6:23",
+                "year": 1979,
+                "bpm": 63,
+                "mood": "Melancholic",
+                "tags": ["rock", "psychedelic", "guitar solo", "ballad"],
+                "file": "music/classic-rock/comfortably-numb.mp3",
+                "cover": "https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=400&h=400&fit=crop"
+              },
+              {
+                "id": 4,
+                "title": "Whole Lotta Love",
+                "artist": "Led Zeppelin",
+                "album": "Led Zeppelin II",
+                "duration": "5:34",
+                "year": 1969,
+                "bpm": 90,
+                "mood": "Energetic",
+                "tags": ["rock", "blues", "heavy", "riff"],
+                "file": "music/classic-rock/whole-lotta-love.mp3",
+                "cover": "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=400&fit=crop"
+              },
+              {
+                "id": 5,
+                "title": "We Will Rock You",
+                "artist": "Queen",
+                "album": "News of the World",
+                "duration": "2:02",
+                "year": 1977,
+                "bpm": 81,
+                "mood": "Energetic",
+                "tags": ["rock", "anthem", "stadium", "classic"],
+                "file": "music/classic-rock/we-will-rock-you.mp3",
+                "cover": "https://images.unsplash.com/photo-1514320291840-2e0a9bf2a9ae?w=400&h=400&fit=crop"
+              }
+            ]
+          },
+          {
+            "id": "80s-rock-hits",
+            "name": "80s Rock Hits",
+            "artists": "AC/DC, Guns N' Roses, U2",
+            "trackCount": 3,
+            "duration": "18h 45m",
+            "images": [
+              "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&h=400&fit=crop",
+              "https://images.unsplash.com/photo-1506157786151-b8491531f063?w=400&h=400&fit=crop",
+              "https://images.unsplash.com/photo-1487180144351-b8472da7d491?w=400&h=400&fit=crop",
+              "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=400&h=400&fit=crop"
+            ],
+            "link": "#",
+            "tracks": [
+              {
+                "id": 6,
+                "title": "Back in Black",
+                "artist": "AC/DC",
+                "album": "Back in Black",
+                "duration": "4:15",
+                "year": 1980,
+                "bpm": 94,
+                "mood": "Energetic",
+                "tags": ["rock", "hard rock", "80s", "anthem"],
+                "file": "music/80s-rock/back-in-black.mp3",
+                "cover": "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&h=400&fit=crop"
+              },
+              {
+                "id": 7,
+                "title": "Sweet Child O' Mine",
+                "artist": "Guns N' Roses",
+                "album": "Appetite for Destruction",
+                "duration": "5:56",
+                "year": 1987,
+                "bpm": 125,
+                "mood": "Happy",
+                "tags": ["rock", "hard rock", "guitar solo", "classic"],
+                "file": "music/80s-rock/sweet-child-o-mine.mp3",
+                "cover": "https://images.unsplash.com/photo-1506157786151-b8491531f063?w=400&h=400&fit=crop"
+              },
+              {
+                "id": 8,
+                "title": "With or Without You",
+                "artist": "U2",
+                "album": "The Joshua Tree",
+                "duration": "4:56",
+                "year": 1987,
+                "bpm": 110,
+                "mood": "Melancholic",
+                "tags": ["rock", "ballad", "80s", "love song"],
+                "file": "music/80s-rock/with-or-without-you.mp3",
+                "cover": "https://images.unsplash.com/photo-1487180144351-b8472da7d491?w=400&h=400&fit=crop"
+              }
+            ]
+          },
+          {
+            "id": "90s-grunge",
+            "name": "90s Grunge",
+            "artists": "Nirvana, Pearl Jam, Soundgarden",
+            "trackCount": 3,
+            "duration": "14h 20m",
+            "images": [
+              "https://images.unsplash.com/photo-1520523839897-bd0b52f945a0?w=400&h=400&fit=crop",
+              "https://images.unsplash.com/photo-1571330735066-03aaa9429d89?w=400&h=400&fit=crop",
+              "https://images.unsplash.com/photo-1524650359799-842906ca1c06?w=400&h=400&fit=crop",
+              "https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=400&h=400&fit=crop"
+            ],
+            "link": "#",
+            "tracks": [
+              {
+                "id": 9,
+                "title": "Smells Like Teen Spirit",
+                "artist": "Nirvana",
+                "album": "Nevermind",
+                "duration": "5:01",
+                "year": 1991,
+                "bpm": 116,
+                "mood": "Aggressive",
+                "tags": ["grunge", "90s", "alternative", "iconic"],
+                "file": "music/90s-grunge/smells-like-teen-spirit.mp3",
+                "cover": "https://images.unsplash.com/photo-1520523839897-bd0b52f945a0?w=400&h=400&fit=crop"
+              },
+              {
+                "id": 10,
+                "title": "Alive",
+                "artist": "Pearl Jam",
+                "album": "Ten",
+                "duration": "5:41",
+                "year": 1991,
+                "bpm": 78,
+                "mood": "Energetic",
+                "tags": ["grunge", "90s", "alternative", "guitar"],
+                "file": "music/90s-grunge/alive.mp3",
+                "cover": "https://images.unsplash.com/photo-1571330735066-03aaa9429d89?w=400&h=400&fit=crop"
+              },
+              {
+                "id": 11,
+                "title": "Black Hole Sun",
+                "artist": "Soundgarden",
+                "album": "Superunknown",
+                "duration": "5:18",
+                "year": 1994,
+                "bpm": 104,
+                "mood": "Melancholic",
+                "tags": ["grunge", "90s", "dark", "alternative"],
+                "file": "music/90s-grunge/black-hole-sun.mp3",
+                "cover": "https://images.unsplash.com/photo-1524650359799-842906ca1c06?w=400&h=400&fit=crop"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "electronic",
+        "name": "Electronic",
+        "icon": "fa-waveform-lines",
+        "color": "#a855f7",
+        "description": "Electronic & EDM beats",
+        "subfolders": [
+          {
+            "id": "house-essentials",
+            "name": "House Essentials",
+            "artists": "Daft Punk, Calvin Harris, Deadmau5",
+            "trackCount": 2,
+            "duration": "28h 15m",
+            "images": [
+              "https://images.unsplash.com/photo-1571266028243-d220c2925fee?w=400&h=400&fit=crop",
+              "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=400&h=400&fit=crop",
+              "https://images.unsplash.com/photo-1558899836-2f30c6e4f3e4?w=400&h=400&fit=crop",
+              "https://images.unsplash.com/photo-1571609804759-7c6b6a9e5f4c?w=400&h=400&fit=crop"
+            ],
+            "link": "#",
+            "tracks": [
+              {
+                "id": 12,
+                "title": "One More Time",
+                "artist": "Daft Punk",
+                "album": "Discovery",
+                "duration": "5:20",
+                "year": 2000,
+                "bpm": 123,
+                "mood": "Happy",
+                "tags": ["electronic", "house", "dance", "upbeat"],
+                "file": "music/electronic/one-more-time.mp3",
+                "cover": "https://images.unsplash.com/photo-1571266028243-d220c2925fee?w=400&h=400&fit=crop"
+              },
+              {
+                "id": 13,
+                "title": "Strobe",
+                "artist": "Deadmau5",
+                "album": "For Lack of a Better Name",
+                "duration": "10:37",
+                "year": 2009,
+                "bpm": 128,
+                "mood": "Epic",
+                "tags": ["electronic", "progressive house", "atmospheric"],
+                "file": "music/electronic/strobe.mp3",
+                "cover": "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=400&h=400&fit=crop"
+              }
+            ]
+          },
+          {
+            "id": "ambient-chill",
+            "name": "Ambient Chill",
+            "artists": "Tycho, Boards of Canada, Aphex Twin",
+            "trackCount": 2,
+            "duration": "21h 40m",
+            "images": [
+              "https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=400&h=400&fit=crop",
+              "https://images.unsplash.com/photo-1557672172-298e090bd0f1?w=400&h=400&fit=crop",
+              "https://images.unsplash.com/photo-1485579149621-3123dd979885?w=400&h=400&fit=crop",
+              "https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?w=400&h=400&fit=crop"
+            ],
+            "link": "#",
+            "tracks": [
+              {
+                "id": 14,
+                "title": "Awake",
+                "artist": "Tycho",
+                "album": "Awake",
+                "duration": "4:52",
+                "year": 2014,
+                "bpm": 120,
+                "mood": "Calm",
+                "tags": ["electronic", "ambient", "chill", "instrumental"],
+                "file": "music/ambient/awake.mp3",
+                "cover": "https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=400&h=400&fit=crop"
+              },
+              {
+                "id": 15,
+                "title": "Roygbiv",
+                "artist": "Boards of Canada",
+                "album": "Music Has the Right to Children",
+                "duration": "2:31",
+                "year": 1998,
+                "bpm": 128,
+                "mood": "Calm",
+                "tags": ["electronic", "ambient", "idm", "nostalgic"],
+                "file": "music/ambient/roygbiv.mp3",
+                "cover": "https://images.unsplash.com/photo-1557672172-298e090bd0f1?w=400&h=400&fit=crop"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "jazz",
+        "name": "Jazz",
+        "icon": "fa-saxophone",
+        "color": "#f97316",
+        "description": "Smooth jazz vibes",
+        "subfolders": [
+          {
+            "id": "smooth-jazz",
+            "name": "Smooth Jazz",
+            "artists": "Miles Davis, John Coltrane, Bill Evans",
+            "trackCount": 2,
+            "duration": "16h 30m",
+            "images": [
+              "https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=400&h=400&fit=crop",
+              "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop",
+              "https://images.unsplash.com/photo-1546559990-98d31048d53e?w=400&h=400&fit=crop",
+              "https://images.unsplash.com/photo-1465145498025-928c7a71cab9?w=400&h=400&fit=crop"
+            ],
+            "link": "#",
+            "tracks": [
+              {
+                "id": 16,
+                "title": "So What",
+                "artist": "Miles Davis",
+                "album": "Kind of Blue",
+                "duration": "9:22",
+                "year": 1959,
+                "bpm": 138,
+                "mood": "Calm",
+                "tags": ["jazz", "modal jazz", "trumpet", "classic"],
+                "file": "music/jazz/so-what.mp3",
+                "cover": "https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=400&h=400&fit=crop"
+              },
+              {
+                "id": 17,
+                "title": "Blue in Green",
+                "artist": "Miles Davis",
+                "album": "Kind of Blue",
+                "duration": "5:37",
+                "year": 1959,
+                "bpm": 88,
+                "mood": "Melancholic",
+                "tags": ["jazz", "ballad", "piano", "trumpet"],
+                "file": "music/jazz/blue-in-green.mp3",
+                "cover": "https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=400&h=400&fit=crop"
+              }
+            ]
+          },
+          {
+            "id": "bebop-classics",
+            "name": "Bebop Classics",
+            "artists": "Charlie Parker, Dizzy Gillespie, Thelonious Monk",
+            "trackCount": 1,
+            "duration": "11h 20m",
+            "images": [
+              "https://images.unsplash.com/photo-1510915228340-29c85a43dcfe?w=400&h=400&fit=crop",
+              "https://images.unsplash.com/photo-1520523839897-bd0b52f945a0?w=400&h=400&fit=crop",
+              "https://images.unsplash.com/photo-1519735777090-ec97265f937d?w=400&h=400&fit=crop",
+              "https://images.unsplash.com/photo-1514320291840-2e0a9bf2a9ae?w=400&h=400&fit=crop"
+            ],
+            "link": "#",
+            "tracks": [
+              {
+                "id": 18,
+                "title": "Round Midnight",
+                "artist": "Thelonious Monk",
+                "album": "Genius of Modern Music",
+                "duration": "3:11",
+                "year": 1947,
+                "bpm": 72,
+                "mood": "Melancholic",
+                "tags": ["jazz", "bebop", "piano", "classic"],
+                "file": "music/jazz/round-midnight.mp3",
+                "cover": "https://images.unsplash.com/photo-1510915228340-29c85a43dcfe?w=400&h=400&fit=crop"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "hip-hop",
+        "name": "Hip Hop",
+        "icon": "fa-microphone",
+        "color": "#10b981",
+        "description": "Urban beats & rhymes",
+        "subfolders": [
+          {
+            "id": "golden-age",
+            "name": "Golden Age Hip Hop",
+            "artists": "Wu-Tang Clan, Nas, A Tribe Called Quest",
+            "trackCount": 2,
+            "duration": "22h 10m",
+            "images": [
+              "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=400&h=400&fit=crop",
+              "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=400&fit=crop",
+              "https://images.unsplash.com/photo-1571266028243-d220c2925fee?w=400&h=400&fit=crop",
+              "https://images.unsplash.com/photo-1558899836-2f30c6e4f3e4?w=400&h=400&fit=crop"
+            ],
+            "link": "#",
+            "tracks": [
+              {
+                "id": 19,
+                "title": "C.R.E.A.M.",
+                "artist": "Wu-Tang Clan",
+                "album": "Enter the Wu-Tang",
+                "duration": "5:00",
+                "year": 1993,
+                "bpm": 93,
+                "mood": "Aggressive",
+                "tags": ["hip-hop", "90s", "east coast", "classic"],
+                "file": "music/hip-hop/cream.mp3",
+                "cover": "https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=400&h=400&fit=crop"
+              },
+              {
+                "id": 20,
+                "title": "N.Y. State of Mind",
+                "artist": "Nas",
+                "album": "Illmatic",
+                "duration": "4:54",
+                "year": 1994,
+                "bpm": 85,
+                "mood": "Calm",
+                "tags": ["hip-hop", "90s", "east coast", "storytelling"],
+                "file": "music/hip-hop/ny-state-of-mind.mp3",
+                "cover": "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=400&fit=crop"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
