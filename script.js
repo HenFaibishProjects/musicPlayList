@@ -1,41 +1,8 @@
 // UI state variables are in playlists.js (currentView, selectedGenre, currentSort, etc.)
 // Data variables are in data.js (libraryData, apiAvailable, recentTracks, smartPlaylists, etc.)
+// Player state variables are in player.js (audioPlayer, currentPlaylist, isPlaying, etc.)
 
-// Player state
-let audioPlayer = null;
-let audioPlayerB = null;
-let activePlayer = 'A'; // 'A' or 'B' - which player is currently playing
-let currentPlaylist = [];
-let currentTrackIndex = 0;
-let isPlaying = false;
-let isShuffle = false;
-let repeatMode = 0; // 0: off, 1: repeat all, 2: repeat one
-let currentVolume = 0.7;
-let crossfadeEnabled = false;
-let crossfadeDuration = 3; // seconds
-let crossfadeTimer = null;
-let fadeIntervals = { A: null, B: null };
-let isQueuePanelOpen = false;
-let playbackOrder = [];
-let playbackOrderPosition = 0;
-let isDraggingVolume = false;
-let systemVolumeSyncSupported = true;
-let isSyncingSystemVolume = false;
-let systemVolumePollIntervalId = null;
-let queuedSystemVolumeValue = null;
-let pendingVolumePushTimer = null;
-let lastSyncedSystemVolume = null;
-let pendingDeletePlaylist = null;
-let editingGenreContext = null;
-let currentRecentViewTracks = [];
-let currentPlaylistContext = { playlistName: '', genreName: '' };
-let currentSmartPlaylistTracks = [];
-const modalFormBaseline = {
-    addGenre: '',
-    addPlaylist: '',
-    editGenre: '',
-    editPlaylist: ''
-};
+// Script-specific state (modalFormBaseline, notificationAutoCloseTimer, pendingDeletePlaylist, editingGenreContext are in ui.js)
 let folderBrowserState = {
     isOpen: false,
     currentPath: '',
@@ -43,7 +10,6 @@ let folderBrowserState = {
     targetInputId: null,
     onSelect: null
 };
-let notificationAutoCloseTimer = null;
 
 function serializeFormState(form) {
     if (!form) return '';
@@ -1862,6 +1828,7 @@ async function init() {
 
         await syncVolumeFromSystem({ silent: true });
         startSystemVolumePolling();
+        setupSystemVolumeSyncTriggers();
 
         try {
             libraryData = await fetchLibraryData({ forceRescan: false });
@@ -1880,6 +1847,13 @@ async function init() {
 
         setRescanButtonState();
         refreshLibraryUI();
+        
+        // Clear any loading spinners
+        const grid = document.getElementById('folderGrid');
+        const loadingDiv = grid?.querySelector('.loading');
+        if (loadingDiv) {
+            loadingDiv.remove();
+        }
     } catch (error) {
         console.error('Error loading data:', error);
         showError();
