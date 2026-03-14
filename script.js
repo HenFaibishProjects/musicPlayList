@@ -1,23 +1,20 @@
-// Global state
-let libraryData = null;
-let currentView = 'all';
-let selectedGenre = null;
-let currentSort = 'name';
-let nameSortDirection = 'asc';
-let trackSortDirection = 'desc';
-let searchQuery = '';
-let viewMode = 'grid';
-let isGlobalSearchActive = false;
-let currentGlobalSearchTracks = [];
+// UI state variables are in playlists.js (currentView, selectedGenre, currentSort, etc.)
+// Data variables are in data.js (libraryData, apiAvailable, recentTracks, smartPlaylists, etc.)
 
 // Player state
 let audioPlayer = null;
+let audioPlayerB = null;
+let activePlayer = 'A'; // 'A' or 'B' - which player is currently playing
 let currentPlaylist = [];
 let currentTrackIndex = 0;
 let isPlaying = false;
 let isShuffle = false;
 let repeatMode = 0; // 0: off, 1: repeat all, 2: repeat one
 let currentVolume = 0.7;
+let crossfadeEnabled = false;
+let crossfadeDuration = 3; // seconds
+let crossfadeTimer = null;
+let fadeIntervals = { A: null, B: null };
 let isQueuePanelOpen = false;
 let playbackOrder = [];
 let playbackOrderPosition = 0;
@@ -28,69 +25,25 @@ let systemVolumePollIntervalId = null;
 let queuedSystemVolumeValue = null;
 let pendingVolumePushTimer = null;
 let lastSyncedSystemVolume = null;
-let apiAvailable = false;
-let isRescanningLibrary = false;
 let pendingDeletePlaylist = null;
 let editingGenreContext = null;
-let recentTracks = [];
 let currentRecentViewTracks = [];
 let currentPlaylistContext = { playlistName: '', genreName: '' };
+let currentSmartPlaylistTracks = [];
 const modalFormBaseline = {
     addGenre: '',
     addPlaylist: '',
     editGenre: '',
     editPlaylist: ''
 };
+let folderBrowserState = {
+    isOpen: false,
+    currentPath: '',
+    selectedPath: null,
+    targetInputId: null,
+    onSelect: null
+};
 let notificationAutoCloseTimer = null;
-const DEFAULT_COVER = 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=400&fit=crop';
-const RECENT_TRACKS_STORAGE_KEY = 'musicvault_recent_tracks_v1';
-const MAX_RECENT_TRACKS = 100;
-
-function escapeHtml(value) {
-    return String(value ?? '').replace(/[&<>'"]/g, char => ({
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#39;'
-    }[char]));
-}
-
-function sanitizeColor(value, fallback = '#6366f1') {
-    const candidate = String(value || '').trim();
-    return /^#(?:[0-9a-fA-F]{3}){1,2}$/.test(candidate) ? candidate : fallback;
-}
-
-function sanitizeImageUrl(value, fallback = DEFAULT_COVER) {
-    const candidate = String(value || '').trim();
-    if (!candidate) return fallback;
-
-    const lower = candidate.toLowerCase();
-    if (
-        lower.startsWith('http://') ||
-        lower.startsWith('https://') ||
-        lower.startsWith('data:image/') ||
-        lower.startsWith('blob:') ||
-        lower.startsWith('/api/')
-    ) {
-        return candidate;
-    }
-
-    return fallback;
-}
-
-function sanitizeClassList(value, fallback = '') {
-    const tokens = String(value || '')
-        .split(/\s+/)
-        .map(token => token.trim())
-        .filter(token => /^[a-z0-9-]+$/i.test(token));
-
-    if (tokens.length) {
-        return tokens.join(' ');
-    }
-
-    return fallback;
-}
 
 function serializeFormState(form) {
     if (!form) return '';
@@ -1251,55 +1204,184 @@ async function browseEditFolderPath() {
         return;
     }
 
-    const input = document.getElementById('editPlaylistPathInput');
-    const browseBtn = document.getElementById('editBrowseFolderPathBtn');
-    if (!input || !browseBtn) return;
+    await openModernFolderBrowser('editPlaylistPathInput', 'editPlaylistPathStatus');
+}
 
-    const originalLabel = browseBtn.innerHTML;
-    browseBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>Opening...</span>';
-    browseBtn.classList.add('disabled');
-    setFieldStatus('editPlaylistPathStatus', 'Opening secure folder browser…', 'neutral');
+// Modern Folder Browser Functions
+async function openModernFolderBrowser(targetInputId, statusFieldId = null) {
+    folderBrowserState = {
+        isOpen: true,
+        currentPath: '',
+        selectedPath: null,
+        targetInputId,
+        statusFieldId
+    };
+
+    const modal = document.getElementById('folderBrowserModal');
+    if (!modal) return;
+
+    modal.classList.add('show');
+    await loadFolderBrowserDirectory('');
+}
+
+function closeFolderBrowser() {
+    const modal = document.getElementById('folderBrowserModal');
+    if (!modal) return;
+
+    modal.classList.remove('show');
+    folderBrowserState = {
+        isOpen: false,
+        currentPath: '',
+        selectedPath: null,
+        targetInputId: null,
+        statusFieldId: null
+    };
+}
+
+async function loadFolderBrowserDirectory(path) {
+    const container = document.getElementById('folderBrowserContainer');
+    const pathInput = document.getElementById('folderBrowserPathInput');
+    const selectBtn = document.getElementById('folderBrowserSelectBtn');
+    const selectedPathDisplay = document.getElementById('folderBrowserSelectedPath');
+    
+    if (!container) return;
+
+    // Show loading state
+    container.innerHTML = `
+        <div class="folder-browser-loading">
+            <div class="spinner"></div>
+            <p>Loading folders...</p>
+        </div>
+    `;
 
     try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 300000);
-
-        const data = await apiRequest('http://localhost:3000/api/select-folder', {
-            method: 'GET',
-            signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-
-        const selectedPath = data?.path;
-
-        if (selectedPath) {
-            input.value = selectedPath;
-            setFieldStatus('editPlaylistPathStatus', `Linked folder: ${selectedPath}`, 'success');
-        } else if (data?.cancelled) {
-            setFieldStatus('editPlaylistPathStatus', 'Folder picker closed. Existing path was kept.', 'info');
+        const data = await apiRequest(`http://localhost:3000/api/browse-directories?path=${encodeURIComponent(path)}`);
+        
+        folderBrowserState.currentPath = data.path || '';
+        pathInput.value = data.path || 'Select a drive or folder';
+        
+        // Update UI based on selection
+        if (folderBrowserState.selectedPath === data.path && data.path) {
+            selectBtn.disabled = false;
+            selectedPathDisplay.textContent = data.path;
         }
-    } catch (error) {
-        console.error('Folder browse failed:', error);
-        if (error?.name === 'AbortError') {
-            setFieldStatus('editPlaylistPathStatus', 'Folder picker timed out. Try again or paste the path manually.', 'warning');
-            showNotification(
-                'Folder Picker Timeout',
-                'The picker stayed open too long (5 minutes). Please try again and select the folder sooner, or paste the path manually.',
-                'warning'
-            );
+
+        // Render folder list
+        const items = data.items || [];
+        
+        if (items.length === 0) {
+            container.innerHTML = `
+                <div class="folder-browser-empty">
+                    <i class="fas fa-folder-open"></i>
+                    <h4>No Subfolders Found</h4>
+                    <p>This folder doesn't contain any subfolders. You can still select it if it contains music files.</p>
+                </div>
+            `;
             return;
         }
 
-        const msg = String(error?.message || 'Unable to open folder browser.');
-        const hint = msg.includes('404')
-            ? 'Folder browser API not found. Please restart the server (stop npm start, then run npm start again).'
-            : msg;
-        setFieldStatus('editPlaylistPathStatus', 'Unable to open folder browser right now.', 'warning');
-        showNotification('Folder Browser Failed', hint, 'error');
-    } finally {
-        browseBtn.innerHTML = originalLabel;
-        browseBtn.classList.remove('disabled');
+        const listDiv = document.createElement('div');
+        listDiv.className = 'folder-browser-list';
+
+        items.forEach(item => {
+            const folderItem = document.createElement('div');
+            folderItem.className = 'folder-item';
+            if (item.type === 'drive') {
+                folderItem.classList.add('drive');
+            }
+            if (folderBrowserState.selectedPath === item.path) {
+                folderItem.classList.add('selected');
+            }
+
+            const iconClass = item.type === 'drive' ? 'fa-hard-drive' : 'fa-folder';
+            
+            folderItem.innerHTML = `
+                <div class="folder-item-icon">
+                    <i class="fas ${iconClass}"></i>
+                </div>
+                <div class="folder-item-info">
+                    <div class="folder-item-name">${escapeHtml(item.name)}</div>
+                    <div class="folder-item-path">${escapeHtml(item.path)}</div>
+                </div>
+                <div class="folder-item-select">
+                    <i class="fas fa-check"></i>
+                </div>
+            `;
+
+            // Single click to select
+            folderItem.addEventListener('click', () => {
+                // Deselect all
+                listDiv.querySelectorAll('.folder-item').forEach(f => f.classList.remove('selected'));
+                // Select this one
+                folderItem.classList.add('selected');
+                folderBrowserState.selectedPath = item.path;
+                selectBtn.disabled = false;
+                selectedPathDisplay.textContent = item.path;
+            });
+
+            // Double click to navigate into folder
+            folderItem.addEventListener('dblclick', () => {
+                loadFolderBrowserDirectory(item.path);
+            });
+
+            listDiv.appendChild(folderItem);
+        });
+
+        container.innerHTML = '';
+        container.appendChild(listDiv);
+
+    } catch (error) {
+        console.error('Failed to load directory:', error);
+        container.innerHTML = `
+            <div class="folder-browser-error">
+                <i class="fas fa-exclamation-triangle"></i>
+                <h4>Failed to Load Directory</h4>
+                <p>${escapeHtml(error.message || 'Unable to load directory contents')}</p>
+                <button class="btn" onclick="loadFolderBrowserDirectory('')">
+                    <i class="fas fa-home"></i>
+                    <span>Go to Drives</span>
+                </button>
+            </div>
+        `;
     }
+}
+
+async function folderBrowserGoUp() {
+    const container = document.getElementById('folderBrowserContainer');
+    if (!container) return;
+
+    try {
+        const data = await apiRequest(`http://localhost:3000/api/browse-directories?path=${encodeURIComponent(folderBrowserState.currentPath)}`);
+        
+        if (data.parent !== null && data.parent !== undefined) {
+            await loadFolderBrowserDirectory(data.parent);
+        } else {
+            // Go to root/drives
+            await loadFolderBrowserDirectory('');
+        }
+    } catch (error) {
+        console.error('Failed to navigate up:', error);
+    }
+}
+
+function folderBrowserSelectFolder() {
+    const targetInput = document.getElementById(folderBrowserState.targetInputId);
+    const statusFieldId = folderBrowserState.statusFieldId;
+    
+    if (!targetInput) {
+        closeFolderBrowser();
+        return;
+    }
+
+    if (folderBrowserState.selectedPath) {
+        targetInput.value = folderBrowserState.selectedPath;
+        
+        if (statusFieldId) {
+            setFieldStatus(statusFieldId, `Selected: ${folderBrowserState.selectedPath}`, 'success');
+        }
+    }
+
+    closeFolderBrowser();
 }
 
 async function browseFolderPath() {
@@ -1308,55 +1390,7 @@ async function browseFolderPath() {
         return;
     }
 
-    const input = document.getElementById('playlistPathInput');
-    const browseBtn = document.getElementById('browseFolderPathBtn');
-    if (!input || !browseBtn) return;
-
-    const originalLabel = browseBtn.innerHTML;
-    browseBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>Opening...</span>';
-    browseBtn.classList.add('disabled');
-    setFieldStatus('playlistPathStatus', 'Opening secure folder browser…', 'neutral');
-
-    try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 300000);
-
-        const data = await apiRequest('http://localhost:3000/api/select-folder', {
-            method: 'GET',
-            signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-
-        const selectedPath = data?.path;
-
-        if (selectedPath) {
-            input.value = selectedPath;
-            setFieldStatus('playlistPathStatus', `Linked folder: ${selectedPath}`, 'success');
-        } else if (data?.cancelled) {
-            setFieldStatus('playlistPathStatus', 'Folder picker closed. Existing path was kept.', 'info');
-        }
-    } catch (error) {
-        console.error('Folder browse failed:', error);
-        if (error?.name === 'AbortError') {
-            setFieldStatus('playlistPathStatus', 'Folder picker timed out. Try again or paste the path manually.', 'warning');
-            showNotification(
-                'Folder Picker Timeout',
-                'The picker stayed open too long (5 minutes). Please try again and select the folder sooner, or paste the path manually.',
-                'warning'
-            );
-            return;
-        }
-
-        const msg = String(error?.message || 'Unable to open folder browser.');
-        const hint = msg.includes('404')
-            ? 'Folder browser API not found. Please restart the server (stop npm start, then run npm start again).'
-            : msg;
-        setFieldStatus('playlistPathStatus', 'Unable to open folder browser right now.', 'warning');
-        showNotification('Folder Browser Failed', hint, 'error');
-    } finally {
-        browseBtn.innerHTML = originalLabel;
-        browseBtn.classList.remove('disabled');
-    }
+    await openModernFolderBrowser('playlistPathInput', 'playlistPathStatus');
 }
 
 function setRescanButtonState() {
@@ -1493,11 +1527,336 @@ document.addEventListener('click', (e) => {
     }
 });
 
+// M3U Import State
+let currentImportMethod = 'file';
+let importedTracks = [];
+
+// M3U Import Functions
+function openImportM3UModal() {
+    const modal = document.getElementById('importM3UModal');
+    if (!modal) return;
+    
+    // Reset form
+    document.getElementById('importM3UForm').reset();
+    document.getElementById('fileInputDisplay').innerHTML = '<i class="fas fa-file-audio"></i><span>Choose a file...</span>';
+    document.getElementById('fileInputDisplay').classList.remove('has-file');
+    document.getElementById('importProgress').classList.add('hidden');
+    
+    // Load genres into dropdown
+    populateImportGenreSelect();
+    
+    modal.classList.add('show');
+}
+
+function closeImportM3UModal() {
+    const modal = document.getElementById('importM3UModal');
+    if (!modal) return;
+    modal.classList.remove('show');
+}
+
+function populateImportGenreSelect() {
+    const select = document.getElementById('importGenreSelect');
+    if (!select) return;
+    
+    const genres = getGenresFromLibraryState();
+    
+    // Clear existing options except the first two
+    while (select.options.length > 2) {
+        select.remove(2);
+    }
+    
+    // Add genre options
+    genres.forEach(genre => {
+        const option = document.createElement('option');
+        option.value = genre.id;
+        option.textContent = genre.name;
+        select.appendChild(option);
+    });
+}
+
+function toggleImportMethod(method) {
+    currentImportMethod = method;
+    
+    // Update button states
+    document.querySelectorAll('.method-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.method === method);
+    });
+    
+    // Toggle input visibility
+    const fileRow = document.getElementById('fileInputRow');
+    const urlRow = document.getElementById('urlInputRow');
+    
+    if (method === 'file') {
+        fileRow.classList.remove('hidden');
+        urlRow.classList.add('hidden');
+    } else {
+        fileRow.classList.add('hidden');
+        urlRow.classList.remove('hidden');
+    }
+}
+
+function handleFileSelect(event) {
+    const file = event.target.files[0];
+    const display = document.getElementById('fileInputDisplay');
+    
+    if (file) {
+        display.innerHTML = `<i class="fas fa-file-audio"></i><span>${file.name}</span>`;
+        display.classList.add('has-file');
+    } else {
+        display.innerHTML = '<i class="fas fa-file-audio"></i><span>Choose a file...</span>';
+        display.classList.remove('has-file');
+    }
+}
+
+async function importM3UPlaylist(event) {
+    event.preventDefault();
+    
+    const submitBtn = document.getElementById('importM3USubmitBtn');
+    const progressDiv = document.getElementById('importProgress');
+    const progressFill = document.getElementById('importProgressFill');
+    const progressText = document.getElementById('importProgressText');
+    
+    try {
+        // Disable form
+        submitBtn.disabled = true;
+        progressDiv.classList.remove('hidden');
+        progressFill.style.width = '10%';
+        progressText.textContent = 'Reading playlist...';
+        
+        // Parse M3U
+        let tracks = [];
+        if (currentImportMethod === 'file') {
+            const fileInput = document.getElementById('m3uFileInput');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                throw new Error('Please select a file');
+            }
+            
+            tracks = await readM3UFile(file);
+        } else {
+            const urlInput = document.getElementById('m3uUrlInput');
+            const url = urlInput.value.trim();
+            
+            if (!url) {
+                throw new Error('Please enter a URL');
+            }
+            
+            tracks = await fetchM3U(url);
+        }
+        
+        if (tracks.length === 0) {
+            throw new Error('No valid tracks found in playlist');
+        }
+        
+        progressFill.style.width = '40%';
+        progressText.textContent = `Found ${tracks.length} tracks...`;
+        
+        // Get genre selection
+        const genreSelect = document.getElementById('importGenreSelect');
+        const genreValue = genreSelect.value;
+        const playlistName = document.getElementById('importPlaylistName').value.trim();
+        
+        if (!genreValue) {
+            throw new Error('Please select a genre');
+        }
+        
+        if (!playlistName) {
+            throw new Error('Please enter a playlist name');
+        }
+        
+        // Handle new genre creation
+        let targetGenreId = genreValue;
+        if (genreValue === '__new__') {
+            const newGenreName = document.getElementById('newGenreNameInput').value.trim();
+            if (!newGenreName) {
+                throw new Error('Please enter a name for the new genre');
+            }
+            
+            // Create new genre
+            progressText.textContent = 'Creating new genre...';
+            targetGenreId = await createGenreForImport(newGenreName);
+        }
+        
+        progressFill.style.width = '60%';
+        progressText.textContent = 'Processing tracks...';
+        
+        // Fetch stream metadata if enabled
+        const fetchMetadata = document.getElementById('fetchStreamMetadata').checked;
+        if (fetchMetadata) {
+            progressText.textContent = 'Fetching stream metadata...';
+            await enrichTracksWithMetadata(tracks);
+        }
+        
+        progressFill.style.width = '80%';
+        progressText.textContent = 'Saving playlist...';
+        
+        // Add playlist to library
+        await addImportedPlaylistToLibrary(targetGenreId, playlistName, tracks);
+        
+        progressFill.style.width = '100%';
+        progressText.textContent = 'Import complete!';
+        
+        // Success
+        setTimeout(() => {
+            closeImportM3UModal();
+            showNotification(
+                'Import Successful',
+                `Imported ${tracks.length} tracks into "${playlistName}"`,
+                'success'
+            );
+            
+            // Refresh library
+            refreshLibraryUI();
+        }, 1000);
+        
+    } catch (error) {
+        console.error('Import failed:', error);
+        progressDiv.classList.add('hidden');
+        submitBtn.disabled = false;
+        
+        showNotification(
+            'Import Failed',
+            error.message || 'Unable to import playlist. Please check the file/URL and try again.',
+            'error'
+        );
+    }
+}
+
+async function createGenreForImport(genreName) {
+    if (!apiAvailable) {
+        // Fallback: create locally
+        const newGenre = {
+            id: `imported-${Date.now()}`,
+            name: genreName,
+            icon: 'fa-file-import',
+            color: '#10b981',
+            description: 'Imported from M3U',
+            subfolders: []
+        };
+        
+        if (!libraryData.library) {
+            libraryData.library = { folders: [] };
+        }
+        libraryData.library.folders.push(newGenre);
+        
+        return newGenre.id;
+    }
+    
+    // Create via API
+    const payload = await apiRequest('http://localhost:3000/api/genres', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            name: genreName,
+            icon: 'fa-file-import',
+            color: '#10b981',
+            description: 'Imported from M3U'
+        })
+    });
+    
+    return payload.genre.id;
+}
+
+async function enrichTracksWithMetadata(tracks) {
+    // Try to fetch metadata for streams (limit concurrent requests)
+    const maxConcurrent = 3;
+    for (let i = 0; i < tracks.length; i += maxConcurrent) {
+        const batch = tracks.slice(i, i + maxConcurrent);
+        await Promise.all(batch.map(async track => {
+            if (track.file.startsWith('http')) {
+                try {
+                    const metadata = await fetchStreamMetadata(track.file);
+                    if (metadata) {
+                        track.title = metadata.title || track.title;
+                        track.artist = metadata.artist || track.artist;
+                        track.genre = metadata.genre || track.genre;
+                    }
+                } catch (e) {
+                    // Metadata fetch failed, keep original
+                }
+            }
+        }));
+    }
+}
+
+async function addImportedPlaylistToLibrary(genreId, playlistName, tracks) {
+    // Find the genre
+    const genre = libraryData.library.folders.find(f => f.id === genreId);
+    if (!genre) {
+        throw new Error('Genre not found');
+    }
+    
+    // Create playlist object
+    const newPlaylist = {
+        id: `m3u-import-${Date.now()}`,
+        name: playlistName,
+        artists: 'Imported from M3U',
+        trackCount: tracks.length,
+        duration: calculateTotalDuration(tracks),
+        images: extractCovers(tracks),
+        link: `imported://m3u/${playlistName}`,
+        tracks: tracks,
+        isImported: true,
+        importDate: new Date().toISOString()
+    };
+    
+    // Add to genre
+    if (!genre.subfolders) {
+        genre.subfolders = [];
+    }
+    genre.subfolders.push(newPlaylist);
+    
+    // Save to localStorage for persistence
+    try {
+        localStorage.setItem('musicvault_imported_playlists', JSON.stringify(libraryData));
+    } catch (e) {
+        console.warn('Failed to save to localStorage:', e);
+    }
+}
+
+function calculateTotalDuration(tracks) {
+    let totalSeconds = 0;
+    tracks.forEach(track => {
+        if (track.duration) {
+            const parts = track.duration.split(':');
+            if (parts.length === 2) {
+                totalSeconds += parseInt(parts[0]) * 60 + parseInt(parts[1]);
+            }
+        }
+    });
+    
+    if (totalSeconds === 0) return 'Unknown';
+    
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    
+    if (hours > 0) {
+        return `${hours}h ${minutes}m`;
+    }
+    return `${minutes}m`;
+}
+
+function extractCovers(tracks) {
+    const covers = tracks
+        .map(t => t.cover)
+        .filter(c => c && c.length > 0)
+        .slice(0, 4);
+    
+    // Pad with default covers if needed
+    while (covers.length < 4) {
+        covers.push(DEFAULT_COVER);
+    }
+    
+    return covers;
+}
+
 // Initialize app
 async function init() {
     try {
         createBackgroundParticles();
         loadRecentTracksFromStorage();
+        loadSmartPlaylists();
         setupEventListeners();
         initializePlayer();
 
@@ -1530,12 +1889,27 @@ async function init() {
 // Initialize Music Player
 function initializePlayer() {
     audioPlayer = document.getElementById('audioPlayer');
+    audioPlayerB = document.getElementById('audioPlayerB');
+    
+    if (!audioPlayer || !audioPlayerB) {
+        console.error('Audio players not found in DOM');
+        return;
+    }
+    
     audioPlayer.volume = currentVolume;
-    document.getElementById('volumeFill').style.width = (currentVolume * 100) + '%';
+    audioPlayerB.volume = currentVolume;
+    
+    const volumeFill = document.getElementById('volumeFill');
+    if (volumeFill) {
+        volumeFill.style.width = (currentVolume * 100) + '%';
+    }
+    
     updateVolumeIcon();
     
-    // Initialize visualizer
-    initVisualizer();
+    // Initialize visualizer safely
+    if (typeof initVisualizer === 'function') {
+        initVisualizer();
+    }
     
     // Resize canvas to fit container
     window.addEventListener('resize', resizeVisualizerCanvas);
@@ -1552,6 +1926,7 @@ function initializePlayer() {
     document.getElementById('nextBtn').addEventListener('click', playNext);
     document.getElementById('shuffleBtn').addEventListener('click', toggleShuffle);
     document.getElementById('repeatBtn').addEventListener('click', toggleRepeat);
+    document.getElementById('crossfadeBtn').addEventListener('click', toggleCrossfade);
     document.getElementById('playlistBtn').addEventListener('click', toggleQueuePanel);
     document.getElementById('queueCloseBtn').addEventListener('click', closeQueuePanel);
     document.getElementById('queuePlayAllBtn').addEventListener('click', playQueueFromTop);
@@ -1577,10 +1952,19 @@ function initializePlayer() {
     document.addEventListener('touchend', stopVolumeDrag);
     document.addEventListener('touchcancel', stopVolumeDrag);
     
-    // Audio events
+    // Audio events for both players
     audioPlayer.addEventListener('timeupdate', updateProgress);
     audioPlayer.addEventListener('ended', handleTrackEnd);
     audioPlayer.addEventListener('loadedmetadata', updateDuration);
+    
+    audioPlayerB.addEventListener('timeupdate', () => {
+        if (activePlayer === 'B') updateProgress();
+    });
+    audioPlayerB.addEventListener('ended', handleTrackEnd);
+    audioPlayerB.addEventListener('loadedmetadata', () => {
+        if (activePlayer === 'B') updateDuration();
+    });
+    
     audioPlayer.addEventListener('play', () => {
         // Keep visualizer running when playback starts
         startVisualizerPlayback().then(() => {
@@ -1697,7 +2081,32 @@ function loadPlaylist(playlist, genreName = '') {
 
 // Load a specific track
 function loadTrack(track) {
+    // Cancel any ongoing crossfade
+    if (crossfadeTimer) {
+        clearTimeout(crossfadeTimer);
+        crossfadeTimer = null;
+    }
+    if (fadeIntervals.A) {
+        clearInterval(fadeIntervals.A);
+        fadeIntervals.A = null;
+    }
+    if (fadeIntervals.B) {
+        clearInterval(fadeIntervals.B);
+        fadeIntervals.B = null;
+    }
+    
+    // Stop and reset both players
+    audioPlayer.pause();
+    audioPlayerB.pause();
+    audioPlayer.currentTime = 0;
+    audioPlayerB.currentTime = 0;
+    audioPlayer.volume = currentVolume;
+    audioPlayerB.volume = currentVolume;
+    
+    // Load into player A and make it active
     audioPlayer.src = track.file;
+    activePlayer = 'A';
+    
     document.getElementById('playerTitle').textContent = track.title;
     document.getElementById('playerArtist').textContent = track.artist;
     const playerCover = document.getElementById('playerCover');
@@ -1713,7 +2122,8 @@ function loadTrack(track) {
 
 // Play track
 function playTrack() {
-    audioPlayer.play().catch(err => {
+    const currentPlayer = getActivePlayer();
+    currentPlayer.play().catch(err => {
         console.error('Error playing audio:', err);
         showNotification(
             'Unable to Play Track',
@@ -1731,8 +2141,17 @@ function playTrack() {
 
 // Pause track
 function pauseTrack() {
+    // Pause both players
     audioPlayer.pause();
+    audioPlayerB.pause();
     isPlaying = false;
+    
+    // Cancel crossfade timer
+    if (crossfadeTimer) {
+        clearTimeout(crossfadeTimer);
+        crossfadeTimer = null;
+    }
+    
     updatePlayButton();
 }
 
@@ -1772,23 +2191,46 @@ function playNext() {
 function playPrevious() {
     if (currentPlaylist.length === 0) return;
     
-    if (audioPlayer.currentTime > 3) {
-        audioPlayer.currentTime = 0;
+    const currentPlayer = getActivePlayer();
+    if (!currentPlayer) return;
+    
+    // If more than 3 seconds into track, restart current track
+    if (currentPlayer.currentTime > 3) {
+        currentPlayer.currentTime = 0;
     } else {
+        // Otherwise go to previous track
         moveToPreviousTrack({ autoplay: isPlaying, allowWrap: repeatMode === 1 });
     }
 }
 
 // Handle track end
 function handleTrackEnd() {
+    // Only handle if the ended player is the active one
+    const endedPlayer = event?.target || audioPlayer;
+    const currentPlayer = getActivePlayer();
+    
+    // If crossfade is enabled and already transitioning, ignore this event
+    if (crossfadeEnabled && endedPlayer !== currentPlayer) {
+        return;
+    }
+    
     if (repeatMode === 2) {
         // Repeat one
-        audioPlayer.currentTime = 0;
+        currentPlayer.currentTime = 0;
         playTrack();
-    } else {
+    } else if (!crossfadeEnabled) {
+        // Normal transition (no crossfade)
         const moved = moveToNextTrack({ autoplay: true, allowWrap: repeatMode === 1 });
         if (!moved) {
             // End of playlist
+            isPlaying = false;
+            updatePlayButton();
+        }
+    } else {
+        // Crossfade enabled - transition should have already happened
+        // If we get here, it means crossfade didn't trigger properly
+        const moved = moveToNextTrack({ autoplay: true, allowWrap: repeatMode === 1 });
+        if (!moved) {
             isPlaying = false;
             updatePlayButton();
         }
@@ -1824,29 +2266,193 @@ function toggleRepeat() {
     }
 }
 
+// Toggle crossfade
+function toggleCrossfade() {
+    crossfadeEnabled = !crossfadeEnabled;
+    const btn = document.getElementById('crossfadeBtn');
+    btn.classList.toggle('active', crossfadeEnabled);
+    btn.title = crossfadeEnabled ? `Crossfade: ${crossfadeDuration}s` : 'Crossfade: Off';
+    
+    showNotification(
+        crossfadeEnabled ? 'Crossfade Enabled' : 'Crossfade Disabled',
+        crossfadeEnabled 
+            ? `Tracks will smoothly blend with a ${crossfadeDuration}-second crossfade.`
+            : 'Tracks will play with hard cuts between them.',
+        'success'
+    );
+}
+
+// Get active audio player
+function getActivePlayer() {
+    return activePlayer === 'A' ? audioPlayer : audioPlayerB;
+}
+
+// Get inactive audio player
+function getInactivePlayer() {
+    return activePlayer === 'A' ? audioPlayerB : audioPlayer;
+}
+
+// Fade audio volume
+function fadeVolume(player, targetVolume, duration, callback) {
+    const playerKey = player === audioPlayer ? 'A' : 'B';
+    
+    // Clear any existing fade for this player
+    if (fadeIntervals[playerKey]) {
+        clearInterval(fadeIntervals[playerKey]);
+        fadeIntervals[playerKey] = null;
+    }
+    
+    const startVolume = player.volume;
+    const volumeDiff = targetVolume - startVolume;
+    const steps = 50;
+    const stepDuration = (duration * 1000) / steps;
+    const volumeStep = volumeDiff / steps;
+    
+    let currentStep = 0;
+    
+    fadeIntervals[playerKey] = setInterval(() => {
+        currentStep++;
+        
+        if (currentStep >= steps) {
+            player.volume = targetVolume;
+            clearInterval(fadeIntervals[playerKey]);
+            fadeIntervals[playerKey] = null;
+            if (callback) callback();
+        } else {
+            player.volume = Math.max(0, Math.min(1, startVolume + (volumeStep * currentStep)));
+        }
+    }, stepDuration);
+}
+
+// Start crossfade to next track
+function startCrossfade() {
+    if (!crossfadeEnabled || currentPlaylist.length === 0) return;
+    
+    const currentPlayer = getActivePlayer();
+    const nextPlayer = getInactivePlayer();
+    
+    // Determine next track
+    const canMoveNext = moveToNextTrack({ autoplay: false, allowWrap: repeatMode === 1 });
+    if (!canMoveNext) return;
+    
+    const nextTrack = currentPlaylist[currentTrackIndex];
+    
+    // Load next track into inactive player
+    nextPlayer.src = nextTrack.file;
+    nextPlayer.volume = 0;
+    
+    // Start playing next track at 0 volume
+    nextPlayer.play().then(() => {
+        // Fade out current player
+        fadeVolume(currentPlayer, 0, crossfadeDuration, () => {
+            currentPlayer.pause();
+            currentPlayer.currentTime = 0;
+        });
+        
+        // Fade in next player
+        fadeVolume(nextPlayer, currentVolume, crossfadeDuration);
+        
+        // Switch active player
+        activePlayer = activePlayer === 'A' ? 'B' : 'A';
+        
+        // Update UI
+        document.getElementById('playerTitle').textContent = nextTrack.title;
+        document.getElementById('playerArtist').textContent = nextTrack.artist;
+        const playerCover = document.getElementById('playerCover');
+        if (playerCover) {
+            playerCover.src = nextTrack.cover || DEFAULT_COVER;
+        }
+        
+        // Add to recently played
+        addTrackToRecentlyPlayed(nextTrack, currentPlaylistContext);
+        
+        // Update queue if open
+        if (isQueuePanelOpen) {
+            renderQueuePanel();
+        }
+        
+        updateWorkspaceStatus();
+    }).catch(err => {
+        console.error('Crossfade error:', err);
+        // Fallback to normal track change
+        loadTrack(nextTrack);
+        if (isPlaying) playTrack();
+    });
+}
+
+// Setup crossfade monitoring
+function monitorForCrossfade() {
+    if (crossfadeTimer) {
+        clearTimeout(crossfadeTimer);
+        crossfadeTimer = null;
+    }
+    
+    if (!crossfadeEnabled || !isPlaying || currentPlaylist.length === 0) return;
+    
+    const currentPlayer = getActivePlayer();
+    const duration = currentPlayer.duration;
+    const currentTime = currentPlayer.currentTime;
+    
+    if (!duration || !isFinite(duration)) return;
+    
+    const timeRemaining = duration - currentTime;
+    
+    // Start crossfade when crossfadeDuration seconds remaining
+    if (timeRemaining > 0 && timeRemaining <= crossfadeDuration + 0.5) {
+        const triggerTime = (timeRemaining - crossfadeDuration) * 1000;
+        
+        if (triggerTime > 0) {
+            crossfadeTimer = setTimeout(() => {
+                startCrossfade();
+            }, triggerTime);
+        }
+    }
+}
+
 // Update progress bar
 function updateProgress() {
-    if (!audioPlayer.duration) return;
+    const currentPlayer = getActivePlayer();
+    if (!currentPlayer || !currentPlayer.duration || !isFinite(currentPlayer.duration)) return;
     
-    const percent = (audioPlayer.currentTime / audioPlayer.duration) * 100;
-    document.getElementById('progressFill').style.width = percent + '%';
-    document.getElementById('progressHandle').style.left = percent + '%';
-    document.getElementById('currentTime').textContent = formatTime(audioPlayer.currentTime);
+    const percent = Math.min(100, Math.max(0, (currentPlayer.currentTime / currentPlayer.duration) * 100));
+    
+    const progressFill = document.getElementById('progressFill');
+    const progressHandle = document.getElementById('progressHandle');
+    const currentTime = document.getElementById('currentTime');
+    
+    if (progressFill) progressFill.style.width = percent + '%';
+    if (progressHandle) progressHandle.style.left = percent + '%';
+    if (currentTime) currentTime.textContent = formatTime(currentPlayer.currentTime);
+    
+    // Monitor for crossfade trigger point
+    if (crossfadeEnabled && isPlaying) {
+        monitorForCrossfade();
+    }
 }
 
 // Update duration display
 function updateDuration() {
-    document.getElementById('totalTime').textContent = formatTime(audioPlayer.duration);
+    const currentPlayer = getActivePlayer();
+    document.getElementById('totalTime').textContent = formatTime(currentPlayer.duration);
 }
 
 // Seek to position
 function seekTo(e) {
-    if (!audioPlayer.duration) return;
+    const currentPlayer = getActivePlayer();
+    if (!currentPlayer || !currentPlayer.duration || !isFinite(currentPlayer.duration)) return;
     
     const progressBar = document.getElementById('progressBar');
+    if (!progressBar) return;
+    
     const rect = progressBar.getBoundingClientRect();
-    const percent = (e.clientX - rect.left) / rect.width;
-    audioPlayer.currentTime = percent * audioPlayer.duration;
+    if (!rect || !rect.width) return;
+    
+    const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const newTime = percent * currentPlayer.duration;
+    
+    if (isFinite(newTime)) {
+        currentPlayer.currentTime = newTime;
+    }
 }
 
 // Set volume
@@ -1876,7 +2482,9 @@ function toggleMute() {
 // Update volume icon
 function updateVolumeIcon() {
     const icon = document.querySelector('#volumeBtn i');
-    const volume = audioPlayer.volume;
+    if (!icon) return;
+    
+    const volume = currentVolume;
     
     if (volume === 0) {
         icon.className = 'fas fa-volume-mute';
@@ -1898,7 +2506,11 @@ function updateVolumePercentage(volume = audioPlayer?.volume ?? currentVolume) {
 function applyVolumeToUI(volume) {
     const next = Math.max(0, Math.min(1, Number(volume) || 0));
     currentVolume = next;
-    audioPlayer.volume = next;
+    
+    // Update both players' base volume (active player might be fading)
+    if (!fadeIntervals.A) audioPlayer.volume = next;
+    if (!fadeIntervals.B) audioPlayerB.volume = next;
+    
     document.getElementById('volumeFill').style.width = (next * 100) + '%';
     updateVolumePercentage(next);
     updateVolumeIcon();
@@ -2361,6 +2973,11 @@ function setupEventListeners() {
         recentlyPlayedNav.addEventListener('click', showRecentlyPlayed);
     }
 
+    const smartPlaylistsNav = document.getElementById('smartPlaylistsNav');
+    if (smartPlaylistsNav) {
+        smartPlaylistsNav.addEventListener('click', showSmartPlaylists);
+    }
+
     // Theme toggle
     document.getElementById('themeToggle').addEventListener('click', toggleTheme);
 
@@ -2509,6 +3126,96 @@ function setupEventListeners() {
             }
         });
     }
+    
+    const smartPlaylistCloseBtn = document.getElementById('smartPlaylistCloseBtn');
+    if (smartPlaylistCloseBtn) {
+        smartPlaylistCloseBtn.addEventListener('click', closeSmartPlaylistModal);
+    }
+    
+    const smartPlaylistForm = document.getElementById('smartPlaylistForm');
+    if (smartPlaylistForm) {
+        smartPlaylistForm.addEventListener('submit', createSmartPlaylist);
+    }
+    
+    const addSmartRuleBtn = document.getElementById('addSmartRuleBtn');
+    if (addSmartRuleBtn) {
+        addSmartRuleBtn.addEventListener('click', addSmartPlaylistRule);
+    }
+
+    // Modern Folder Browser Controls
+    const folderBrowserCloseBtn = document.getElementById('folderBrowserCloseBtn');
+    if (folderBrowserCloseBtn) {
+        folderBrowserCloseBtn.addEventListener('click', closeFolderBrowser);
+    }
+
+    const folderBrowserCancelBtn = document.getElementById('folderBrowserCancelBtn');
+    if (folderBrowserCancelBtn) {
+        folderBrowserCancelBtn.addEventListener('click', closeFolderBrowser);
+    }
+
+    const folderBrowserSelectBtn = document.getElementById('folderBrowserSelectBtn');
+    if (folderBrowserSelectBtn) {
+        folderBrowserSelectBtn.addEventListener('click', folderBrowserSelectFolder);
+    }
+
+    const folderBrowserUpBtn = document.getElementById('folderBrowserUpBtn');
+    if (folderBrowserUpBtn) {
+        folderBrowserUpBtn.addEventListener('click', folderBrowserGoUp);
+    }
+
+    const folderBrowserRefreshBtn = document.getElementById('folderBrowserRefreshBtn');
+    if (folderBrowserRefreshBtn) {
+        folderBrowserRefreshBtn.addEventListener('click', () => {
+            loadFolderBrowserDirectory(folderBrowserState.currentPath);
+        });
+    }
+
+    // M3U Import event listeners
+    const importM3UBtn = document.getElementById('importM3UBtn');
+    if (importM3UBtn) {
+        importM3UBtn.addEventListener('click', openImportM3UModal);
+    }
+
+    const importM3UCloseBtn = document.getElementById('importM3UCloseBtn');
+    if (importM3UCloseBtn) {
+        importM3UCloseBtn.addEventListener('click', closeImportM3UModal);
+    }
+
+    const importM3UForm = document.getElementById('importM3UForm');
+    if (importM3UForm) {
+        importM3UForm.addEventListener('submit', importM3UPlaylist);
+    }
+
+    const methodBtns = document.querySelectorAll('.method-btn');
+    methodBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            toggleImportMethod(btn.dataset.method);
+        });
+    });
+
+    const m3uFileInput = document.getElementById('m3uFileInput');
+    if (m3uFileInput) {
+        m3uFileInput.addEventListener('change', handleFileSelect);
+    }
+
+    const fileInputDisplay = document.getElementById('fileInputDisplay');
+    if (fileInputDisplay) {
+        fileInputDisplay.addEventListener('click', () => {
+            document.getElementById('m3uFileInput').click();
+        });
+    }
+
+    const importGenreSelect = document.getElementById('importGenreSelect');
+    if (importGenreSelect) {
+        importGenreSelect.addEventListener('change', (e) => {
+            const newGenreRow = document.getElementById('newGenreNameRow');
+            if (e.target.value === '__new__') {
+                newGenreRow.classList.remove('hidden');
+            } else {
+                newGenreRow.classList.add('hidden');
+            }
+        });
+    }
 
     const breadcrumb = document.getElementById('breadcrumb');
     if (breadcrumb) {
@@ -2549,6 +3256,8 @@ function setupEventListeners() {
                 playTrackFromRecent(index);
             } else if (action === 'play-list') {
                 playTrackFromList(index);
+            } else if (action === 'play-smart') {
+                playTrackFromSmart(index);
             }
         });
     }
@@ -3736,6 +4445,518 @@ function showError() {
         </div>
     `;
 }
+
+// Smart Playlists Functions
+function loadSmartPlaylists() {
+    try {
+        const raw = localStorage.getItem(SMART_PLAYLISTS_STORAGE_KEY);
+        if (!raw) {
+            smartPlaylists = getDefaultSmartPlaylists();
+            saveSmartPlaylists();
+            return;
+        }
+        
+        const parsed = JSON.parse(raw);
+        smartPlaylists = Array.isArray(parsed) ? parsed : getDefaultSmartPlaylists();
+    } catch (error) {
+        console.warn('Failed to load smart playlists:', error);
+        smartPlaylists = getDefaultSmartPlaylists();
+    }
+}
+
+function saveSmartPlaylists() {
+    try {
+        localStorage.setItem(SMART_PLAYLISTS_STORAGE_KEY, JSON.stringify(smartPlaylists));
+    } catch (error) {
+        console.warn('Failed to save smart playlists:', error);
+    }
+}
+
+function getDefaultSmartPlaylists() {
+    return [
+        {
+            id: 'smart-high-energy',
+            name: 'High Energy Workout',
+            icon: 'fa-dumbbell',
+            color: '#f97316',
+            matchType: 'all',
+            rules: [
+                { field: 'bpm', operator: 'greater', value: '120' }
+            ]
+        },
+        {
+            id: 'smart-classics',
+            name: 'Classic Oldies',
+            icon: 'fa-compact-disc',
+            color: '#3b82f6',
+            matchType: 'all',
+            rules: [
+                { field: 'year', operator: 'less', value: '1990' }
+            ]
+        },
+        {
+            id: 'smart-recent',
+            name: 'Recently Added',
+            icon: 'fa-clock',
+            color: '#10b981',
+            matchType: 'all',
+            rules: [
+                { field: 'addedDays', operator: 'less', value: '30' }
+            ]
+        }
+    ];
+}
+
+function evaluateSmartPlaylistRule(track, rule) {
+    const field = rule.field;
+    const operator = rule.operator;
+    const value = rule.value;
+    
+    switch (field) {
+        case 'bpm':
+            const trackBpm = Number(track.bpm) || 0;
+            const targetBpm = Number(value) || 0;
+            if (operator === 'greater') return trackBpm > targetBpm;
+            if (operator === 'less') return trackBpm < targetBpm;
+            if (operator === 'equals') return trackBpm === targetBpm;
+            break;
+            
+        case 'year':
+            const trackYear = Number(track.year) || 0;
+            const targetYear = Number(value) || 0;
+            if (operator === 'greater') return trackYear > targetYear;
+            if (operator === 'less') return trackYear < targetYear;
+            if (operator === 'equals') return trackYear === targetYear;
+            break;
+            
+        case 'mood':
+            if (operator === 'equals') return String(track.mood || '').toLowerCase() === String(value || '').toLowerCase();
+            if (operator === 'contains') return String(track.mood || '').toLowerCase().includes(String(value || '').toLowerCase());
+            break;
+            
+        case 'genre':
+            const trackGenre = String(track.genre || '').toLowerCase();
+            const targetGenre = String(value || '').toLowerCase();
+            if (operator === 'equals') return trackGenre === targetGenre;
+            if (operator === 'contains') return trackGenre.includes(targetGenre);
+            break;
+            
+        case 'title':
+            const trackTitle = String(track.title || '').toLowerCase();
+            const targetTitle = String(value || '').toLowerCase();
+            if (operator === 'contains') return trackTitle.includes(targetTitle);
+            break;
+            
+        case 'artist':
+            const trackArtist = String(track.artist || '').toLowerCase();
+            const targetArtist = String(value || '').toLowerCase();
+            if (operator === 'contains') return trackArtist.includes(targetArtist);
+            break;
+            
+        case 'tags':
+            const trackTags = Array.isArray(track.tags) ? track.tags.join(' ').toLowerCase() : '';
+            const targetTag = String(value || '').toLowerCase();
+            if (operator === 'contains') return trackTags.includes(targetTag);
+            break;
+    }
+    
+    return false;
+}
+
+function evaluateSmartPlaylist(smartPlaylist) {
+    const allTracks = getAllTracksWithContext();
+    const matchType = smartPlaylist.matchType || 'all';
+    const rules = smartPlaylist.rules || [];
+    
+    if (rules.length === 0) return [];
+    
+    return allTracks.filter(track => {
+        if (matchType === 'all') {
+            return rules.every(rule => evaluateSmartPlaylistRule(track, rule));
+        } else {
+            return rules.some(rule => evaluateSmartPlaylistRule(track, rule));
+        }
+    });
+}
+
+function showSmartPlaylists() {
+    currentView = 'smart';
+    selectedGenre = null;
+    
+    setActiveMainNav('smartPlaylistsNav');
+    setActiveGenreItem(null);
+    
+    if (searchQuery.trim()) {
+        performSearch();
+        updateWorkspaceStatus();
+        return;
+    }
+    
+    clearGlobalSearchState();
+    
+    renderBreadcrumb([
+        { label: 'Genre Library', action: 'show-all' },
+        { label: 'Smart Playlists', current: true }
+    ]);
+    document.getElementById('pageTitle').textContent = 'Smart Playlists';
+    document.getElementById('pageSubtitle').textContent = 'AI-generated playlists based on your music rules';
+    
+    renderSmartPlaylists();
+    updateStatsForSmartPlaylists();
+    updateWorkspaceStatus();
+}
+
+function renderSmartPlaylists() {
+    const grid = document.getElementById('folderGrid');
+    grid.innerHTML = '';
+    
+    smartPlaylists.forEach((smartPlaylist, index) => {
+        const matchingTracks = evaluateSmartPlaylist(smartPlaylist);
+        const totalSeconds = matchingTracks.reduce((sum, track) => sum + parseTrackDurationToSeconds(track.duration), 0);
+        const duration = formatQueueDuration(totalSeconds);
+        
+        const card = document.createElement('div');
+        card.className = 'playlist-card fade-in';
+        card.style.animationDelay = `${index * 0.1}s`;
+        card.style.setProperty('--card-color', smartPlaylist.color || '#6366f1');
+        
+        const playlistImages = matchingTracks.slice(0, 4).map(t => t.cover).filter(Boolean);
+        const safeImages = (playlistImages.length ? playlistImages : [DEFAULT_COVER, DEFAULT_COVER, DEFAULT_COVER, DEFAULT_COVER]).slice(0, 4);
+        const imagesHTML = safeImages.map(img => `<img src="${sanitizeImageUrl(img)}" alt="Album cover">`).join('');
+        
+        card.innerHTML = `
+            <div class="playlist-card-actions">
+                <button class="playlist-action-btn delete-smart-playlist-btn" title="Delete Smart Playlist" data-smart-id="${smartPlaylist.id}">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+            <div class="play-overlay">
+                <div class="play-btn">
+                    <i class="fas fa-play"></i>
+                </div>
+            </div>
+            <div class="card-icon" style="background: linear-gradient(135deg, ${smartPlaylist.color || '#6366f1'}22, ${smartPlaylist.color || '#6366f1'}11);">
+                <i class="fas ${smartPlaylist.icon || 'fa-brain'}" style="color: ${smartPlaylist.color || '#6366f1'}"></i>
+            </div>
+            <h3 class="card-title">${escapeHtml(smartPlaylist.name)}</h3>
+            <p class="card-description">${smartPlaylist.rules.length} rule${smartPlaylist.rules.length === 1 ? '' : 's'} · ${smartPlaylist.matchType === 'all' ? 'Match ALL' : 'Match ANY'}</p>
+            <div class="image-grid">
+                ${imagesHTML}
+            </div>
+            <div class="card-stats">
+                <div class="card-stat">
+                    <i class="fas fa-music"></i>
+                    <span>${matchingTracks.length} tracks</span>
+                </div>
+                <div class="card-stat">
+                    <i class="far fa-clock"></i>
+                    <span>${duration}</span>
+                </div>
+            </div>
+        `;
+        
+        const playOverlay = card.querySelector('.play-overlay');
+        playOverlay.addEventListener('click', (e) => {
+            e.stopPropagation();
+            playSmartPlaylist(smartPlaylist);
+        });
+        
+        const deleteBtn = card.querySelector('.delete-smart-playlist-btn');
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                deleteSmartPlaylist(smartPlaylist.id);
+            });
+        }
+        
+        card.addEventListener('click', (e) => {
+            if (!e.target.closest('.play-overlay') && !e.target.closest('.playlist-card-actions')) {
+                showSmartPlaylistTracks(smartPlaylist);
+            }
+        });
+        
+        grid.appendChild(card);
+    });
+    
+    // Add "Create New" card
+    const createCard = document.createElement('div');
+    createCard.className = 'playlist-card fade-in create-new-card';
+    createCard.style.animationDelay = `${smartPlaylists.length * 0.1}s`;
+    createCard.innerHTML = `
+        <div class="card-icon" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(99, 102, 241, 0.1));">
+            <i class="fas fa-plus" style="color: #6366f1;"></i>
+        </div>
+        <h3 class="card-title">Create Smart Playlist</h3>
+        <p class="card-description">Auto-updating playlists based on rules</p>
+    `;
+    createCard.addEventListener('click', openSmartPlaylistModal);
+    grid.appendChild(createCard);
+}
+
+function updateStatsForSmartPlaylists() {
+    const statsBar = document.getElementById('statsBar');
+    const totalPlaylists = smartPlaylists.length;
+    const totalTracks = smartPlaylists.reduce((sum, sp) => sum + evaluateSmartPlaylist(sp).length, 0);
+    
+    statsBar.innerHTML = `
+        <div class="stat-item">
+            <i class="fas fa-brain"></i>
+            <div>
+                <div class="stat-value">${totalPlaylists}</div>
+                <div class="stat-label">Smart Playlists</div>
+            </div>
+        </div>
+        <div class="stat-item">
+            <i class="fas fa-music"></i>
+            <div>
+                <div class="stat-value">${totalTracks}</div>
+                <div class="stat-label">Matching Tracks</div>
+            </div>
+        </div>
+        <div class="stat-item">
+            <i class="fas fa-magic"></i>
+            <div>
+                <div class="stat-value">Auto</div>
+                <div class="stat-label">Updates</div>
+            </div>
+        </div>
+    `;
+}
+
+function playSmartPlaylist(smartPlaylist) {
+    const tracks = evaluateSmartPlaylist(smartPlaylist);
+    
+    if (tracks.length === 0) {
+        showNotification(
+            'No Matching Tracks',
+            'This smart playlist has no tracks matching the current rules.',
+            'info'
+        );
+        return;
+    }
+    
+    currentPlaylist = tracks;
+    currentTrackIndex = 0;
+    currentPlaylistContext = {
+        playlistName: smartPlaylist.name,
+        genreName: 'Smart Playlist'
+    };
+    rebuildPlaybackOrder(currentTrackIndex);
+    loadTrack(currentPlaylist[currentTrackIndex]);
+    playTrack();
+}
+
+function showSmartPlaylistTracks(smartPlaylist) {
+    const tracks = evaluateSmartPlaylist(smartPlaylist);
+    currentSmartPlaylistTracks = tracks;
+    
+    renderBreadcrumb([
+        { label: 'Genre Library', action: 'show-all' },
+        { label: 'Smart Playlists', action: 'show-smart' },
+        { label: smartPlaylist.name, current: true }
+    ]);
+    document.getElementById('pageTitle').textContent = smartPlaylist.name;
+    document.getElementById('pageSubtitle').textContent = `Auto-generated · ${tracks.length} matching tracks`;
+    
+    const grid = document.getElementById('folderGrid');
+    grid.innerHTML = '';
+    
+    if (tracks.length === 0) {
+        grid.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-brain"></i>
+                <h3>No Matching Tracks</h3>
+                <p>No tracks in your library match the current rules. Try adjusting the smart playlist criteria.</p>
+            </div>
+        `;
+        return;
+    }
+    
+    const trackList = document.createElement('div');
+    trackList.className = 'track-list-view';
+    
+    tracks.forEach((track, index) => {
+        const trackItem = document.createElement('div');
+        trackItem.className = 'track-row fade-in';
+        trackItem.style.animationDelay = `${index * 0.02}s`;
+        
+        const tags = [track.__playlistName, track.__genreName].filter(Boolean);
+        const tagsHTML = tags.length
+            ? tags.map(tag => `<span class="track-tag">${escapeHtml(tag)}</span>`).join('')
+            : '<span class="track-tag">Smart</span>';
+        
+        trackItem.innerHTML = `
+            <div class="track-number">${index + 1}</div>
+            <img src="${sanitizeImageUrl(track.cover || DEFAULT_COVER)}" alt="${escapeHtml(track.title || 'Track cover')}" class="track-thumb">
+            <div class="track-info">
+                <div class="track-title">${escapeHtml(track.title || 'Unknown Title')}</div>
+                <div class="track-artist">${escapeHtml(track.artist || 'Unknown Artist')}</div>
+            </div>
+            <div class="track-album">${escapeHtml(track.album || track.__playlistName || '—')}</div>
+            <div class="track-meta">
+                ${track.year ? `<span><i class="fas fa-calendar"></i> ${escapeHtml(track.year)}</span>` : ''}
+                ${track.bpm ? `<span><i class="fas fa-drum"></i> ${escapeHtml(track.bpm)} BPM</span>` : ''}
+                ${track.mood ? `<span><i class="far fa-smile"></i> ${escapeHtml(track.mood)}</span>` : ''}
+            </div>
+            <div class="track-tags">${tagsHTML}</div>
+            <div class="track-duration">${escapeHtml(track.duration || '--:--')}</div>
+            <button type="button" class="track-play-btn" data-action="play-smart" data-track-index="${index}">
+                <i class="fas fa-play"></i>
+            </button>
+        `;
+        
+        trackList.appendChild(trackItem);
+    });
+    
+    grid.appendChild(trackList);
+    
+    // Store for playback
+    currentPlaylist = tracks;
+    currentPlaylistContext = {
+        playlistName: smartPlaylist.name,
+        genreName: 'Smart Playlist'
+    };
+    if (currentTrackIndex >= currentPlaylist.length) {
+        currentTrackIndex = 0;
+    }
+    rebuildPlaybackOrder(currentTrackIndex);
+    if (isQueuePanelOpen) {
+        renderQueuePanel();
+    }
+}
+
+function playTrackFromSmart(index) {
+    if (index < 0 || index >= currentSmartPlaylistTracks.length) return;
+    
+    currentPlaylist = currentSmartPlaylistTracks;
+    rebuildPlaybackOrder(index);
+    loadTrack(currentPlaylist[currentTrackIndex]);
+    playTrack();
+}
+
+function deleteSmartPlaylist(id) {
+    smartPlaylists = smartPlaylists.filter(sp => sp.id !== id);
+    saveSmartPlaylists();
+    showSmartPlaylists();
+    showNotification('Smart Playlist Deleted', 'The smart playlist has been removed.', 'success');
+}
+
+function openSmartPlaylistModal() {
+    const modal = document.getElementById('smartPlaylistModal');
+    if (!modal) return;
+    
+    // Reset form
+    document.getElementById('smartPlaylistForm').reset();
+    document.getElementById('smartPlaylistRules').innerHTML = '';
+    
+    // Add one default rule
+    addSmartPlaylistRule();
+    
+    modal.classList.add('show');
+}
+
+function closeSmartPlaylistModal() {
+    const modal = document.getElementById('smartPlaylistModal');
+    if (!modal) return;
+    modal.classList.remove('show');
+}
+
+let smartRuleCounter = 0;
+
+function addSmartPlaylistRule() {
+    const rulesContainer = document.getElementById('smartPlaylistRules');
+    const ruleId = ++smartRuleCounter;
+    
+    const ruleDiv = document.createElement('div');
+    ruleDiv.className = 'smart-rule';
+    ruleDiv.dataset.ruleId = ruleId;
+    
+    ruleDiv.innerHTML = `
+        <select class="smart-rule-field">
+            <option value="bpm">BPM</option>
+            <option value="year">Year</option>
+            <option value="mood">Mood</option>
+            <option value="genre">Genre</option>
+            <option value="title">Title</option>
+            <option value="artist">Artist</option>
+            <option value="tags">Tags</option>
+        </select>
+        <select class="smart-rule-operator">
+            <option value="greater">Greater than</option>
+            <option value="less">Less than</option>
+            <option value="equals">Equals</option>
+            <option value="contains">Contains</option>
+        </select>
+        <input type="text" class="smart-rule-value" placeholder="Value">
+        <button type="button" class="smart-rule-remove" title="Remove Rule">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    
+    const removeBtn = ruleDiv.querySelector('.smart-rule-remove');
+    removeBtn.addEventListener('click', () => {
+        ruleDiv.remove();
+    });
+    
+    rulesContainer.appendChild(ruleDiv);
+}
+
+function createSmartPlaylist(event) {
+    event.preventDefault();
+    
+    const name = document.getElementById('smartPlaylistNameInput').value.trim();
+    const icon = document.getElementById('smartPlaylistIconInput').value;
+    const matchType = document.getElementById('smartPlaylistMatchType').value;
+    
+    if (!name) {
+        showNotification('Missing Name', 'Please enter a name for the smart playlist.', 'warning');
+        return;
+    }
+    
+    const ruleElements = document.querySelectorAll('.smart-rule');
+    if (ruleElements.length === 0) {
+        showNotification('No Rules', 'Please add at least one rule for the smart playlist.', 'warning');
+        return;
+    }
+    
+    const rules = Array.from(ruleElements).map(ruleEl => ({
+        field: ruleEl.querySelector('.smart-rule-field').value,
+        operator: ruleEl.querySelector('.smart-rule-operator').value,
+        value: ruleEl.querySelector('.smart-rule-value').value.trim()
+    })).filter(rule => rule.value);
+    
+    if (rules.length === 0) {
+        showNotification('Empty Rules', 'Please fill in at least one rule with a value.', 'warning');
+        return;
+    }
+    
+    const newSmartPlaylist = {
+        id: `smart-${Date.now()}`,
+        name,
+        icon,
+        color: '#6366f1',
+        matchType,
+        rules
+    };
+    
+    smartPlaylists.push(newSmartPlaylist);
+    saveSmartPlaylists();
+    closeSmartPlaylistModal();
+    showSmartPlaylists();
+    
+    showNotification(
+        'Smart Playlist Created',
+        `"${name}" will automatically update with ${evaluateSmartPlaylist(newSmartPlaylist).length} matching tracks.`,
+        'success'
+    );
+}
+
+// Initialize waveform on load
+document.addEventListener('DOMContentLoaded', () => {
+    if (typeof initializeProgressWaveform === 'function') {
+        setTimeout(initializeProgressWaveform, 100);
+    }
+});
 
 // Initialize on page load
 window.onload = init;

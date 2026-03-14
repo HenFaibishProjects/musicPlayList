@@ -680,7 +680,83 @@ app.get('/api/genres', async (req, res) => {
     }
 });
 
-// API: Open native folder picker dialog
+// API: Browse directories (for modern folder browser)
+app.get('/api/browse-directories', async (req, res) => {
+    try {
+        const requestedPath = req.query.path || '';
+        const basePath = requestedPath ? path.resolve(requestedPath) : (process.platform === 'win32' ? '' : path.resolve('/'));
+
+        // For Windows, if no path, return available drives
+        if (process.platform === 'win32' && !requestedPath) {
+            const drives = [];
+            for (let i = 65; i <= 90; i++) {
+                const drive = String.fromCharCode(i) + ':\\';
+                try {
+                    await fs.access(drive);
+                    drives.push({
+                        name: drive,
+                        path: drive,
+                        type: 'drive',
+                        isDirectory: true
+                    });
+                } catch {
+                    // Drive not available
+                }
+            }
+            return res.json({ 
+                path: '', 
+                parent: null, 
+                items: drives 
+            });
+        }
+
+        // Check if path exists
+        try {
+            const stat = await fs.stat(basePath);
+            if (!stat.isDirectory()) {
+                return res.status(400).json({ error: 'Path is not a directory' });
+            }
+        } catch (error) {
+            if (error.code === 'ENOENT') {
+                return res.status(404).json({ error: 'Path not found' });
+            }
+            throw error;
+        }
+
+        // Read directory contents
+        const entries = await fs.readdir(basePath, { withFileTypes: true });
+        const items = [];
+
+        for (const entry of entries) {
+            if (entry.isDirectory()) {
+                const fullPath = path.join(basePath, entry.name);
+                items.push({
+                    name: entry.name,
+                    path: fullPath,
+                    type: 'folder',
+                    isDirectory: true
+                });
+            }
+        }
+
+        // Sort folders alphabetically
+        items.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+
+        // Determine parent path
+        const parentPath = basePath !== path.parse(basePath).root ? path.dirname(basePath) : null;
+
+        res.json({
+            path: basePath,
+            parent: parentPath,
+            items
+        });
+    } catch (error) {
+        console.error('Error browsing directories:', error);
+        res.status(500).json({ error: error.message || 'Failed to browse directories' });
+    }
+});
+
+// API: Open native folder picker dialog (legacy fallback)
 app.get('/api/select-folder', async (req, res) => {
     try {
         const selectedPath = await openFolderPicker();
