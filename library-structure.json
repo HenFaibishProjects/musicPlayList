@@ -7,6 +7,7 @@
         "name": "111sadsadsad1",
         "icon": "fa-headphones",
         "color": "#2f47c1",
+        "imageUrl": null,
         "description": "sadsa",
         "subfolders": [
           {
@@ -26,6 +27,7 @@
         "name": "70'sabc",
         "icon": "fa-music",
         "color": "#6366f1",
+        "imageUrl": null,
         "description": "",
         "subfolders": [
           {
@@ -55,6 +57,7 @@
         "name": "sss",
         "icon": "fa-music",
         "color": "#6366f1",
+        "imageUrl": null,
         "description": "",
         "subfolders": [
           {
@@ -68,6 +71,15 @@
             "images": []
           }
         ]
+      },
+      {
+        "id": "genre-test1-mmqarr32",
+        "name": "test1",
+        "icon": "fa-music",
+        "color": "#6366f1",
+        "imageUrl": null,
+        "description": "",
+        "subfolders": []
       }
     ]
   }

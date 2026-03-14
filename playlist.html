@@ -24,7 +24,7 @@
                 <div class="nav-section">
                     <div class="nav-item active" id="allGenresNav">
                         <i class="fas fa-th-large"></i>
-                        <span>Show All</span>
+                        <span>Genre Library</span>
                     </div>
                     <div class="nav-item" id="favoritesNav">
                         <i class="fas fa-star"></i>
@@ -37,7 +37,7 @@
                 </div>
 
                 <div class="nav-section">
-                    <div class="nav-title">Available Libraries</div>
+                    <div class="nav-title">Available Genre Libraries</div>
                     <div class="genre-list" id="genreList">
                         <!-- Dynamically populated -->
                     </div>
@@ -49,13 +49,17 @@
         <main class="main-content">
             <section class="workspace-strip" id="workspaceStrip">
                 <div class="workspace-title-wrap">
-                    <p class="workspace-overline">Enterprise Workspace</p>
-                    <h3 class="workspace-title">MusicVault Control Center</h3>
+                    <p class="workspace-overline">Your Music Space</p>
+                    <h3 class="workspace-title">MusicVault</h3>
                 </div>
                 <div class="workspace-chips" id="workspaceChips">
                     <span class="workspace-chip" id="apiStatusChip">
                         <i class="fas fa-plug-circle-xmark"></i>
                         <span>API Offline</span>
+                    </span>
+                    <span class="workspace-chip" id="playbackStatusChip">
+                        <i class="fas fa-circle-play"></i>
+                        <span>Ready</span>
                     </span>
                     <span class="workspace-chip" id="viewStatusChip">
                         <i class="fas fa-th-large"></i>
@@ -74,7 +78,7 @@
 
             <div class="header">
                 <div class="breadcrumb" id="breadcrumb">
-                    <span>Available Libraries</span>
+                    <span>Available Genre Libraries</span>
                 </div>
                 <div class="page-title">
                     <h2 id="pageTitle">All Genres</h2>
@@ -99,19 +103,19 @@
                 <div class="visualizer-header">
                     <div class="viz-title-wrap">
                         <h4 class="viz-title">Live Visualizer</h4>
-                        <p class="viz-subtitle">Realtime spectrum</p>
+                        <p class="viz-subtitle">Reactive neon motion</p>
                     </div>
                     <div class="viz-controls">
-                        <button class="viz-type-btn active" data-viz-type="bars" title="Bars">
+                        <button class="viz-type-btn active" data-viz-type="bars" title="Spectrum Bars">
                             <i class="fas fa-chart-bar"></i>
                         </button>
-                        <button class="viz-type-btn" data-viz-type="wave" title="Waveform">
+                        <button class="viz-type-btn" data-viz-type="wave" title="Flow Wave">
                             <i class="fas fa-wave-square"></i>
                         </button>
-                        <button class="viz-type-btn" data-viz-type="circular" title="Circular">
+                        <button class="viz-type-btn" data-viz-type="circular" title="Halo Ring">
                             <i class="fas fa-circle-notch"></i>
                         </button>
-                        <button class="viz-type-btn" data-viz-type="particles" title="Particles">
+                        <button class="viz-type-btn" data-viz-type="particles" title="Pulse Particles">
                             <i class="fas fa-fire"></i>
                         </button>
                     </div>
@@ -130,7 +134,7 @@
                     type="text" 
                     class="search-box" 
                     id="searchInput"
-                    placeholder="Search playlists, genres, or artists..."
+                    placeholder="Search songs, playlists, artists, or genres..."
                     autocomplete="off"
                 >
                 <i class="fas fa-times clear-search" id="clearSearch"></i>
@@ -149,13 +153,17 @@
                     </div>
                 </div>
                 <div class="toolbar-right">
-                    <div class="btn" id="manageLibraryBtn" title="Add genres and playlist folders">
+                    <div class="btn" id="openAddGenreBtn" title="Create a new genre">
+                        <i class="fas fa-layer-group"></i>
+                        <span>Add Genre</span>
+                    </div>
+                    <div class="btn" id="openAddPlaylistBtn" title="Map a folder to an existing genre">
                         <i class="fas fa-folder-plus"></i>
-                        <span>Manage Library</span>
+                        <span>Add Playlist</span>
                     </div>
                     <div class="btn" id="rescanBtn" title="Rescan all playlist folders for songs">
                         <i class="fas fa-rotate"></i>
-                        <span>Rescan Library</span>
+                        <span>Rescan Playlist Libraries</span>
                     </div>
                     <div class="btn active" id="gridViewBtn">
                         <i class="fas fa-th"></i>
@@ -175,7 +183,7 @@
             <div class="folder-grid" id="folderGrid">
                 <div class="loading">
                     <div class="spinner"></div>
-                    <p>Loading your music library...</p>
+                    <p>Loading your genre and playlist libraries...</p>
                 </div>
             </div>
         </main>
@@ -258,61 +266,119 @@
         </div>
     </div>
 
-    <!-- Library Manager Modal -->
-    <div class="modal" id="libraryManagerModal">
-        <div class="modal-content library-manager-content">
-            <div class="modal-header">
-                <h3><i class="fas fa-diagram-project"></i> Library Structure Manager</h3>
-                <button class="modal-close" id="libraryManagerCloseBtn" title="Close">
+    <!-- Add Genre Modal -->
+    <div class="modal" id="addGenreModal">
+        <div class="modal-content library-manager-content add-genre-content">
+            <div class="modal-header library-modal-header">
+                <div class="library-modal-heading">
+                    <span class="library-modal-kicker">Genre Governance</span>
+                    <h3><i class="fas fa-layer-group"></i> Add Genre</h3>
+                    <p>Create reusable genre categories with optional artwork and descriptions.</p>
+                </div>
+                <button class="modal-close" id="addGenreModalCloseBtn" title="Close">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
             <div class="modal-body library-manager-body">
-                <div class="device-selector-info">
-                    <i class="fas fa-info-circle"></i>
-                    <p>Add a playlist and type its genre name. If the genre does not exist yet, it will be created automatically.</p>
-                </div>
+                <div class="library-manager-layout single-column-layout">
+                    <div class="library-side-note inline-note">
+                        <i class="fas fa-circle-info"></i>
+                        <p>After adding a genre, use the separate Add Playlist window to map folders to your new category.</p>
+                    </div>
 
-                <div class="library-manager-grid">
-                    <form id="addPlaylistForm" class="library-form-card">
-                        <h4><i class="fas fa-folder-tree"></i> Add Playlist Folder</h4>
-                        <div class="library-form-row">
-                            <label for="playlistGenreInput">Genre (text) *</label>
-                            <input type="text" id="playlistGenreInput" placeholder="Example: Electronic" required>
-                        </div>
-                        <div class="library-form-row">
-                            <label for="playlistNameInput">Playlist Name *</label>
-                            <input type="text" id="playlistNameInput" placeholder="Example: Chill House" required>
-                        </div>
-                        <div class="library-form-row">
-                            <label for="playlistArtistsInput">Artists</label>
-                            <input type="text" id="playlistArtistsInput" placeholder="Various Artists">
-                        </div>
-                        <div class="library-form-row">
-                            <label for="playlistPathInput">Folder Path *</label>
-                            <div class="library-path-row">
-                                <input type="text" id="playlistPathInput" placeholder="Path..." required>
-                                <button type="button" class="btn" id="browseFolderPathBtn" title="Browse folder">
-                                    <i class="fas fa-folder-open"></i>
-                                    <span>Browse</span>
-                                </button>
+                    <div class="library-manager-grid">
+                        <form id="addGenreForm" class="library-form-card">
+                            <h4><i class="fas fa-layer-group"></i> Add Genre</h4>
+                            <p class="library-form-subtitle">Create a reusable genre with optional artwork so your genre library feels curated and visual.</p>
+                            <div class="library-form-row">
+                                <label for="genreNameInput">Genre Name *</label>
+                                <input type="text" id="genreNameInput" placeholder="Example: Ambient" required>
                             </div>
-                        </div>
-                        <div class="library-form-row">
-                            <label for="playlistCoverInput">Cover Image URL (optional)</label>
-                            <input type="url" id="playlistCoverInput" placeholder="https://...">
-                        </div>
-                        <div class="library-form-row library-checkbox-row">
-                            <label class="library-checkbox-label" for="playlistFavoriteInput">
-                                <input type="checkbox" id="playlistFavoriteInput">
-                                <span><i class="fas fa-star"></i> Add to Favorites</span>
-                            </label>
-                        </div>
-                        <button type="submit" class="btn library-submit-btn">
-                            <i class="fas fa-folder-plus"></i>
-                            <span>Add Playlist Folder</span>
-                        </button>
-                    </form>
+                            <div class="library-form-row">
+                                <label for="genreImageInput">Genre Photo URL</label>
+                                <input type="url" id="genreImageInput" placeholder="https://...">
+                            </div>
+                            <div class="library-form-row">
+                                <label for="genreDescriptionInput">Description</label>
+                                <input type="text" id="genreDescriptionInput" placeholder="Calm, atmospheric textures">
+                            </div>
+                            <button type="submit" class="btn library-submit-btn">
+                                <i class="fas fa-plus-circle"></i>
+                                <span>Add Genre</span>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Playlist Modal -->
+    <div class="modal" id="addPlaylistModal">
+        <div class="modal-content library-manager-content add-playlist-content">
+            <div class="modal-header library-modal-header">
+                <div class="library-modal-heading">
+                    <span class="library-modal-kicker">Playlist Governance</span>
+                    <h3><i class="fas fa-folder-tree"></i> Add Playlist Folder</h3>
+                    <p>Map a local folder path to one of your existing genres.</p>
+                </div>
+                <button class="modal-close" id="addPlaylistModalCloseBtn" title="Close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body library-manager-body">
+                <div class="library-manager-layout single-column-layout">
+                    <div class="library-side-note inline-note">
+                        <i class="fas fa-circle-info"></i>
+                        <p>Select a genre first. If none exist yet, create one using the Add Genre button on the main toolbar.</p>
+                    </div>
+
+                    <div class="library-manager-grid">
+                        <form id="addPlaylistForm" class="library-form-card">
+                            <h4><i class="fas fa-folder-tree"></i> Playlist Mapping Details</h4>
+                            <p class="library-form-subtitle">Map a folder to one of your existing genres from the curated list.</p>
+                            <div class="library-form-row">
+                                <label for="playlistGenreSelect">Genre *</label>
+                                <select id="playlistGenreSelect" required>
+                                    <option value="">Select a genre</option>
+                                </select>
+                                <div class="library-field-status" id="playlistGenreStatus" role="status" aria-live="polite"></div>
+                            </div>
+                            <div class="library-form-row">
+                                <label for="playlistNameInput">Playlist Name *</label>
+                                <input type="text" id="playlistNameInput" placeholder="Example: Chill House" required>
+                            </div>
+                            <div class="library-form-row">
+                                <label for="playlistArtistsInput">Artists</label>
+                                <input type="text" id="playlistArtistsInput" placeholder="Various Artists">
+                            </div>
+                            <div class="library-form-row">
+                                <label for="playlistPathInput">Folder Path *</label>
+                                <div class="library-path-row">
+                                    <input type="text" id="playlistPathInput" placeholder="Path..." required>
+                                    <button type="button" class="btn" id="browseFolderPathBtn" title="Browse folder">
+                                        <i class="fas fa-folder-open"></i>
+                                        <span>Browse</span>
+                                    </button>
+                                </div>
+                                <div class="library-field-status" id="playlistPathStatus" role="status" aria-live="polite"></div>
+                            </div>
+                            <div class="library-form-row">
+                                <label for="playlistCoverInput">Cover Image URL (optional)</label>
+                                <input type="url" id="playlistCoverInput" placeholder="https://...">
+                            </div>
+                            <div class="library-form-row library-checkbox-row">
+                                <label class="library-checkbox-label" for="playlistFavoriteInput">
+                                    <input type="checkbox" id="playlistFavoriteInput">
+                                    <span><i class="fas fa-star"></i> Add to Favorites</span>
+                                </label>
+                            </div>
+                            <button type="submit" class="btn library-submit-btn">
+                                <i class="fas fa-folder-plus"></i>
+                                <span>Add Playlist Folder</span>
+                            </button>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>
@@ -321,106 +387,117 @@
     <!-- Edit Genre Modal -->
     <div class="modal" id="editGenreModal">
         <div class="modal-content library-manager-content edit-genre-content">
-            <div class="modal-header">
-                <h3><i class="fas fa-pen-to-square"></i> Edit Genre</h3>
+            <div class="modal-header library-modal-header">
+                <div class="library-modal-heading">
+                    <span class="library-modal-kicker">Genre Governance</span>
+                    <h3><i class="fas fa-pen-to-square"></i> Edit Genre</h3>
+                    <p>Refine naming, iconography, artwork, and branding style for this genre across your collection.</p>
+                </div>
                 <button class="modal-close" id="editGenreCloseBtn" title="Close">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
             <div class="modal-body library-manager-body">
-                <div class="device-selector-info">
-                    <i class="fas fa-circle-info"></i>
-                    <p>Update genre name, icon, color, and description. Playlists inside this genre remain unchanged.</p>
-                </div>
+                <div class="library-manager-layout single-column-layout">
+                    <div class="library-side-note inline-note">
+                        <i class="fas fa-circle-info"></i>
+                        <p>Editing genre data will not move or modify existing files. It only updates metadata presentation in the app.</p>
+                    </div>
 
-                <div class="library-manager-grid">
-                    <form id="editGenreForm" class="library-form-card">
-                        <h4><i class="fas fa-layer-group"></i> Genre Details</h4>
-                        <input type="hidden" id="editGenreId">
+                    <div class="library-manager-grid">
+                        <form id="editGenreForm" class="library-form-card">
+                            <h4><i class="fas fa-layer-group"></i> Genre Details</h4>
+                            <p class="library-form-subtitle">Apply polished naming and visual identity settings for this category.</p>
+                            <input type="hidden" id="editGenreId">
 
-                        <div class="library-form-row">
-                            <label for="editGenreNameInput">Genre Name *</label>
-                            <input type="text" id="editGenreNameInput" required>
-                        </div>
-                        <div class="library-form-row">
-    <label>Genre Icon</label>
-    <input type="hidden" id="editGenreIconInput" name="genreIcon" value="fa-music">
+                            <div class="library-form-row">
+                                <label for="editGenreNameInput">Genre Name *</label>
+                                <input type="text" id="editGenreNameInput" required>
+                            </div>
+                            <div class="library-form-row">
+                                <label>Genre Icon</label>
+                                <input type="hidden" id="editGenreIconInput" name="genreIcon" value="fa-music">
 
-    <div class="pro-dropdown" id="genreDropdown">
-        
-        <div class="pro-dropdown-trigger" id="dropdownTrigger">
-            <span class="trigger-content">
-                <i class="fas fa-music" id="selectedIconDisplay"></i>
-                <span id="selectedTextDisplay">Music</span>
-            </span>
-            <i class="fas fa-chevron-down dropdown-arrow"></i> </div>
+                                <div class="pro-dropdown" id="genreDropdown">
+                                    <div class="pro-dropdown-trigger" id="dropdownTrigger">
+                                        <span class="trigger-content">
+                                            <i class="fas fa-music" id="selectedIconDisplay"></i>
+                                            <span id="selectedTextDisplay">Music</span>
+                                        </span>
+                                        <i class="fas fa-chevron-down dropdown-arrow"></i>
+                                    </div>
 
-        <div class="pro-dropdown-menu" id="dropdownMenu">
-            <div class="pro-dropdown-item selected" data-value="fa-music" data-text="Music">
-                <i class="fas fa-music"></i> Music
-            </div>
-            <div class="pro-dropdown-item" data-value="fa-guitar" data-text="Guitar">
-                <i class="fas fa-guitar"></i> Guitar
-            </div>
-            <div class="pro-dropdown-item" data-value="fa-headphones" data-text="Headphones">
-                <i class="fas fa-headphones"></i> Headphones
-            </div>
-            <div class="pro-dropdown-item" data-value="fa-drum" data-text="Drums">
-                <i class="fas fa-drum"></i> Drums
-            </div>
-            <div class="pro-dropdown-item" data-value="fa-compact-disc" data-text="Disc">
-                <i class="fas fa-compact-disc"></i> Disc
-            </div>
-            <div class="pro-dropdown-item" data-value="fa-solid fa-star-of-david" data-text="Star of David">
-                <i class="fa-solid fa-star-of-david"></i> Star of David
-            </div>
-            <div class="pro-dropdown-item" data-value="fa-sharp fa-solid fa-airplay-audio" data-text="Airplay Audio">
-                <i class="fa-sharp fa-solid fa-airplay-audio"></i> Airplay Audio
-            </div>
-            <div class="pro-dropdown-item" data-value="fa-notdog fa-solid fa-address-card" data-text="Address Card">
-                <i class="fa-notdog fa-solid fa-address-card"></i> Address Card
-            </div>
-            <div class="pro-dropdown-item" data-value="fa-brands fa-app-store" data-text="App Store">
-                <i class="fa-brands fa-app-store"></i> App Store
-            </div>
-            <div class="pro-dropdown-item" data-value="fa-solid fa-arrow-up-from-ground-water" data-text="Arrow Ground Water">
-                <i class="fa-solid fa-arrow-up-from-ground-water"></i> Arrow Ground Water
-            </div>
-            <div class="pro-dropdown-item" data-value="fa-brands fa-asymmetrik" data-text="Asymmetrik">
-                <i class="fa-brands fa-asymmetrik"></i> Asymmetrik
-            </div>
-            <div class="pro-dropdown-item" data-value="fa-solid fa-biohazard" data-text="Biohazard">
-                <i class="fa-solid fa-biohazard"></i> Biohazard
-            </div>
-            <div class="pro-dropdown-item" data-value="fa-solid fa-bridge-lock" data-text="Bridge Lock">
-                <i class="fa-solid fa-bridge-lock"></i> Bridge Lock
-            </div>
-            <div class="pro-dropdown-item" data-value="fa-solid fa-burst" data-text="Burst">
-                <i class="fa-solid fa-burst"></i> Burst
-            </div>
-            <div class="pro-dropdown-item" data-value="fa-solid fa-car-on" data-text="Car On">
-                <i class="fa-solid fa-car-on"></i> Car On
-            </div>
-            <div class="pro-dropdown-item" data-value="fa-solid fa-cat" data-text="Cat">
-                <i class="fa-solid fa-cat"></i> Cat
-            </div>
-        </div>
-    </div>
-</div>
-                        <div class="library-form-row">
-                            <label for="editGenreColorInput">Accent Color</label>
-                            <input type="color" id="editGenreColorInput" value="#6366f1">
-                        </div>
-                        <div class="library-form-row">
-                            <label for="editGenreDescriptionInput">Description</label>
-                            <input type="text" id="editGenreDescriptionInput" placeholder="Genre description">
-                        </div>
+                                    <div class="pro-dropdown-menu" id="dropdownMenu">
+                                        <div class="pro-dropdown-item selected" data-value="fa-music" data-text="Music">
+                                            <i class="fas fa-music"></i> Music
+                                        </div>
+                                        <div class="pro-dropdown-item" data-value="fa-guitar" data-text="Guitar">
+                                            <i class="fas fa-guitar"></i> Guitar
+                                        </div>
+                                        <div class="pro-dropdown-item" data-value="fa-headphones" data-text="Headphones">
+                                            <i class="fas fa-headphones"></i> Headphones
+                                        </div>
+                                        <div class="pro-dropdown-item" data-value="fa-drum" data-text="Drums">
+                                            <i class="fas fa-drum"></i> Drums
+                                        </div>
+                                        <div class="pro-dropdown-item" data-value="fa-compact-disc" data-text="Disc">
+                                            <i class="fas fa-compact-disc"></i> Disc
+                                        </div>
+                                        <div class="pro-dropdown-item" data-value="fa-solid fa-star-of-david" data-text="Star of David">
+                                            <i class="fa-solid fa-star-of-david"></i> Star of David
+                                        </div>
+                                        <div class="pro-dropdown-item" data-value="fa-sharp fa-solid fa-airplay-audio" data-text="Airplay Audio">
+                                            <i class="fa-sharp fa-solid fa-airplay-audio"></i> Airplay Audio
+                                        </div>
+                                        <div class="pro-dropdown-item" data-value="fa-notdog fa-solid fa-address-card" data-text="Address Card">
+                                            <i class="fa-notdog fa-solid fa-address-card"></i> Address Card
+                                        </div>
+                                        <div class="pro-dropdown-item" data-value="fa-brands fa-app-store" data-text="App Store">
+                                            <i class="fa-brands fa-app-store"></i> App Store
+                                        </div>
+                                        <div class="pro-dropdown-item" data-value="fa-solid fa-arrow-up-from-ground-water" data-text="Arrow Ground Water">
+                                            <i class="fa-solid fa-arrow-up-from-ground-water"></i> Arrow Ground Water
+                                        </div>
+                                        <div class="pro-dropdown-item" data-value="fa-brands fa-asymmetrik" data-text="Asymmetrik">
+                                            <i class="fa-brands fa-asymmetrik"></i> Asymmetrik
+                                        </div>
+                                        <div class="pro-dropdown-item" data-value="fa-solid fa-biohazard" data-text="Biohazard">
+                                            <i class="fa-solid fa-biohazard"></i> Biohazard
+                                        </div>
+                                        <div class="pro-dropdown-item" data-value="fa-solid fa-bridge-lock" data-text="Bridge Lock">
+                                            <i class="fa-solid fa-bridge-lock"></i> Bridge Lock
+                                        </div>
+                                        <div class="pro-dropdown-item" data-value="fa-solid fa-burst" data-text="Burst">
+                                            <i class="fa-solid fa-burst"></i> Burst
+                                        </div>
+                                        <div class="pro-dropdown-item" data-value="fa-solid fa-car-on" data-text="Car On">
+                                            <i class="fa-solid fa-car-on"></i> Car On
+                                        </div>
+                                        <div class="pro-dropdown-item" data-value="fa-solid fa-cat" data-text="Cat">
+                                            <i class="fa-solid fa-cat"></i> Cat
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="library-form-row">
+                                <label for="editGenreColorInput">Accent Color</label>
+                                <input type="color" id="editGenreColorInput" value="#6366f1">
+                            </div>
+                            <div class="library-form-row">
+                                <label for="editGenreDescriptionInput">Description</label>
+                                <input type="text" id="editGenreDescriptionInput" placeholder="Genre description">
+                            </div>
+                            <div class="library-form-row">
+                                <label for="editGenreImageInput">Genre Photo URL</label>
+                                <input type="url" id="editGenreImageInput" placeholder="https://...">
+                            </div>
 
-                        <button type="submit" class="btn library-submit-btn">
-                            <i class="fas fa-floppy-disk"></i>
-                            <span>Save Genre Changes</span>
-                        </button>
-                    </form>
+                            <button type="submit" class="btn library-submit-btn">
+                                <i class="fas fa-floppy-disk"></i>
+                                <span>Save Genre Changes</span>
+                            </button>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>
@@ -429,60 +506,68 @@
     <!-- Edit Playlist Modal -->
     <div class="modal" id="editPlaylistModal">
         <div class="modal-content library-manager-content edit-playlist-content">
-            <div class="modal-header">
-                <h3><i class="fas fa-pen"></i> Edit Playlist Folder</h3>
+            <div class="modal-header library-modal-header">
+                <div class="library-modal-heading">
+                    <span class="library-modal-kicker">Playlist Governance</span>
+                    <h3><i class="fas fa-pen"></i> Edit Playlist Folder</h3>
+                    <p>Adjust playlist metadata and storage path while preserving your current playlist library structure.</p>
+                </div>
                 <button class="modal-close" id="editPlaylistCloseBtn" title="Close">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
             <div class="modal-body library-manager-body">
-                <div class="device-selector-info">
-                    <i class="fas fa-circle-info"></i>
-                    <p>Update playlist details, folder path, or cover image and save your changes.</p>
-                </div>
+                <div class="library-manager-layout single-column-layout">
+                    <div class="library-side-note inline-note">
+                        <i class="fas fa-circle-info"></i>
+                        <p>Update details safely. Changes are reflected in the mapping layer without altering file contents on disk.</p>
+                    </div>
 
-                <div class="library-manager-grid">
-                    <form id="editPlaylistForm" class="library-form-card">
-                        <h4><i class="fas fa-folder-tree"></i> Edit Playlist Details</h4>
-                        <input type="hidden" id="editPlaylistId">
+                    <div class="library-manager-grid">
+                        <form id="editPlaylistForm" class="library-form-card">
+                            <h4><i class="fas fa-folder-tree"></i> Edit Playlist Details</h4>
+                            <p class="library-form-subtitle">Review and update the playlist profile, then save to apply.</p>
+                            <input type="hidden" id="editPlaylistId">
 
-                        <div class="library-form-row">
-                            <label for="editPlaylistGenreInput">Genre</label>
-                            <input type="text" id="editPlaylistGenreInput" readonly>
-                        </div>
-                        <div class="library-form-row">
-                            <label for="editPlaylistNameInput">Playlist Name *</label>
-                            <input type="text" id="editPlaylistNameInput" required>
-                        </div>
-                        <div class="library-form-row">
-                            <label for="editPlaylistArtistsInput">Artists</label>
-                            <input type="text" id="editPlaylistArtistsInput">
-                        </div>
-                        <div class="library-form-row">
-                            <label for="editPlaylistPathInput">Folder Path *</label>
-                            <div class="library-path-row">
-                                <input type="text" id="editPlaylistPathInput" required>
-                                <button type="button" class="btn" id="editBrowseFolderPathBtn" title="Browse folder">
-                                    <i class="fas fa-folder-open"></i>
-                                    <span>Browse</span>
-                                </button>
+                            <div class="library-form-row">
+                                <label for="editPlaylistGenreInput">Genre</label>
+                                <input type="text" id="editPlaylistGenreInput" readonly>
                             </div>
-                        </div>
-                        <div class="library-form-row">
-                            <label for="editPlaylistCoverInput">Cover Image URL (optional)</label>
-                            <input type="url" id="editPlaylistCoverInput" placeholder="https://...">
-                        </div>
-                        <div class="library-form-row library-checkbox-row">
-                            <label class="library-checkbox-label" for="editPlaylistFavoriteInput">
-                                <input type="checkbox" id="editPlaylistFavoriteInput">
-                                <span><i class="fas fa-star"></i> Mark as Favorite</span>
-                            </label>
-                        </div>
-                        <button type="submit" class="btn library-submit-btn">
-                            <i class="fas fa-floppy-disk"></i>
-                            <span>Save Changes</span>
-                        </button>
-                    </form>
+                            <div class="library-form-row">
+                                <label for="editPlaylistNameInput">Playlist Name *</label>
+                                <input type="text" id="editPlaylistNameInput" required>
+                            </div>
+                            <div class="library-form-row">
+                                <label for="editPlaylistArtistsInput">Artists</label>
+                                <input type="text" id="editPlaylistArtistsInput">
+                            </div>
+                            <div class="library-form-row">
+                                <label for="editPlaylistPathInput">Folder Path *</label>
+                                <div class="library-path-row">
+                                    <input type="text" id="editPlaylistPathInput" required>
+                                    <button type="button" class="btn" id="editBrowseFolderPathBtn" title="Browse folder">
+                                        <i class="fas fa-folder-open"></i>
+                                        <span>Browse</span>
+                                    </button>
+                                </div>
+                                <div class="library-field-status" id="editPlaylistPathStatus" role="status" aria-live="polite"></div>
+                            </div>
+                            <div class="library-form-row">
+                                <label for="editPlaylistCoverInput">Cover Image URL (optional)</label>
+                                <input type="url" id="editPlaylistCoverInput" placeholder="https://...">
+                            </div>
+                            <div class="library-form-row library-checkbox-row">
+                                <label class="library-checkbox-label" for="editPlaylistFavoriteInput">
+                                    <input type="checkbox" id="editPlaylistFavoriteInput">
+                                    <span><i class="fas fa-star"></i> Mark as Favorite</span>
+                                </label>
+                            </div>
+                            <button type="submit" class="btn library-submit-btn">
+                                <i class="fas fa-floppy-disk"></i>
+                                <span>Save Changes</span>
+                            </button>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>
@@ -530,13 +615,13 @@
         </div>
     </div>
 
-    <!-- Enterprise Current Playlist Queue Panel -->
+    <!-- Current Playlist Queue Panel -->
     <div class="queue-panel-overlay" id="queuePanelOverlay">
         <aside class="queue-panel" id="queuePanel">
             <div class="queue-panel-header">
                 <div>
-                    <p class="queue-label">Playback Queue</p>
-                    <h3>Current Playlist</h3>
+                    <p class="queue-label">Up Next</p>
+                    <h3>Current Queue</h3>
                 </div>
                 <button class="queue-close-btn" id="queueCloseBtn" title="Close Queue">
                     <i class="fas fa-times"></i>

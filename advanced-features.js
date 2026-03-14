@@ -312,7 +312,7 @@ async function startUpload() {
     
     showNotification(
         'Upload Complete',
-        `Successfully processed ${uploadQueue.length} audio ${uploadQueue.length === 1 ? 'file' : 'files'}. Your music library has been updated with the new tracks.`,
+        `Successfully processed ${uploadQueue.length} audio ${uploadQueue.length === 1 ? 'file' : 'files'}. Your genre and playlist libraries have been updated with the new tracks.`,
         'success'
     );
     clearQueue();
@@ -442,7 +442,7 @@ function applyBatchEdit() {
     
     showNotification(
         'Batch Edit Complete',
-        `Successfully updated metadata for ${selectedTracks.size} tracks in your library.`,
+        `Successfully updated metadata for ${selectedTracks.size} tracks in your playlist libraries.`,
         'success'
     );
     closeBatchEditor();
@@ -475,7 +475,7 @@ function showSearchHistory() {
     if (searchHistory.length === 0) {
         showNotification(
             'Search History Empty',
-            'You haven\'t performed any searches yet. Try using the advanced filters to search your library, and your searches will be saved here for easy access.',
+            'You haven\'t performed any searches yet. Try using the advanced filters to search your genre and playlist libraries, and your searches will be saved here for easy access.',
             'info'
         );
         return;
@@ -530,7 +530,7 @@ function showSmartPlaylists() {
     
     document.getElementById('breadcrumb').innerHTML = '<span>Smart Playlists</span>';
     document.getElementById('pageTitle').textContent = 'Smart Playlists';
-    document.getElementById('pageSubtitle').textContent = 'AI-generated playlists based on your library';
+    document.getElementById('pageSubtitle').textContent = 'AI-generated playlists based on your genre and playlist libraries';
     
     const smartPlaylists = [
         {

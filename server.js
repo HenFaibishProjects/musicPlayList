@@ -219,6 +219,7 @@ function normalizeLibraryStructure(input) {
                 name: folder.name || 'Unnamed Genre',
                 icon: folder.icon || 'fa-music',
                 color: folder.color || '#6366f1',
+                imageUrl: (typeof folder.imageUrl === 'string' && folder.imageUrl.trim()) ? folder.imageUrl.trim() : null,
                 description: folder.description || '',
                 subfolders: (Array.isArray(folder.subfolders) ? folder.subfolders : []).map(subfolder => ({
                     id: subfolder.id || createId('playlist', subfolder.name || 'playlist'),
@@ -658,6 +659,27 @@ app.get('/api/library-structure', async (req, res) => {
     }
 });
 
+// API: Get genre catalog for dropdowns/forms
+app.get('/api/genres', async (req, res) => {
+    try {
+        const structure = await loadLibraryStructure();
+        const genres = (structure?.library?.folders || []).map(folder => ({
+            id: folder.id,
+            name: folder.name,
+            icon: folder.icon || 'fa-music',
+            color: folder.color || '#6366f1',
+            imageUrl: folder.imageUrl || null,
+            description: folder.description || '',
+            playlistCount: Array.isArray(folder.subfolders) ? folder.subfolders.length : 0
+        }));
+
+        res.json({ genres });
+    } catch (error) {
+        console.error('Error getting genres:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // API: Open native folder picker dialog
 app.get('/api/select-folder', async (req, res) => {
     try {
@@ -729,17 +751,29 @@ app.post('/api/system-volume', async (req, res) => {
 // API: Add genre
 app.post('/api/genres', async (req, res) => {
     try {
-        const { name, icon, color, description } = req.body || {};
+        const { name, icon, color, description, imageUrl } = req.body || {};
         if (!name || typeof name !== 'string' || !name.trim()) {
             return res.status(400).json({ error: 'Genre name is required' });
         }
 
+        const normalizedName = name.trim();
+        const normalizedImageUrl = (typeof imageUrl === 'string') ? imageUrl.trim() : '';
+
         const structure = await loadLibraryStructure();
+        const duplicate = (structure?.library?.folders || []).some(folder =>
+            String(folder?.name || '').trim().toLowerCase() === normalizedName.toLowerCase()
+        );
+
+        if (duplicate) {
+            return res.status(409).json({ error: 'A genre with this name already exists' });
+        }
+
         const newGenre = {
-            id: createId('genre', name),
-            name: name.trim(),
+            id: createId('genre', normalizedName),
+            name: normalizedName,
             icon: icon || 'fa-music',
             color: color || '#6366f1',
+            imageUrl: normalizedImageUrl || null,
             description: description || '',
             subfolders: []
         };
@@ -759,7 +793,7 @@ app.post('/api/genres', async (req, res) => {
 app.patch('/api/genres/:id', async (req, res) => {
     try {
         const genreId = req.params.id;
-        const { name, icon, color, description } = req.body || {};
+        const { name, icon, color, description, imageUrl } = req.body || {};
 
         const structure = await loadLibraryStructure();
         const found = findGenreInStructure(structure, genreId);
@@ -772,8 +806,9 @@ app.patch('/api/genres/:id', async (req, res) => {
         const hasIcon = typeof icon === 'string';
         const hasColor = typeof color === 'string';
         const hasDescription = typeof description === 'string';
+        const hasImageUrl = typeof imageUrl === 'string' || imageUrl === null;
 
-        if (!hasName && !hasIcon && !hasColor && !hasDescription) {
+        if (!hasName && !hasIcon && !hasColor && !hasDescription && !hasImageUrl) {
             return res.status(400).json({ error: 'No genre fields provided to update' });
         }
 
@@ -782,6 +817,16 @@ app.patch('/api/genres/:id', async (req, res) => {
             if (!nextName) {
                 return res.status(400).json({ error: 'Genre name cannot be empty' });
             }
+
+            const duplicate = (structure?.library?.folders || []).some(folder =>
+                folder.id !== genreId &&
+                String(folder?.name || '').trim().toLowerCase() === nextName.toLowerCase()
+            );
+
+            if (duplicate) {
+                return res.status(409).json({ error: 'A genre with this name already exists' });
+            }
+
             found.genre.name = nextName;
         }
 
@@ -797,6 +842,11 @@ app.patch('/api/genres/:id', async (req, res) => {
 
         if (hasDescription) {
             found.genre.description = description.trim();
+        }
+
+        if (hasImageUrl) {
+            const nextImage = typeof imageUrl === 'string' ? imageUrl.trim() : '';
+            found.genre.imageUrl = nextImage || null;
         }
 
         await saveLibraryStructure(structure);
@@ -868,6 +918,7 @@ app.post('/api/playlists', async (req, res) => {
                 name: requestedGenreName,
                 icon: 'fa-music',
                 color: '#6366f1',
+                imageUrl: null,
                 description: '',
                 subfolders: []
             };
@@ -1094,6 +1145,7 @@ app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
     console.log(`\nAPI Endpoints:`);
     console.log(`  GET  /api/library-structure - Get editable library folder structure`);
+    console.log(`  GET  /api/genres           - List existing genres for dropdowns`);
     console.log(`  POST /api/genres            - Create a genre from UI`);
     console.log(`  POST /api/playlists         - Map a playlist to a folder path`);
     console.log(`  GET  /api/library       - Get full library with scanned tracks (cached)`);

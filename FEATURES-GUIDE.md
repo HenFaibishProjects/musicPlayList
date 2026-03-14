@@ -46,7 +46,7 @@ From left to right, you now have:
 
 ## 🎯 Quick Start
 
-1. **Play a song** from your library
+1. **Play a song** from your playlist libraries
 2. **Click the magic wand** (✨) for instant audio enhancement
 3. **Try the "Music" preset** - balanced enhancement
 4. **Click the chart icon** (📊) to see visualizations
