@@ -4,6 +4,33 @@ class AudioDeviceManager {
         this.audio = audioElement;
         this.devices = [];
         this.currentDeviceId = 'default';
+        this.storageKey = 'musicvault.audio.outputDeviceId';
+    }
+
+    getSavedDeviceId() {
+        try {
+            return localStorage.getItem(this.storageKey) || 'default';
+        } catch (error) {
+            console.warn('Could not read saved audio output device:', error);
+            return 'default';
+        }
+    }
+
+    saveDeviceId(deviceId) {
+        try {
+            localStorage.setItem(this.storageKey, deviceId || 'default');
+        } catch (error) {
+            console.warn('Could not save audio output device:', error);
+        }
+    }
+
+    async applyInitialOutputDevice() {
+        const preferredDevice = this.getSavedDeviceId();
+        await this.setAudioDevice(preferredDevice, {
+            persist: false,
+            silent: true,
+            allowFallback: true
+        });
     }
     
     // Get all available audio output devices
@@ -27,29 +54,68 @@ class AudioDeviceManager {
     }
     
     // Set audio output device
-    async setAudioDevice(deviceId) {
+    async setAudioDevice(deviceId, options = {}) {
+        const {
+            persist = true,
+            silent = false,
+            allowFallback = true
+        } = options;
+
+        const targetDeviceId = deviceId || 'default';
+
         try {
             if (typeof this.audio.setSinkId !== 'undefined') {
-                await this.audio.setSinkId(deviceId);
-                this.currentDeviceId = deviceId;
-                console.log(`✅ Audio output set to device: ${deviceId}`);
+                await this.audio.setSinkId(targetDeviceId);
+                this.currentDeviceId = targetDeviceId;
+
+                if (persist) {
+                    this.saveDeviceId(targetDeviceId);
+                }
+
+                console.log(`✅ Audio output set to device: ${targetDeviceId}`);
                 return true;
             } else {
                 console.warn('setSinkId not supported in this browser');
-                showNotification(
-                    'Feature Not Supported',
-                    'Audio device selection is not supported in this browser. Try using Chrome, Edge, or Opera for full audio device control.',
-                    'warning'
-                );
+                if (!silent) {
+                    showNotification(
+                        'Feature Not Supported',
+                        'Audio device selection is not supported in this browser. Try using Chrome, Edge, or Opera for full audio device control.',
+                        'warning'
+                    );
+                }
                 return false;
             }
         } catch (error) {
             console.error('Error setting audio device:', error);
-            showNotification(
-                'Could Not Switch Device',
-                'Unable to switch to the selected audio device. Please check your system audio settings.',
-                'warning'
-            );
+
+            if (allowFallback && targetDeviceId !== 'default' && typeof this.audio.setSinkId !== 'undefined') {
+                try {
+                    await this.audio.setSinkId('default');
+                    this.currentDeviceId = 'default';
+                    if (persist) {
+                        this.saveDeviceId('default');
+                    }
+
+                    if (!silent) {
+                        showNotification(
+                            'Audio Output Reset',
+                            'The selected device is unavailable. Switched back to System Default.',
+                            'warning'
+                        );
+                    }
+                    return true;
+                } catch (fallbackError) {
+                    console.error('Error falling back to default audio device:', fallbackError);
+                }
+            }
+
+            if (!silent) {
+                showNotification(
+                    'Could Not Switch Device',
+                    'Unable to switch to the selected audio device. Please check your system audio settings.',
+                    'warning'
+                );
+            }
             return false;
         }
     }
@@ -71,20 +137,8 @@ async function initAudioDeviceManager() {
     if (!deviceManager) {
         const audio = document.getElementById('audioPlayer');
         deviceManager = new AudioDeviceManager(audio);
+        await deviceManager.applyInitialOutputDevice();
     }
-}
-
-// Open audio device selector
-async function openDeviceSelector() {
-    if (!deviceManager) {
-        await initAudioDeviceManager();
-    }
-    
-    const modal = document.getElementById('deviceSelectorModal');
-    modal.classList.add('show');
-    
-    // Load available devices
-    await loadAudioDevices();
 }
 
 // Close device selector
@@ -144,7 +198,9 @@ async function loadAudioDevices() {
                     '<i class="fas fa-circle device-dot"></i>'}
             `;
             
-            deviceItem.onclick = () => selectAudioDevice(device.deviceId, deviceItem);
+            deviceItem.addEventListener('click', () => {
+                selectAudioDevice(device.deviceId, deviceItem);
+            });
             deviceList.appendChild(deviceItem);
         });
         
@@ -160,7 +216,11 @@ async function loadAudioDevices() {
 
 // Select audio device
 async function selectAudioDevice(deviceId, deviceElement) {
-    const success = await deviceManager.setAudioDevice(deviceId);
+    const success = await deviceManager.setAudioDevice(deviceId, {
+        persist: true,
+        silent: false,
+        allowFallback: true
+    });
     
     if (success) {
         // Update UI
@@ -214,3 +274,32 @@ async function refreshDevices() {
         'success'
     );
 }
+
+window.addEventListener('DOMContentLoaded', () => {
+    initAudioDeviceManager().catch(error => {
+        console.warn('Audio device manager auto-init failed:', error);
+    });
+
+    const closeBtn = document.getElementById('deviceSelectorCloseBtn');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', closeDeviceSelector);
+    }
+
+    const refreshBtn = document.getElementById('refreshDevicesBtn');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', () => {
+            refreshDevices().catch(error => {
+                console.error('Failed to refresh audio devices:', error);
+            });
+        });
+    }
+
+    const modal = document.getElementById('deviceSelectorModal');
+    if (modal) {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                closeDeviceSelector();
+            }
+        });
+    }
+});

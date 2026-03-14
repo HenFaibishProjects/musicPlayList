@@ -1,0 +1,74 @@
+{
+  "library": {
+    "name": "My Music Collection",
+    "folders": [
+      {
+        "id": "genre-11-mmmdsdmg",
+        "name": "111sadsadsad1",
+        "icon": "fa-headphones",
+        "color": "#2f47c1",
+        "description": "sadsa",
+        "subfolders": [
+          {
+            "id": "playlist-122-mmmdsdmg",
+            "name": "122",
+            "artists": "21312",
+            "path": "F:\\music\\Blues and Jazz\\Blues Rock\\Bonnie Raitt - Greatest Hits",
+            "link": "F:\\music\\Blues and Jazz\\Blues Rock\\Bonnie Raitt - Greatest Hits",
+            "isFavorite": true,
+            "coverImage": null,
+            "images": []
+          }
+        ]
+      },
+      {
+        "id": "genre-70-s-mmn3fozh",
+        "name": "70'sabc",
+        "icon": "fa-music",
+        "color": "#6366f1",
+        "description": "",
+        "subfolders": [
+          {
+            "id": "playlist-playname-mmn3km4d",
+            "name": "playname",
+            "artists": "artist",
+            "path": "F:\\music\\Blues and Jazz\\Classic Jazz",
+            "link": "F:\\music\\Blues and Jazz\\Classic Jazz",
+            "isFavorite": false,
+            "coverImage": null,
+            "images": []
+          },
+          {
+            "id": "playlist-newplay-mmn3yq81",
+            "name": "newPlay",
+            "artists": "NewArtist",
+            "path": "F:\\music\\Blues and Jazz\\Blues Rock\\Bonnie Raitt - Greatest Hits",
+            "link": "F:\\music\\Blues and Jazz\\Blues Rock\\Bonnie Raitt - Greatest Hits",
+            "isFavorite": false,
+            "coverImage": null,
+            "images": []
+          }
+        ]
+      },
+      {
+        "id": "genre-sss-mmovfplc",
+        "name": "sss",
+        "icon": "fa-music",
+        "color": "#6366f1",
+        "description": "",
+        "subfolders": [
+          {
+            "id": "playlist-sss-mmovfplc",
+            "name": "sss",
+            "artists": "sss",
+            "path": "F:\\music\\PlayLists\\Genres\\Afro-Pop",
+            "link": "F:\\music\\PlayLists\\Genres\\Afro-Pop",
+            "isFavorite": false,
+            "coverImage": null,
+            "images": []
+          }
+        ]
+      }
+    ]
+  }
+}

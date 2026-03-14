@@ -1,4 +1,4 @@
-// Audio Visualizer & Equalizer System
+// Audio Visualizer System
 class AudioVisualizer {
     constructor(audioElement) {
         this.audio = audioElement;
@@ -9,15 +9,12 @@ class AudioVisualizer {
         this.bufferLength = null;
         this.isInitialized = false;
         
-        // Equalizer
-        this.filters = [];
-        this.gainNode = null;
-        
         // Visualization settings
         this.visualizationType = 'bars'; // bars, wave, circular, particles
         this.canvas = null;
         this.canvasCtx = null;
         this.animationId = null;
+        this.isStopped = false;
     }
     
     // Initialize Web Audio API
@@ -36,39 +33,13 @@ class AudioVisualizer {
             this.analyser.fftSize = 256;
             this.bufferLength = this.analyser.frequencyBinCount;
             this.dataArray = new Uint8Array(this.bufferLength);
-            
-            // Create equalizer filters (10 bands)
-            const frequencies = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
-            frequencies.forEach(freq => {
-                const filter = this.audioContext.createBiquadFilter();
-                filter.type = 'peaking';
-                filter.frequency.value = freq;
-                filter.Q.value = 1;
-                filter.gain.value = 0;
-                this.filters.push(filter);
-            });
-            
-            // Create gain node
-            this.gainNode = this.audioContext.createGain();
-            
-            // Don't connect to destination yet - will be done after effects engine
-            let currentNode = this.source;
-            this.filters.forEach(filter => {
-                currentNode.connect(filter);
-                currentNode = filter;
-            });
-            currentNode.connect(this.gainNode);
-            this.gainNode.connect(this.analyser);
+
+            // Direct processing chain: source -> analyser -> output
+            this.source.connect(this.analyser);
+            this.analyser.connect(this.audioContext.destination);
             
             this.isInitialized = true;
             console.log('🎵 Audio Visualizer initialized');
-            
-            // Initialize effects engine after visualizer
-            setTimeout(() => {
-                if (typeof initAudioEffects === 'function') {
-                    initAudioEffects();
-                }
-            }, 100);
         } catch (error) {
             console.error('Error initializing audio visualizer:', error);
         }
@@ -80,45 +51,24 @@ class AudioVisualizer {
         this.canvasCtx = canvas.getContext('2d');
     }
     
-    // Set equalizer band
-    setEQBand(bandIndex, gain) {
-        if (this.filters[bandIndex]) {
-            this.filters[bandIndex].gain.value = gain;
-        }
-    }
-    
-    // Reset equalizer
-    resetEQ() {
-        this.filters.forEach(filter => {
-            filter.gain.value = 0;
-        });
-    }
-    
-    // Set EQ preset
-    setPreset(preset) {
-        const presets = {
-            flat: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            rock: [5, 4, 3, 1, -1, -1, 0, 2, 4, 5],
-            pop: [-1, -1, 0, 2, 4, 4, 2, 0, -1, -1],
-            jazz: [4, 3, 2, 2, -1, -1, 0, 2, 3, 4],
-            classical: [4, 3, 2, 0, 0, 0, -1, -2, -3, -4],
-            bass: [6, 5, 4, 2, 0, -1, -2, -3, -4, -4],
-            treble: [-4, -4, -3, -2, -1, 0, 2, 4, 5, 6],
-            vocal: [-2, -3, -2, 1, 3, 3, 2, 1, 0, -1]
-        };
-        
-        const values = presets[preset] || presets.flat;
-        values.forEach((gain, index) => {
-            this.setEQBand(index, gain);
-        });
-    }
-    
     // Start visualization
     startVisualization() {
         if (!this.isInitialized) this.initialize();
-        if (!this.canvas) return;
+        if (!this.canvas || !this.analyser || !this.dataArray) return;
+
+        this.isStopped = false;
+
+        if (this.animationId) {
+            cancelAnimationFrame(this.animationId);
+            this.animationId = null;
+        }
         
         const draw = () => {
+            if (this.isStopped) {
+                this.animationId = null;
+                return;
+            }
+
             this.animationId = requestAnimationFrame(draw);
             
             this.analyser.getByteFrequencyData(this.dataArray);
@@ -144,6 +94,7 @@ class AudioVisualizer {
     
     // Stop visualization
     stopVisualization() {
+        this.isStopped = true;
         if (this.animationId) {
             cancelAnimationFrame(this.animationId);
             this.animationId = null;
@@ -161,11 +112,12 @@ class AudioVisualizer {
         let x = 0;
         
         const gradient = canvasCtx.createLinearGradient(0, 0, 0, canvas.height);
-        gradient.addColorStop(0, '#3b82f6');
-        gradient.addColorStop(0.5, '#a855f7');
-        gradient.addColorStop(1, '#f97316');
+        gradient.addColorStop(0, '#00f5ff');
+        gradient.addColorStop(0.35, '#7c3aed');
+        gradient.addColorStop(0.7, '#ff2d95');
+        gradient.addColorStop(1, '#ffe066');
         
-        canvasCtx.fillStyle = 'rgba(10, 10, 15, 0.3)';
+        canvasCtx.fillStyle = 'rgba(8, 10, 20, 0.22)';
         canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
         
         for (let i = 0; i < bufferLength; i++) {
@@ -173,6 +125,11 @@ class AudioVisualizer {
             
             canvasCtx.fillStyle = gradient;
             canvasCtx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+
+            canvasCtx.shadowColor = 'rgba(0, 245, 255, 0.45)';
+            canvasCtx.shadowBlur = 10;
+            canvasCtx.fillRect(x, canvas.height - barHeight, barWidth, Math.max(2, barHeight * 0.08));
+            canvasCtx.shadowBlur = 0;
             
             x += barWidth + 1;
         }
@@ -182,15 +139,17 @@ class AudioVisualizer {
     drawWave() {
         const { canvasCtx, canvas, dataArray, bufferLength } = this;
         
-        canvasCtx.fillStyle = 'rgba(10, 10, 15, 0.3)';
+        canvasCtx.fillStyle = 'rgba(8, 10, 20, 0.18)';
         canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
         
-        canvasCtx.lineWidth = 3;
+        canvasCtx.lineWidth = 3.5;
         const gradient = canvasCtx.createLinearGradient(0, 0, canvas.width, 0);
-        gradient.addColorStop(0, '#3b82f6');
-        gradient.addColorStop(0.5, '#a855f7');
-        gradient.addColorStop(1, '#f97316');
+        gradient.addColorStop(0, '#00f5ff');
+        gradient.addColorStop(0.45, '#8b5cf6');
+        gradient.addColorStop(1, '#ff2d95');
         canvasCtx.strokeStyle = gradient;
+        canvasCtx.shadowColor = 'rgba(139, 92, 246, 0.45)';
+        canvasCtx.shadowBlur = 12;
         
         canvasCtx.beginPath();
         
@@ -211,13 +170,14 @@ class AudioVisualizer {
         }
         
         canvasCtx.stroke();
+        canvasCtx.shadowBlur = 0;
     }
     
     // Draw circular visualization
     drawCircular() {
         const { canvasCtx, canvas, dataArray, bufferLength } = this;
         
-        canvasCtx.fillStyle = 'rgba(10, 10, 15, 0.3)';
+        canvasCtx.fillStyle = 'rgba(8, 10, 20, 0.18)';
         canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
         
         const centerX = canvas.width / 2;
@@ -234,21 +194,25 @@ class AudioVisualizer {
             const y2 = centerY + Math.sin(angle) * (radius + barHeight);
             
             const hue = (i / bufferLength) * 360;
-            canvasCtx.strokeStyle = `hsl(${hue}, 80%, 60%)`;
-            canvasCtx.lineWidth = 3;
+            canvasCtx.strokeStyle = `hsla(${hue}, 92%, 62%, 0.95)`;
+            canvasCtx.lineWidth = 2.6;
+            canvasCtx.shadowColor = `hsla(${(hue + 40) % 360}, 90%, 60%, 0.45)`;
+            canvasCtx.shadowBlur = 10;
             
             canvasCtx.beginPath();
             canvasCtx.moveTo(x1, y1);
             canvasCtx.lineTo(x2, y2);
             canvasCtx.stroke();
         }
+
+        canvasCtx.shadowBlur = 0;
     }
     
     // Draw particles visualization
     drawParticles() {
         const { canvasCtx, canvas, dataArray, bufferLength } = this;
         
-        canvasCtx.fillStyle = 'rgba(10, 10, 15, 0.2)';
+        canvasCtx.fillStyle = 'rgba(8, 10, 20, 0.14)';
         canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
         
         for (let i = 0; i < bufferLength; i += 2) {
@@ -258,12 +222,16 @@ class AudioVisualizer {
             const size = (value / 255) * 20;
             
             const hue = (i / bufferLength) * 360;
-            canvasCtx.fillStyle = `hsla(${hue}, 80%, 60%, ${value / 255})`;
+            canvasCtx.fillStyle = `hsla(${hue}, 92%, 62%, ${Math.max(0.25, value / 255)})`;
+            canvasCtx.shadowColor = `hsla(${(hue + 25) % 360}, 92%, 62%, 0.5)`;
+            canvasCtx.shadowBlur = 14;
             
             canvasCtx.beginPath();
             canvasCtx.arc(x, y + Math.sin(Date.now() / 100 + i) * 50, size, 0, Math.PI * 2);
             canvasCtx.fill();
         }
+
+        canvasCtx.shadowBlur = 0;
     }
     
     // Change visualization type
@@ -283,94 +251,98 @@ function initVisualizer() {
     }
 }
 
-// Toggle visualizer display
-function toggleVisualizer() {
-    const container = document.getElementById('visualizerContainer');
-    const isVisible = container.style.display !== 'none';
-    
-    if (isVisible) {
-        container.style.display = 'none';
-        visualizer.stopVisualization();
+// Ensure Web Audio processing graph is initialized before visualization interaction
+async function ensureVisualizerReady() {
+    initVisualizer();
+
+    if (!visualizer) return false;
+
+    visualizer.initialize();
+
+    if (visualizer.audioContext && visualizer.audioContext.state === 'suspended') {
+        try {
+            await visualizer.audioContext.resume();
+        } catch (error) {
+            console.warn('Unable to resume audio context:', error);
+        }
+    }
+
+    return visualizer.isInitialized;
+}
+
+async function startVisualizerPlayback() {
+    const ready = await ensureVisualizerReady();
+    if (!ready) return;
+
+    if (!visualizer.canvas) {
+        visualizer.setCanvas(document.getElementById('visualizerCanvas'));
+    }
+
+    visualizer.startVisualization();
+}
+
+function updateVisualizerToggleButton(isRunning) {
+    const btn = document.getElementById('vizToggleBtn');
+    if (!btn) return;
+
+    const icon = btn.querySelector('i');
+    if (isRunning) {
+        btn.title = 'Stop Visualizer';
+        if (icon) icon.className = 'fas fa-pause';
     } else {
-        container.style.display = 'flex';
-        if (!visualizer.canvas) {
-            visualizer.setCanvas(document.getElementById('visualizerCanvas'));
-        }
-        visualizer.initialize();
-        visualizer.startVisualization();
+        btn.title = 'Start Visualizer';
+        if (icon) icon.className = 'fas fa-play';
     }
 }
 
-// Toggle equalizer panel
-function toggleEqualizer() {
-    const panel = document.getElementById('equalizerPanel');
-    panel.classList.toggle('show');
-}
-
-// Set EQ preset
-function setEQPreset(preset) {
-    if (visualizer) {
-        visualizer.setPreset(preset);
-        updateEQSliders(preset);
+async function toggleVisualizerPlayback() {
+    if (!visualizer) {
+        await startVisualizerPlayback();
+        updateVisualizerToggleButton(true);
+        return;
     }
-}
 
-// Update EQ sliders to match preset
-function updateEQSliders(preset) {
-    const presets = {
-        flat: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        rock: [5, 4, 3, 1, -1, -1, 0, 2, 4, 5],
-        pop: [-1, -1, 0, 2, 4, 4, 2, 0, -1, -1],
-        jazz: [4, 3, 2, 2, -1, -1, 0, 2, 3, 4],
-        classical: [4, 3, 2, 0, 0, 0, -1, -2, -3, -4],
-        bass: [6, 5, 4, 2, 0, -1, -2, -3, -4, -4],
-        treble: [-4, -4, -3, -2, -1, 0, 2, 4, 5, 6],
-        vocal: [-2, -3, -2, 1, 3, 3, 2, 1, 0, -1]
-    };
-    
-    const values = presets[preset] || presets.flat;
-    values.forEach((value, index) => {
-        const slider = document.getElementById(`eq-band-${index}`);
-        if (slider) {
-            slider.value = value;
-            updateEQBandDisplay(index, value);
-        }
-    });
-}
-
-// Update EQ band
-function updateEQBand(bandIndex, value) {
-    if (visualizer) {
-        visualizer.setEQBand(bandIndex, value);
-        updateEQBandDisplay(bandIndex, value);
-    }
-}
-
-// Update EQ band display
-function updateEQBandDisplay(bandIndex, value) {
-    const display = document.getElementById(`eq-value-${bandIndex}`);
-    if (display) {
-        display.textContent = value > 0 ? `+${value}` : value;
-    }
-}
-
-// Reset equalizer
-function resetEQ() {
-    if (visualizer) {
-        visualizer.resetEQ();
-        updateEQSliders('flat');
+    if (visualizer.isStopped) {
+        await startVisualizerPlayback();
+        updateVisualizerToggleButton(true);
+    } else {
+        visualizer.stopVisualization();
+        updateVisualizerToggleButton(false);
     }
 }
 
 // Change visualization type
 function setVisualizationType(type) {
-    if (visualizer) {
-        visualizer.setVisualizationType(type);
-        
-        // Update active button
-        document.querySelectorAll('.viz-type-btn').forEach(btn => {
-            btn.classList.remove('active');
-        });
-        event.target.closest('.viz-type-btn').classList.add('active');
-    }
+    if (!visualizer) return;
+
+    visualizer.setVisualizationType(type);
+
+    // Update active button
+    document.querySelectorAll('.viz-type-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+
+    const matchingButton = Array.from(document.querySelectorAll('.viz-type-btn'))
+        .find(btn => btn.dataset.vizType === type);
+    matchingButton?.classList.add('active');
 }
+
+window.addEventListener('DOMContentLoaded', () => {
+    const toggleBtn = document.getElementById('vizToggleBtn');
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', () => {
+            toggleVisualizerPlayback().catch(error => {
+                console.error('Visualizer toggle failed:', error);
+            });
+        });
+    }
+
+    document.querySelectorAll('.viz-type-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const type = btn.dataset.vizType;
+            if (type) {
+                setVisualizationType(type);
+            }
+        });
+    });
+});
