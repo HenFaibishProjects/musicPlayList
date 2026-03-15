@@ -1,5 +1,5 @@
 // UI state variables are in playlists.js (currentView, selectedGenre, currentSort, etc.)
-// Data variables are in data.js (libraryData, apiAvailable, recentTracks, smartPlaylists, etc.)
+// Data variables are in data.js (libraryData, apiAvailable, recentTracks, etc.)
 // Player state variables are in player.js (audioPlayer, currentPlaylist, isPlaying, etc.)
 
 // Script-specific state (modalFormBaseline, notificationAutoCloseTimer, pendingDeletePlaylist, editingGenreContext are in ui.js)
@@ -10,6 +10,100 @@ let folderBrowserState = {
     targetInputId: null,
     onSelect: null
 };
+
+let quickPlayObjectUrl = null;
+let volumeSliderInstance = null;
+let isUpdatingVolumeSlider = false;
+let lastVolume = -1;
+
+function isQuickPlayTrack(track) {
+    return Boolean(track && track.__quickPlay === true);
+}
+
+function isQuickPlayModeActive() {
+    return currentPlaylist.length === 1 && isQuickPlayTrack(currentPlaylist[0]);
+}
+
+function releaseQuickPlayObjectUrl({ exceptUrl = '' } = {}) {
+    if (!quickPlayObjectUrl) return;
+    if (exceptUrl && quickPlayObjectUrl === exceptUrl) return;
+
+    try {
+        URL.revokeObjectURL(quickPlayObjectUrl);
+    } catch (error) {
+        console.warn('Failed to revoke Quick Play object URL:', error);
+    }
+
+    quickPlayObjectUrl = null;
+}
+
+function getFileNameWithoutExtension(fileName = '') {
+    const value = String(fileName || '').trim();
+    if (!value) return 'Quick Play';
+
+    const extensionIndex = value.lastIndexOf('.');
+    if (extensionIndex <= 0) {
+        return value;
+    }
+
+    return value.slice(0, extensionIndex);
+}
+
+function createQuickPlayTrack(file, fileUrl) {
+    const fileName = String(file?.name || 'Quick Play').trim() || 'Quick Play';
+    return {
+        id: `quick-play-${Date.now()}`,
+        title: getFileNameWithoutExtension(fileName),
+        artist: 'Duration: --:--',
+        album: '',
+        duration: '--:--',
+        cover: DEFAULT_COVER,
+        file: fileUrl,
+        __quickPlay: true,
+        __quickPlayFileName: fileName
+    };
+}
+
+function openQuickPlayFilePicker() {
+    const fileInput = document.getElementById('quickPlayFileInput');
+    if (!fileInput) return;
+
+    // Reset so selecting the same file twice still triggers change event
+    fileInput.value = '';
+    fileInput.click();
+}
+
+function playQuickPlayFile(file) {
+    if (!file) return;
+
+    const isLikelyAudio = (file.type || '').startsWith('audio/') || /\.(mp3|wav|flac|m4a|ogg)$/i.test(file.name || '');
+    if (!isLikelyAudio) {
+        showNotification('Unsupported File', 'Please choose an audio file (mp3, wav, flac, m4a, ogg).', 'warning');
+        return;
+    }
+
+    releaseQuickPlayObjectUrl();
+    const objectUrl = URL.createObjectURL(file);
+    quickPlayObjectUrl = objectUrl;
+
+    const quickTrack = createQuickPlayTrack(file, objectUrl);
+    currentPlaylistContext = {
+        playlistName: 'Quick Play',
+        genreName: ''
+    };
+
+    currentPlaylist = [quickTrack];
+    currentTrackIndex = 0;
+    rebuildPlaybackOrder(0);
+    loadTrack(quickTrack);
+    playTrack();
+}
+
+function handleQuickPlayFileChange(event) {
+    const file = event?.target?.files?.[0];
+    if (!file) return;
+    playQuickPlayFile(file);
+}
 
 function serializeFormState(form) {
     if (!form) return '';
@@ -260,94 +354,6 @@ function loadRecentTracksFromStorage() {
     }
 }
 
-function loadPlaybackSpeedFromStorage() {
-    try {
-        const saved = localStorage.getItem(PLAYBACK_SPEED_STORAGE_KEY);
-        if (saved) {
-            const speed = parseFloat(saved);
-            if (speed >= 0.5 && speed <= 2.0) {
-                currentPlaybackSpeed = speed;
-                return;
-            }
-        }
-        currentPlaybackSpeed = 1.0;
-    } catch (error) {
-        console.warn('Failed to load playback speed from storage:', error);
-        currentPlaybackSpeed = 1.0;
-    }
-}
-
-function savePlaybackSpeedToStorage() {
-    try {
-        localStorage.setItem(PLAYBACK_SPEED_STORAGE_KEY, currentPlaybackSpeed.toString());
-    } catch (error) {
-        console.warn('Failed to save playback speed:', error);
-    }
-}
-
-function setPlaybackSpeed(speed) {
-    const newSpeed = Math.max(0.5, Math.min(2.0, parseFloat(speed) || 1.0));
-    currentPlaybackSpeed = newSpeed;
-    
-    // Apply to both audio players
-    if (audioPlayer) audioPlayer.playbackRate = newSpeed;
-    if (audioPlayerB) audioPlayerB.playbackRate = newSpeed;
-    
-    // Update UI
-    updateSpeedUI(newSpeed);
-    
-    // Save to localStorage
-    savePlaybackSpeedToStorage();
-}
-
-function updateSpeedUI(speed) {
-    const speedBtn = document.getElementById('speedBtn');
-    const speedIndicator = speedBtn?.querySelector('.speed-indicator');
-    const speedSlider = document.getElementById('speedSlider');
-    const speedValueDisplay = document.getElementById('speedValueDisplay');
-    
-    // Update button indicator
-    if (speedIndicator) {
-        speedIndicator.textContent = `${speed.toFixed(1)}x`;
-    }
-    
-    // Update button title
-    if (speedBtn) {
-        speedBtn.title = `Playback Speed: ${speed.toFixed(2)}x`;
-        speedBtn.classList.toggle('active', speed !== 1.0);
-    }
-    
-    // Update slider
-    if (speedSlider) {
-        speedSlider.value = speed;
-    }
-    
-    // Update value display
-    if (speedValueDisplay) {
-        speedValueDisplay.textContent = `${speed.toFixed(2)}x`;
-    }
-    
-    // Update preset buttons
-    document.querySelectorAll('.speed-preset-btn').forEach(btn => {
-        const btnSpeed = parseFloat(btn.dataset.speed);
-        btn.classList.toggle('active', Math.abs(btnSpeed - speed) < 0.01);
-    });
-}
-
-function openSpeedModal() {
-    const modal = document.getElementById('speedModal');
-    if (!modal) return;
-    
-    updateSpeedUI(currentPlaybackSpeed);
-    modal.classList.add('show');
-}
-
-function closeSpeedModal() {
-    const modal = document.getElementById('speedModal');
-    if (!modal) return;
-    modal.classList.remove('show');
-}
-
 function saveRecentTracksToStorage() {
     try {
         localStorage.setItem(RECENT_TRACKS_STORAGE_KEY, JSON.stringify(recentTracks.slice(0, MAX_RECENT_TRACKS)));
@@ -558,7 +564,6 @@ function refreshLibraryUI() {
     }
 
     renderGenreList();
-    renderPinnedPlaylists();
 
     if (currentView === 'genre' && selectedGenre) {
         const updatedGenre = (libraryData.library.folders || []).find(folder => folder.id === selectedGenre.id);
@@ -1906,272 +1911,11 @@ function extractCovers(tracks) {
     return covers;
 }
 
-// Resume session functions
-function showResumeSessionBanner() {
-    const session = loadListeningSession();
-    if (!session) return;
-    
-    const banner = document.getElementById('resumeSessionBanner');
-    const resumeText = document.getElementById('resumeSessionText');
-    
-    if (!banner || !resumeText) return;
-    
-    const timeAgo = formatRelativeTime(session.timestamp);
-    const trackInfo = `"${session.track.title}" by ${session.track.artist}`;
-    const playlistInfo = session.playlist.name ? ` from ${session.playlist.name}` : '';
-    
-    resumeText.textContent = `${trackInfo}${playlistInfo} · ${timeAgo}`;
-    banner.classList.remove('hidden');
-}
-
-function hideResumeSessionBanner() {
-    const banner = document.getElementById('resumeSessionBanner');
-    if (banner) {
-        banner.classList.add('hidden');
-    }
-}
-
-function dismissResumeSession() {
-    hideResumeSessionBanner();
-    clearListeningSession();
-}
-
-async function resumeListeningSession() {
-    const session = listeningSession;
-    if (!session) {
-        hideResumeSessionBanner();
-        return;
-    }
-    
-    // Find the playlist/track in current library
-    const allPlaylists = getAllPlaylistsWithGenre();
-    let targetPlaylist = null;
-    let targetTrack = null;
-    
-    // Try to find by playlist name
-    if (session.playlist.name) {
-        targetPlaylist = allPlaylists.find(p => p.name === session.playlist.name);
-    }
-    
-    if (targetPlaylist && targetPlaylist.tracks) {
-        // Try to find the exact track
-        targetTrack = targetPlaylist.tracks.find(t => t.file === session.track.file);
-        
-        if (targetTrack) {
-            // Load the full playlist
-            const genreName = targetPlaylist.__genreName || session.playlist.genreName || '';
-            currentPlaylistContext = {
-                playlistName: targetPlaylist.name,
-                genreName: genreName
-            };
-            
-            currentPlaylist = targetPlaylist.tracks;
-            const trackIndex = currentPlaylist.indexOf(targetTrack);
-            currentTrackIndex = trackIndex >= 0 ? trackIndex : 0;
-            
-            rebuildPlaybackOrder(currentTrackIndex);
-            loadTrack(currentPlaylist[currentTrackIndex]);
-            
-            // Resume from saved position
-            const player = getActivePlayer();
-            if (player && session.currentTime > 0) {
-                player.currentTime = session.currentTime;
-            }
-            
-            playTrack();
-            hideResumeSessionBanner();
-            
-            showNotification(
-                'Session Resumed',
-                `Continuing "${targetTrack.title}" from where you left off.`,
-                'success'
-            );
-            return;
-        }
-    }
-    
-    // Fallback: Just show notification if we can't find the exact track
-    hideResumeSessionBanner();
-    showNotification(
-        'Session Not Found',
-        'The previous listening session could not be restored. The playlist may have been removed.',
-        'info'
-    );
-}
-
-// Pinned Playlists Functions
-function renderPinnedPlaylists() {
-    const pinnedList = document.getElementById('pinnedPlaylistsList');
-    const emptyState = document.getElementById('pinnedEmptyState');
-    
-    if (!pinnedList || !emptyState) return;
-    
-    if (pinnedPlaylists.length === 0) {
-        pinnedList.innerHTML = '';
-        emptyState.classList.add('visible');
-        return;
-    }
-    
-    emptyState.classList.remove('visible');
-    pinnedList.innerHTML = '';
-    
-    pinnedPlaylists.forEach((pinned, index) => {
-        const pinnedItem = document.createElement('div');
-        pinnedItem.className = 'pinned-playlist-item';
-        pinnedItem.dataset.playlistId = pinned.id;
-        pinnedItem.draggable = true;
-        
-        pinnedItem.innerHTML = `
-            <div class="pinned-playlist-info">
-                <div class="pinned-playlist-icon" style="background: ${sanitizeColor(pinned.genreColor)};"></div>
-                <div style="flex: 1; min-width: 0;">
-                    <div class="pinned-playlist-name">${escapeHtml(pinned.name)}</div>
-                    ${pinned.genreName ? `<div class="pinned-playlist-genre">${escapeHtml(pinned.genreName)}</div>` : ''}
-                </div>
-            </div>
-            <div class="pinned-playlist-actions">
-                <button class="pinned-action-btn unpin-btn" title="Unpin">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-        `;
-        
-        // Click to play
-        pinnedItem.addEventListener('click', (e) => {
-            if (!e.target.closest('.pinned-action-btn')) {
-                playPinnedPlaylist(pinned.id);
-            }
-        });
-        
-        // Unpin button
-        const unpinBtn = pinnedItem.querySelector('.unpin-btn');
-        unpinBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            togglePinPlaylist(pinned.id);
-        });
-        
-        // Drag & drop
-        pinnedItem.addEventListener('dragstart', handlePinnedDragStart);
-        pinnedItem.addEventListener('dragend', handlePinnedDragEnd);
-        pinnedItem.addEventListener('dragover', handlePinnedDragOver);
-        pinnedItem.addEventListener('drop', handlePinnedDrop);
-        
-        pinnedList.appendChild(pinnedItem);
-    });
-}
-
-async function playPinnedPlaylist(playlistId) {
-    // Find playlist in library
-    const allPlaylists = getAllPlaylistsWithGenre();
-    const playlist = allPlaylists.find(p => p.id === playlistId);
-    
-    if (!playlist) {
-        showNotification(
-            'Playlist Not Found',
-            'This pinned playlist no longer exists in your library.',
-            'warning'
-        );
-        unpinPlaylist(playlistId);
-        renderPinnedPlaylists();
-        return;
-    }
-    
-    const genreName = playlist.__genreName || '';
-    loadPlaylist(playlist, genreName);
-}
-
-function togglePinPlaylist(playlistId, playlistName, genreName, genreColor) {
-    if (isPlaylistPinned(playlistId)) {
-        // Unpin
-        const success = unpinPlaylist(playlistId);
-        if (success) {
-            renderPinnedPlaylists();
-            refreshLibraryUI();
-            showNotification(
-                'Playlist Unpinned',
-                `Removed from Quick Access.`,
-                'success'
-            );
-        }
-    } else {
-        // Pin
-        const result = pinPlaylist(playlistId, playlistName, genreName, genreColor);
-        if (result === 'limit_reached') {
-            showNotification(
-                'Pin Limit Reached',
-                `You can pin up to ${MAX_PINNED_PLAYLISTS} playlists. Unpin one first.`,
-                'warning'
-            );
-        } else if (result === true) {
-            renderPinnedPlaylists();
-            refreshLibraryUI();
-            showNotification(
-                'Playlist Pinned',
-                `Added "${playlistName}" to Quick Access!`,
-                'success'
-            );
-        }
-    }
-}
-
-// Drag & Drop for Pinned Playlists
-let draggedPinnedIndex = null;
-
-function handlePinnedDragStart(e) {
-    const item = e.target.closest('.pinned-playlist-item');
-    if (!item) return;
-    
-    draggedPinnedIndex = Array.from(item.parentElement.children).indexOf(item);
-    item.classList.add('dragging');
-    e.dataTransfer.effectAllowed = 'move';
-}
-
-function handlePinnedDragEnd(e) {
-    const item = e.target.closest('.pinned-playlist-item');
-    if (!item) return;
-    
-    item.classList.remove('dragging');
-    document.querySelectorAll('.pinned-playlist-item').forEach(el => el.classList.remove('drag-over'));
-    draggedPinnedIndex = null;
-}
-
-function handlePinnedDragOver(e) {
-    e.preventDefault();
-    const item = e.target.closest('.pinned-playlist-item');
-    if (!item || draggedPinnedIndex === null) return;
-    
-    const targetIndex = Array.from(item.parentElement.children).indexOf(item);
-    if (targetIndex !== draggedPinnedIndex) {
-        item.classList.add('drag-over');
-    }
-}
-
-function handlePinnedDrop(e) {
-    e.preventDefault();
-    const item = e.target.closest('.pinned-playlist-item');
-    if (!item || draggedPinnedIndex === null) return;
-    
-    item.classList.remove('drag-over');
-    
-    const targetIndex = Array.from(item.parentElement.children).indexOf(item);
-    if (targetIndex !== draggedPinnedIndex && targetIndex >= 0) {
-        // Reorder array
-        const [removed] = pinnedPlaylists.splice(draggedPinnedIndex, 1);
-        pinnedPlaylists.splice(targetIndex, 0, removed);
-        savePinnedPlaylists();
-        renderPinnedPlaylists();
-    }
-}
-
 // Initialize app
 async function init() {
     try {
         createBackgroundParticles();
         loadRecentTracksFromStorage();
-        loadSmartPlaylists();
-        loadPlaybackSpeedFromStorage();
-        loadListeningSession();
-        loadPinnedPlaylists();
         setupEventListeners();
         initializePlayer();
 
@@ -2197,11 +1941,6 @@ async function init() {
         setRescanButtonState();
         refreshLibraryUI();
         
-        // Show resume session banner if available
-        if (listeningSession) {
-            showResumeSessionBanner();
-        }
-        
         // Clear any loading spinners
         const grid = document.getElementById('folderGrid');
         const loadingDiv = grid?.querySelector('.loading');
@@ -2226,17 +1965,8 @@ function initializePlayer() {
     
     audioPlayer.volume = currentVolume;
     audioPlayerB.volume = currentVolume;
-    audioPlayer.playbackRate = currentPlaybackSpeed;
-    audioPlayerB.playbackRate = currentPlaybackSpeed;
     
-    // Update speed UI to reflect loaded speed
-    updateSpeedUI(currentPlaybackSpeed);
-    
-    const volumeFill = document.getElementById('volumeFill');
-    if (volumeFill) {
-        volumeFill.style.width = (currentVolume * 100) + '%';
-    }
-    
+    initializeVolumeSlider();
     updateVolumeIcon();
     
     // Initialize visualizer safely
@@ -2274,16 +2004,6 @@ function initializePlayer() {
     
     // Volume controls
     document.getElementById('volumeBtn').addEventListener('click', toggleMute);
-    const volumeBar = document.getElementById('volumeBar');
-    volumeBar.addEventListener('click', setVolume);
-    volumeBar.addEventListener('mousedown', startVolumeDrag);
-    volumeBar.addEventListener('touchstart', startVolumeDrag, { passive: false });
-
-    document.addEventListener('mousemove', onVolumeDrag);
-    document.addEventListener('touchmove', onVolumeDrag, { passive: false });
-    document.addEventListener('mouseup', stopVolumeDrag);
-    document.addEventListener('touchend', stopVolumeDrag);
-    document.addEventListener('touchcancel', stopVolumeDrag);
     
     // Audio events for both players
     audioPlayer.addEventListener('timeupdate', updateProgress);
@@ -2319,57 +2039,73 @@ function initializePlayer() {
     });
 }
 
-function getPointerClientX(e) {
-    if (e.touches && e.touches.length > 0) {
-        return e.touches[0].clientX;
+function updateVolumeUI(volume) {
+    const nextVolume = Math.max(0, Math.min(1, Number(volume) || 0));
+    if (Math.abs(nextVolume - lastVolume) < 0.005) return;
+
+    lastVolume = nextVolume;
+
+    if (volumeSliderInstance && !isUpdatingVolumeSlider) {
+        isUpdatingVolumeSlider = true;
+        volumeSliderInstance.set(Math.round(nextVolume * 100));
+        isUpdatingVolumeSlider = false;
     }
-    if (e.changedTouches && e.changedTouches.length > 0) {
-        return e.changedTouches[0].clientX;
-    }
-    return e.clientX;
-}
 
-function setVolumeFromClientX(clientX) {
-    const volumeBar = document.getElementById('volumeBar');
-    if (!volumeBar || typeof clientX !== 'number') return;
-
-    const rect = volumeBar.getBoundingClientRect();
-    if (!rect.width) return;
-
-    const percent = (clientX - rect.left) / rect.width;
-    const nextVolume = Math.max(0, Math.min(1, percent));
-    const changed = Math.abs(nextVolume - currentVolume) > 0.001;
-
-    currentVolume = nextVolume;
-    audioPlayer.volume = currentVolume;
-    document.getElementById('volumeFill').style.width = (currentVolume * 100) + '%';
-    updateVolumePercentage(currentVolume);
+    updateVolumePercentage(nextVolume);
     updateVolumeIcon();
-
-    if (changed) {
-        scheduleSystemVolumeSync();
-    }
 }
 
-function startVolumeDrag(e) {
-    isDraggingVolume = true;
-    if (e.cancelable) {
-        e.preventDefault();
-    }
-    setVolumeFromClientX(getPointerClientX(e));
-}
+function initializeVolumeSlider() {
+    const volumeBar = document.getElementById('volumeBar');
+    if (!volumeBar || !window.noUiSlider) return;
 
-function onVolumeDrag(e) {
-    if (!isDraggingVolume) return;
-    if (e.cancelable) {
-        e.preventDefault();
+    if (volumeBar.noUiSlider) {
+        volumeBar.noUiSlider.destroy();
     }
-    setVolumeFromClientX(getPointerClientX(e));
-}
 
-function stopVolumeDrag() {
-    isDraggingVolume = false;
-    syncVolumeToSystem({ immediate: true });
+    noUiSlider.create(volumeBar, {
+        start: Math.round(currentVolume * 100),
+        range: {
+            min: 0,
+            max: 100
+        },
+        step: 1,
+        connect: [true, false]
+    });
+
+    volumeSliderInstance = volumeBar.noUiSlider;
+
+    volumeSliderInstance.on('start', () => {
+        isDraggingVolume = true;
+    });
+
+    volumeSliderInstance.on('update', (values) => {
+        if (isUpdatingVolumeSlider) return;
+
+        const value = Number(values?.[0]);
+        if (!Number.isFinite(value)) return;
+
+        const volume = Math.max(0, Math.min(1, value / 100));
+        const changed = Math.abs(volume - currentVolume) > 0.001;
+
+        currentVolume = volume;
+        audioPlayer.volume = volume;
+        if (!fadeIntervals.B) {
+            audioPlayerB.volume = volume;
+        }
+
+        updateVolumePercentage(volume);
+        updateVolumeIcon();
+
+        if (changed) {
+            scheduleSystemVolumeSync();
+        }
+    });
+
+    volumeSliderInstance.on('end', () => {
+        isDraggingVolume = false;
+        syncVolumeToSystem({ immediate: true });
+    });
 }
 
 // Resize visualizer canvas
@@ -2414,6 +2150,10 @@ function loadPlaylist(playlist, genreName = '') {
 
 // Load a specific track
 function loadTrack(track) {
+    if (!isQuickPlayTrack(track)) {
+        releaseQuickPlayObjectUrl();
+    }
+
     // Cancel any ongoing crossfade
     if (crossfadeTimer) {
         clearTimeout(crossfadeTimer);
@@ -2441,7 +2181,9 @@ function loadTrack(track) {
     activePlayer = 'A';
     
     document.getElementById('playerTitle').textContent = track.title;
-    document.getElementById('playerArtist').textContent = track.artist;
+    document.getElementById('playerArtist').textContent = isQuickPlayTrack(track)
+        ? `Duration: ${track.duration || '--:--'}`
+        : track.artist;
     const playerCover = document.getElementById('playerCover');
     if (playerCover) {
         playerCover.src = track.cover || DEFAULT_COVER;
@@ -2456,6 +2198,11 @@ function loadTrack(track) {
 // Play track
 function playTrack() {
     const currentPlayer = getActivePlayer();
+
+    if (currentPlayer && currentPlayer.ended) {
+        currentPlayer.currentTime = 0;
+    }
+
     currentPlayer.play().catch(err => {
         console.error('Error playing audio:', err);
         showNotification(
@@ -2466,7 +2213,7 @@ function playTrack() {
     });
     isPlaying = true;
     const currentTrack = currentPlaylist[currentTrackIndex];
-    if (currentTrack) {
+    if (currentTrack && !isQuickPlayTrack(currentTrack)) {
         addTrackToRecentlyPlayed(currentTrack, currentPlaylistContext);
     }
     updatePlayButton();
@@ -2537,7 +2284,20 @@ function playPrevious() {
 }
 
 // Handle track end
-function handleTrackEnd() {
+function handleTrackEnd(event) {
+    const activeTrack = currentPlaylist[currentTrackIndex];
+    if (isQuickPlayTrack(activeTrack)) {
+        const currentPlayer = getActivePlayer();
+        if (currentPlayer) {
+            currentPlayer.pause();
+            currentPlayer.currentTime = 0;
+        }
+        isPlaying = false;
+        updatePlayButton();
+        updateProgress();
+        return;
+    }
+
     // Only handle if the ended player is the active one
     const endedPlayer = event?.target || audioPlayer;
     const currentPlayer = getActivePlayer();
@@ -2757,20 +2517,6 @@ function updateProgress() {
     if (progressHandle) progressHandle.style.left = percent + '%';
     if (currentTime) currentTime.textContent = formatTime(currentPlayer.currentTime);
     
-    // Auto-save listening session
-    if (isPlaying && currentPlaylist.length > 0) {
-        const currentTrack = currentPlaylist[currentTrackIndex];
-        if (currentTrack) {
-            scheduleSessionSave(
-                currentTrack,
-                currentTrackIndex,
-                currentPlayer.currentTime,
-                currentPlaylist,
-                currentPlaylistContext
-            );
-        }
-    }
-    
     // Monitor for crossfade trigger point
     if (crossfadeEnabled && isPlaying) {
         monitorForCrossfade();
@@ -2780,7 +2526,24 @@ function updateProgress() {
 // Update duration display
 function updateDuration() {
     const currentPlayer = getActivePlayer();
-    document.getElementById('totalTime').textContent = formatTime(currentPlayer.duration);
+    const formatted = formatTime(currentPlayer.duration);
+    document.getElementById('totalTime').textContent = formatted;
+
+    const currentTrack = currentPlaylist[currentTrackIndex];
+    if (currentTrack && isFinite(currentPlayer.duration)) {
+        currentTrack.duration = formatted;
+
+        if (isQuickPlayTrack(currentTrack)) {
+            const playerArtist = document.getElementById('playerArtist');
+            if (playerArtist) {
+                playerArtist.textContent = `Duration: ${formatted}`;
+            }
+        }
+
+        if (isQueuePanelOpen) {
+            renderQueuePanel();
+        }
+    }
 }
 
 // Seek to position
@@ -2802,27 +2565,23 @@ function seekTo(e) {
     }
 }
 
-// Set volume
-function setVolume(e) {
-    setVolumeFromClientX(getPointerClientX(e));
-}
-
 // Toggle mute
 function toggleMute() {
     if (audioPlayer.volume > 0) {
-        audioPlayer.volume = 0;
         currentVolume = 0;
-        document.getElementById('volumeFill').style.width = '0%';
-        updateVolumePercentage(0);
+        if (!fadeIntervals.A) audioPlayer.volume = 0;
+        if (!fadeIntervals.B) audioPlayerB.volume = 0;
+        updateVolumeUI(0);
     } else {
         if (currentVolume <= 0) {
             currentVolume = 0.5;
         }
-        audioPlayer.volume = currentVolume;
-        document.getElementById('volumeFill').style.width = (currentVolume * 100) + '%';
-        updateVolumePercentage(currentVolume);
+
+        if (!fadeIntervals.A) audioPlayer.volume = currentVolume;
+        if (!fadeIntervals.B) audioPlayerB.volume = currentVolume;
+        updateVolumeUI(currentVolume);
     }
-    updateVolumeIcon();
+
     syncVolumeToSystem({ immediate: true });
 }
 
@@ -2857,10 +2616,8 @@ function applyVolumeToUI(volume) {
     // Update both players' base volume (active player might be fading)
     if (!fadeIntervals.A) audioPlayer.volume = next;
     if (!fadeIntervals.B) audioPlayerB.volume = next;
-    
-    document.getElementById('volumeFill').style.width = (next * 100) + '%';
-    updateVolumePercentage(next);
-    updateVolumeIcon();
+
+    updateVolumeUI(next);
 }
 
 async function fetchSystemVolume() {
@@ -3227,6 +2984,7 @@ function removeTrackFromQueue(index) {
     currentPlaylist.splice(index, 1);
 
     if (currentPlaylist.length === 0) {
+        releaseQuickPlayObjectUrl();
         pauseTrack();
         audioPlayer.removeAttribute('src');
         audioPlayer.load();
@@ -3269,6 +3027,7 @@ function clearCurrentQueue() {
     currentTrackIndex = 0;
     playbackOrder = [];
     playbackOrderPosition = 0;
+    releaseQuickPlayObjectUrl();
     pauseTrack();
     audioPlayer.removeAttribute('src');
     audioPlayer.load();
@@ -3323,11 +3082,6 @@ function setupEventListeners() {
     const smartPlaylistsNav = document.getElementById('smartPlaylistsNav');
     if (smartPlaylistsNav) {
         smartPlaylistsNav.addEventListener('click', showSmartPlaylists);
-    }
-    
-    const historyCalendarNav = document.getElementById('historyCalendarNav');
-    if (historyCalendarNav) {
-        historyCalendarNav.addEventListener('click', showListeningHistory);
     }
 
     // Theme toggle
@@ -3538,6 +3292,16 @@ function setupEventListeners() {
         importM3UForm.addEventListener('submit', importM3UPlaylist);
     }
 
+    const quickPlayBtn = document.getElementById('quickPlayBtn');
+    if (quickPlayBtn) {
+        quickPlayBtn.addEventListener('click', openQuickPlayFilePicker);
+    }
+
+    const quickPlayFileInput = document.getElementById('quickPlayFileInput');
+    if (quickPlayFileInput) {
+        quickPlayFileInput.addEventListener('change', handleQuickPlayFileChange);
+    }
+
     const methodBtns = document.querySelectorAll('.method-btn');
     methodBtns.forEach(btn => {
         btn.addEventListener('click', () => {
@@ -3567,52 +3331,6 @@ function setupEventListeners() {
                 newGenreRow.classList.add('hidden');
             }
         });
-    }
-
-    // Playback Speed Controls
-    const speedBtn = document.getElementById('speedBtn');
-    if (speedBtn) {
-        speedBtn.addEventListener('click', openSpeedModal);
-    }
-
-    const speedModalCloseBtn = document.getElementById('speedModalCloseBtn');
-    if (speedModalCloseBtn) {
-        speedModalCloseBtn.addEventListener('click', closeSpeedModal);
-    }
-
-    const speedModal = document.getElementById('speedModal');
-    if (speedModal) {
-        speedModal.addEventListener('click', (e) => {
-            if (e.target === speedModal) {
-                closeSpeedModal();
-            }
-        });
-    }
-
-    const speedSlider = document.getElementById('speedSlider');
-    if (speedSlider) {
-        speedSlider.addEventListener('input', (e) => {
-            const speed = parseFloat(e.target.value);
-            setPlaybackSpeed(speed);
-        });
-    }
-
-    document.querySelectorAll('.speed-preset-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const speed = parseFloat(btn.dataset.speed);
-            setPlaybackSpeed(speed);
-        });
-    });
-
-    // Resume session controls
-    const resumeSessionBtn = document.getElementById('resumeSessionBtn');
-    if (resumeSessionBtn) {
-        resumeSessionBtn.addEventListener('click', resumeListeningSession);
-    }
-    
-    const dismissResumeBtn = document.getElementById('dismissResumeBtn');
-    if (dismissResumeBtn) {
-        dismissResumeBtn.addEventListener('click', dismissResumeSession);
     }
 
     const breadcrumb = document.getElementById('breadcrumb');
@@ -3656,8 +3374,6 @@ function setupEventListeners() {
                 playTrackFromList(index);
             } else if (action === 'play-smart') {
                 playTrackFromSmart(index);
-            } else if (action === 'play-calendar') {
-                playTrackFromCalendar(index);
             }
         });
     }
@@ -3687,26 +3403,6 @@ function setupEventListeners() {
             }
 
             closeDeletePlaylistModal();
-            closeSpeedModal();
-        }
-        
-        // Speed control shortcuts (when not typing in inputs)
-        if (document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
-            // '[' to decrease speed by 0.25x
-            if (e.key === '[') {
-                e.preventDefault();
-                setPlaybackSpeed(Math.max(0.5, currentPlaybackSpeed - 0.25));
-            }
-            // ']' to increase speed by 0.25x
-            if (e.key === ']') {
-                e.preventDefault();
-                setPlaybackSpeed(Math.min(2.0, currentPlaybackSpeed + 0.25));
-            }
-            // '=' or '+' to reset to normal speed
-            if (e.key === '=' || e.key === '+') {
-                e.preventDefault();
-                setPlaybackSpeed(1.0);
-            }
         }
     });
 }
@@ -4569,13 +4265,9 @@ function createPlaylistCard(playlist, color, index, genreName = '') {
     const playlistImages = Array.isArray(playlist.images) ? playlist.images : [];
     const safeImages = (playlistImages.length ? playlistImages : [DEFAULT_COVER, DEFAULT_COVER, DEFAULT_COVER, DEFAULT_COVER]).slice(0, 4);
     const imagesHTML = safeImages.map(img => `<img src="${img}" alt="Album cover">`).join('');
-    const isPinned = isPlaylistPinned(playlist.id);
     
     card.innerHTML = `
         <div class="playlist-card-actions">
-            <button class="playlist-action-btn pin-playlist-btn ${isPinned ? 'active' : ''}" title="${isPinned ? 'Unpin from Quick Access' : 'Pin to Quick Access'}">
-                <i class="fas fa-thumbtack"></i>
-            </button>
             <button class="playlist-action-btn favorite-playlist-btn ${playlist.isFavorite ? 'active' : ''}" title="Toggle Favorite">
                 <i class="${playlist.isFavorite ? 'fas' : 'far'} fa-star"></i>
             </button>
@@ -4639,14 +4331,6 @@ function createPlaylistCard(playlist, color, index, genreName = '') {
         favoriteBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             togglePlaylistFavoriteFromUI(playlist);
-        });
-    }
-    
-    const pinBtn = card.querySelector('.pin-playlist-btn');
-    if (pinBtn) {
-        pinBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            togglePinPlaylist(playlist.id, playlist.name, genreName, color);
         });
     }
     
@@ -5038,419 +4722,6 @@ function showSmartPlaylists() {
     updateWorkspaceStatus();
 }
 
-// Calendar State
-let currentCalendarDate = new Date();
-let selectedCalendarDay = null;
-
-// Calendar Functions
-function showListeningHistory() {
-    currentView = 'calendar';
-    selectedGenre = null;
-    
-    setActiveMainNav('historyCalendarNav');
-    setActiveGenreItem(null);
-    
-    clearGlobalSearchState();
-    
-    renderBreadcrumb([
-        { label: 'Genre Library', action: 'show-all' },
-        { label: 'Listening History', current: true }
-    ]);
-    document.getElementById('pageTitle').textContent = 'Listening History';
-    document.getElementById('pageSubtitle').textContent = 'Visual calendar of your music journey';
-    
-    renderCalendarView();
-    updateStatsForCalendar();
-    updateWorkspaceStatus();
-}
-
-function getTracksByDate() {
-    const tracksByDate = {};
-    
-    recentTracks.forEach(track => {
-        const date = new Date(track.playedAt);
-        const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-        
-        if (!tracksByDate[dateKey]) {
-            tracksByDate[dateKey] = [];
-        }
-        tracksByDate[dateKey].push(track);
-    });
-    
-    return tracksByDate;
-}
-
-function getCalendarStats() {
-    const tracksByDate = getTracksByDate();
-    const dates = Object.keys(tracksByDate);
-    
-    // Most played day
-    let mostPlayedDay = null;
-    let maxTracks = 0;
-    dates.forEach(date => {
-        const count = tracksByDate[date].length;
-        if (count > maxTracks) {
-            maxTracks = count;
-            mostPlayedDay = date;
-        }
-    });
-    
-    // Listening by hour
-    const hourCounts = new Array(24).fill(0);
-    recentTracks.forEach(track => {
-        const date = new Date(track.playedAt);
-        const hour = date.getHours();
-        hourCounts[hour]++;
-    });
-    
-    const maxHourIndex = hourCounts.indexOf(Math.max(...hourCounts));
-    const favoriteTime = maxHourIndex >= 0 ? formatHourRange(maxHourIndex) : 'N/A';
-    
-    return {
-        totalDays: dates.length,
-        mostPlayedDay,
-        maxTracksInDay: maxTracks,
-        favoriteTime,
-        totalTracksLogged: recentTracks.length
-    };
-}
-
-function formatHourRange(hour) {
-    const start = hour % 12 || 12;
-    const end = (hour + 1) % 12 || 12;
-    const startPeriod = hour < 12 ? 'AM' : 'PM';
-    const endPeriod = (hour + 1) < 12 ? 'AM' : 'PM';
-    return `${start}${startPeriod}-${end}${endPeriod}`;
-}
-
-function renderCalendarView() {
-    const grid = document.getElementById('folderGrid');
-    const tracksByDate = getTracksByDate();
-    const stats = getCalendarStats();
-    
-    const year = currentCalendarDate.getFullYear();
-    const month = currentCalendarDate.getMonth();
-    const monthName = currentCalendarDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-    
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    const startDayOfWeek = firstDay.getDay();
-    const daysInMonth = lastDay.getDate();
-    
-    let calendarHTML = `
-        <div class="calendar-container">
-            <div class="calendar-header">
-                <div class="calendar-month-nav">
-                    <button class="calendar-nav-btn" id="calPrevMonth">
-                        <i class="fas fa-chevron-left"></i>
-                    </button>
-                    <div class="calendar-current-month">${monthName}</div>
-                    <button class="calendar-nav-btn" id="calNextMonth">
-                        <i class="fas fa-chevron-right"></i>
-                    </button>
-                    <button class="calendar-nav-btn" id="calToday" title="Go to Today">
-                        <i class="fas fa-calendar-day"></i>
-                    </button>
-                </div>
-                <div class="calendar-stats-preview">
-                    <div class="calendar-stat-mini">
-                        <div class="stat-value">${stats.totalDays}</div>
-                        <div class="stat-label">Active Days</div>
-                    </div>
-                    <div class="calendar-stat-mini">
-                        <div class="stat-value">${stats.favoriteTime}</div>
-                        <div class="stat-label">Peak Hour</div>
-                    </div>
-                    <div class="calendar-stat-mini">
-                        <div class="stat-value">${stats.maxTracksInDay}</div>
-                        <div class="stat-label">Max/Day</div>
-                    </div>
-                </div>
-            </div>
-            <div class="calendar-grid">
-    `;
-    
-    // Day headers
-    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    dayNames.forEach(day => {
-        calendarHTML += `<div class="calendar-day-header">${day}</div>`;
-    });
-    
-    // Empty cells before first day
-    for (let i = 0; i < startDayOfWeek; i++) {
-        const prevMonthDate = new Date(year, month, -(startDayOfWeek - i - 1));
-        const dateKey = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2, '0')}-${String(prevMonthDate.getDate()).padStart(2, '0')}`;
-        const tracks = tracksByDate[dateKey] || [];
-        
-        calendarHTML += `
-            <div class="calendar-day other-month">
-                <div class="calendar-day-number">${prevMonthDate.getDate()}</div>
-                ${tracks.length > 0 ? `<div class="calendar-day-count">${tracks.length}</div>` : ''}
-            </div>
-        `;
-    }
-    
-    // Days of current month
-    const today = new Date();
-    const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month;
-    
-    for (let day = 1; day <= daysInMonth; day++) {
-        const date = new Date(year, month, day);
-        const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        const tracks = tracksByDate[dateKey] || [];
-        const isToday = isCurrentMonth && today.getDate() === day;
-        const hasActivity = tracks.length > 0;
-        
-        const classes = [
-            'calendar-day',
-            isToday ? 'today' : '',
-            hasActivity ? 'has-activity' : ''
-        ].filter(Boolean).join(' ');
-        
-        const activityIndicator = hasActivity ? 
-            `<div class="calendar-day-activity">${'<div class="calendar-activity-dot"></div>'.repeat(Math.min(3, Math.ceil(tracks.length / 5)))}</div>` : 
-            '';
-        
-        calendarHTML += `
-            <div class="${classes}" data-date="${dateKey}">
-                <div class="calendar-day-number">${day}</div>
-                ${activityIndicator}
-                ${hasActivity ? `<div class="calendar-day-count">${tracks.length} track${tracks.length === 1 ? '' : 's'}</div>` : ''}
-            </div>
-        `;
-    }
-    
-    // Remaining cells
-    const totalCells = startDayOfWeek + daysInMonth;
-    const remainingCells = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
-    for (let i = 1; i <= remainingCells; i++) {
-        const nextMonthDate = new Date(year, month + 1, i);
-        const dateKey = `${nextMonthDate.getFullYear()}-${String(nextMonthDate.getMonth() + 1).padStart(2, '0')}-${String(nextMonthDate.getDate()).padStart(2, '0')}`;
-        const tracks = tracksByDate[dateKey] || [];
-        
-        calendarHTML += `
-            <div class="calendar-day other-month">
-                <div class="calendar-day-number">${i}</div>
-                ${tracks.length > 0 ? `<div class="calendar-day-count">${tracks.length}</div>` : ''}
-            </div>
-        `;
-    }
-    
-    calendarHTML += `
-            </div>
-        </div>
-    `;
-    
-    grid.innerHTML = calendarHTML;
-    
-    // Add event listeners
-    document.getElementById('calPrevMonth')?.addEventListener('click', () => {
-        currentCalendarDate = new Date(currentCalendarDate.getFullYear(), currentCalendarDate.getMonth() - 1, 1);
-        renderCalendarView();
-    });
-    
-    document.getElementById('calNextMonth')?.addEventListener('click', () => {
-        currentCalendarDate = new Date(currentCalendarDate.getFullYear(), currentCalendarDate.getMonth() + 1, 1);
-        renderCalendarView();
-    });
-    
-    document.getElementById('calToday')?.addEventListener('click', () => {
-        currentCalendarDate = new Date();
-        renderCalendarView();
-    });
-    
-    // Day click handlers
-    grid.querySelectorAll('.calendar-day.has-activity:not(.other-month)').forEach(dayEl => {
-        dayEl.addEventListener('click', () => {
-            const dateKey = dayEl.dataset.date;
-            showCalendarDayDetails(dateKey, tracksByDate[dateKey]);
-        });
-    });
-}
-
-function showCalendarDayDetails(dateKey, tracks) {
-    if (!tracks || tracks.length === 0) return;
-    
-    selectedCalendarDay = dateKey;
-    const grid = document.getElementById('folderGrid');
-    const calendarContainer = grid.querySelector('.calendar-container');
-    
-    // Remove any existing details
-    grid.querySelectorAll('.calendar-day-details').forEach(el => el.remove());
-    
-    // Parse date
-    const [year, month, day] = dateKey.split('-').map(Number);
-    const date = new Date(year, month - 1, day);
-    const dateString = date.toLocaleDateString('en-US', { 
-        weekday: 'long', 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric' 
-    });
-    
-    // Calculate stats for this day
-    const uniqueArtists = new Set(tracks.map(t => t.artist)).size;
-    const uniquePlaylists = new Set(tracks.map(t => t.playlistName)).size;
-    const hourCounts = new Array(24).fill(0);
-    tracks.forEach(track => {
-        const trackDate = new Date(track.playedAt);
-        hourCounts[trackDate.getHours()]++;
-    });
-    const peakHour = hourCounts.indexOf(Math.max(...hourCounts));
-    
-    // Create details panel
-    const detailsPanel = document.createElement('div');
-    detailsPanel.className = 'calendar-day-details';
-    detailsPanel.innerHTML = `
-        <div class="calendar-details-header">
-            <div class="calendar-details-title">
-                <i class="fas fa-calendar-day"></i>
-                <div>
-                    <h3>${dateString}</h3>
-                    <p style="color: var(--text-secondary); font-size: 14px; margin: 0;">${tracks.length} tracks played</p>
-                </div>
-            </div>
-            <button class="calendar-details-close" id="closeCalendarDetails">
-                <i class="fas fa-times"></i>
-            </button>
-        </div>
-        <div class="calendar-day-stats">
-            <div class="calendar-day-stat-card">
-                <i class="fas fa-music"></i>
-                <div class="stat-value">${tracks.length}</div>
-                <div class="stat-label">Tracks</div>
-            </div>
-            <div class="calendar-day-stat-card">
-                <i class="fas fa-user-music"></i>
-                <div class="stat-value">${uniqueArtists}</div>
-                <div class="stat-label">Artists</div>
-            </div>
-            <div class="calendar-day-stat-card">
-                <i class="fas fa-list-music"></i>
-                <div class="stat-value">${uniquePlaylists}</div>
-                <div class="stat-label">Playlists</div>
-            </div>
-            <div class="calendar-day-stat-card">
-                <i class="fas fa-clock"></i>
-                <div class="stat-value">${formatHourRange(peakHour)}</div>
-                <div class="stat-label">Peak Hour</div>
-            </div>
-        </div>
-    `;
-    
-    // Add track list
-    const trackList = document.createElement('div');
-    trackList.className = 'track-list-view';
-    
-    // Sort tracks by time played (most recent first)
-    const sortedTracks = [...tracks].sort((a, b) => b.playedAt - a.playedAt);
-    
-    sortedTracks.forEach((track, index) => {
-        const playTime = new Date(track.playedAt);
-        const timeString = playTime.toLocaleTimeString('en-US', { 
-            hour: 'numeric', 
-            minute: '2-digit',
-            hour12: true 
-        });
-        
-        const trackItem = document.createElement('div');
-        trackItem.className = 'track-row fade-in';
-        trackItem.style.animationDelay = `${index * 0.02}s`;
-        
-        const tags = [track.playlistName, track.genreName].filter(Boolean);
-        const tagsHTML = tags.length
-            ? tags.map(tag => `<span class="track-tag">${escapeHtml(tag)}</span>`).join('')
-            : '';
-        
-        trackItem.innerHTML = `
-            <div class="track-number">${index + 1}</div>
-            <img src="${sanitizeImageUrl(track.cover || DEFAULT_COVER)}" alt="${escapeHtml(track.title)}" class="track-thumb">
-            <div class="track-info">
-                <div class="track-title">${escapeHtml(track.title)}</div>
-                <div class="track-artist">${escapeHtml(track.artist)}</div>
-            </div>
-            <div class="track-album">${escapeHtml(track.album || track.playlistName || '—')}</div>
-            <div class="track-meta">
-                <span><i class="fas fa-clock"></i> ${timeString}</span>
-            </div>
-            <div class="track-tags">${tagsHTML}</div>
-            <div class="track-duration">${escapeHtml(track.duration || '--:--')}</div>
-            <button type="button" class="track-play-btn" data-action="play-calendar" data-track-index="${index}">
-                <i class="fas fa-play"></i>
-            </button>
-        `;
-        
-        trackList.appendChild(trackItem);
-    });
-    
-    detailsPanel.appendChild(trackList);
-    
-    // Insert after calendar grid
-    const calendarGrid = grid.querySelector('.calendar-grid');
-    if (calendarGrid) {
-        calendarGrid.after(detailsPanel);
-    }
-    
-    // Add close handler
-    document.getElementById('closeCalendarDetails')?.addEventListener('click', () => {
-        detailsPanel.remove();
-        selectedCalendarDay = null;
-    });
-    
-    // Store for playback
-    currentCalendarDayTracks = sortedTracks;
-}
-
-function updateStatsForCalendar() {
-    const statsBar = document.getElementById('statsBar');
-    const stats = getCalendarStats();
-    const tracksByDate = getTracksByDate();
-    
-    const avgPerDay = stats.totalDays > 0 ? Math.round(stats.totalTracksLogged / stats.totalDays) : 0;
-    
-    statsBar.innerHTML = `
-        <div class="stat-item">
-            <i class="fas fa-calendar-days"></i>
-            <div>
-                <div class="stat-value">${stats.totalDays}</div>
-                <div class="stat-label">Active Days</div>
-            </div>
-        </div>
-        <div class="stat-item">
-            <i class="fas fa-music"></i>
-            <div>
-                <div class="stat-value">${stats.totalTracksLogged}</div>
-                <div class="stat-label">Total Plays</div>
-            </div>
-        </div>
-        <div class="stat-item">
-            <i class="fas fa-chart-line"></i>
-            <div>
-                <div class="stat-value">${avgPerDay}</div>
-                <div class="stat-label">Avg Per Day</div>
-            </div>
-        </div>
-    `;
-}
-
-let currentCalendarDayTracks = [];
-
-function playTrackFromCalendar(index) {
-    if (index < 0 || index >= currentCalendarDayTracks.length) return;
-    
-    currentPlaylist = currentCalendarDayTracks.map(track => ({ ...track }));
-    rebuildPlaybackOrder(index);
-    
-    const selectedTrack = currentPlaylist[currentTrackIndex];
-    currentPlaylistContext = {
-        playlistName: selectedTrack?.playlistName || 'Calendar Day',
-        genreName: selectedTrack?.genreName || ''
-    };
-    
-    loadTrack(selectedTrack);
-    playTrack();
-}
-
 function renderSmartPlaylists() {
     const grid = document.getElementById('folderGrid');
     grid.innerHTML = '';
@@ -5801,6 +5072,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (typeof initializeProgressWaveform === 'function') {
         setTimeout(initializeProgressWaveform, 100);
     }
+});
+
+window.addEventListener('beforeunload', () => {
+    releaseQuickPlayObjectUrl();
 });
 
 // Initialize on page load

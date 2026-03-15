@@ -6,6 +6,7 @@
     <title>Music Playlist Manager - Professional Edition</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nouislider@15.8.1/dist/nouislider.min.css">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -34,28 +35,15 @@
                         <i class="fas fa-clock"></i>
                         <span>Recently Played</span>
                     </div>
-                    <div class="nav-item" id="smartPlaylistsNav">
-                        <i class="fas fa-brain"></i>
-                        <span>Smart Playlists</span>
+                     <div class="nav-item" id="importM3UBtn" title="Import M3U/M3U8 playlist">
+                        <i class="fas fa-file-import"></i>
+                        <span>Import M3U</span>
                     </div>
-                    <div class="nav-item" id="historyCalendarNav">
-                        <i class="fas fa-calendar-days"></i>
-                        <span>Listening History</span>
+                      <div class="btn-nav" id="quickPlayBtn" title="Play a single local audio file instantly">
+                        <i class="fas fa-bolt"></i>
+                        <span>Quick Play</span>
                     </div>
-                </div>
-
-                <div class="nav-section" id="pinnedPlaylistsSection">
-                    <div class="nav-title pinned-title">
-                        <span>Quick Access</span>
-                        <i class="fas fa-thumbtack pinned-icon"></i>
-                    </div>
-                    <div class="pinned-playlists-list" id="pinnedPlaylistsList">
-                        <!-- Dynamically populated -->
-                    </div>
-                    <div class="pinned-empty-state" id="pinnedEmptyState">
-                        <i class="fas fa-thumbtack"></i>
-                        <p>Pin playlists for quick access</p>
-                    </div>
+                   
                 </div>
 
                 <div class="nav-section">
@@ -98,28 +86,6 @@
                 </div>
             </section>
 
-            <!-- Resume Session Banner -->
-            <div class="resume-session-banner hidden" id="resumeSessionBanner">
-                <div class="resume-banner-content">
-                    <div class="resume-icon">
-                        <i class="fas fa-play-circle"></i>
-                    </div>
-                    <div class="resume-info">
-                        <h4>Continue Where You Left Off</h4>
-                        <p id="resumeSessionText">Last played: Song Name</p>
-                    </div>
-                    <div class="resume-actions">
-                        <button class="btn resume-btn" id="resumeSessionBtn">
-                            <i class="fas fa-play"></i>
-                            <span>Resume</span>
-                        </button>
-                        <button class="btn-icon dismiss-resume-btn" id="dismissResumeBtn" title="Dismiss">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-
             <div class="header">
                 <div class="breadcrumb" id="breadcrumb">
                     <span>Available Genre Libraries</span>
@@ -161,9 +127,6 @@
                         </button>
                         <button class="viz-type-btn" data-viz-type="particles" title="Pulse Particles">
                             <i class="fas fa-fire"></i>
-                        </button>
-                        <button class="viz-type-btn" data-viz-type="3d" title="3D Space Flight">
-                            <i class="fas fa-rocket"></i>
                         </button>
                     </div>
                     <button class="viz-close-btn" id="vizToggleBtn" title="Stop Visualizer">
@@ -208,10 +171,7 @@
                         <i class="fas fa-folder-plus"></i>
                         <span>Add Playlist</span>
                     </div>
-                    <div class="btn" id="importM3UBtn" title="Import M3U/M3U8 playlist">
-                        <i class="fas fa-file-import"></i>
-                        <span>Import M3U</span>
-                    </div>
+                    
                     <div class="btn" id="rescanBtn" title="Rescan all playlist folders for songs">
                         <i class="fas fa-rotate"></i>
                         <span>Rescan Playlist Libraries</span>
@@ -278,9 +238,7 @@
             <button class="control-btn" id="volumeBtn" title="Volume">
                 <i class="fas fa-volume-up"></i>
             </button>
-            <div class="volume-bar" id="volumeBar">
-                <div class="volume-fill" id="volumeFill"></div>
-            </div>
+            <div class="volume-bar" id="volumeBar"></div>
             <span class="volume-percent" id="volumePercent">70%</span>
             <button class="control-btn" id="shuffleBtn" title="Shuffle">
                 <i class="fas fa-random"></i>
@@ -291,10 +249,6 @@
             <button class="control-btn" id="crossfadeBtn" title="Crossfade: Off">
                 <i class="fas fa-wave-square"></i>
             </button>
-            <button class="control-btn" id="speedBtn" title="Playback Speed: 1.0x">
-                <i class="fas fa-gauge-high"></i>
-                <span class="speed-indicator">1.0x</span>
-            </button>
             <button class="control-btn" id="playlistBtn" title="Current Playlist">
                 <i class="fas fa-list-ul"></i>
             </button>
@@ -304,56 +258,12 @@
     <!-- Audio Elements (dual players for crossfade) -->
     <audio id="audioPlayer"></audio>
     <audio id="audioPlayerB"></audio>
-
-    <!-- Playback Speed Modal -->
-    <div class="modal" id="speedModal">
-        <div class="modal-content speed-modal-content">
-            <div class="modal-header">
-                <h3><i class="fas fa-gauge-high"></i> Playback Speed</h3>
-                <button class="modal-close" id="speedModalCloseBtn">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="speed-selector">
-                    <div class="speed-slider-container">
-                        <input type="range" id="speedSlider" min="0.5" max="2.0" step="0.05" value="1.0" class="speed-slider">
-                        <div class="speed-value-display" id="speedValueDisplay">1.00x</div>
-                    </div>
-                    <div class="speed-presets">
-                        <button class="speed-preset-btn" data-speed="0.5">
-                            <i class="fas fa-backward"></i>
-                            <span>0.5x</span>
-                        </button>
-                        <button class="speed-preset-btn" data-speed="0.75">
-                            <i class="fas fa-backward-step"></i>
-                            <span>0.75x</span>
-                        </button>
-                        <button class="speed-preset-btn active" data-speed="1.0">
-                            <i class="fas fa-circle-play"></i>
-                            <span>1.0x</span>
-                        </button>
-                        <button class="speed-preset-btn" data-speed="1.25">
-                            <i class="fas fa-forward-step"></i>
-                            <span>1.25x</span>
-                        </button>
-                        <button class="speed-preset-btn" data-speed="1.5">
-                            <i class="fas fa-forward-fast"></i>
-                            <span>1.5x</span>
-                        </button>
-                        <button class="speed-preset-btn" data-speed="2.0">
-                            <i class="fas fa-forward"></i>
-                            <span>2.0x</span>
-                        </button>
-                    </div>
-                    <div class="speed-info">
-                        <i class="fas fa-info-circle"></i>
-                        <p>Adjust playback speed without changing pitch. Perfect for podcasts, audiobooks, or quick reviews.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+    <input
+        type="file"
+        id="quickPlayFileInput"
+        accept=".mp3,.wav,.flac,.m4a,.ogg,audio/*"
+        style="display: none;"
+    >
 
     <!-- Audio Device Selector Modal -->
     <div class="modal" id="deviceSelectorModal">
@@ -802,71 +712,6 @@
         </div>
     </div>
 
-    <!-- Smart Playlist Modal -->
-    <div class="modal" id="smartPlaylistModal">
-        <div class="modal-content library-manager-content">
-            <div class="modal-header library-modal-header">
-                <div class="library-modal-heading">
-                    <span class="library-modal-kicker">Smart Playlists</span>
-                    <h3><i class="fas fa-brain"></i> Create Smart Playlist</h3>
-                    <p>Auto-updating playlists based on intelligent rules and filters.</p>
-                </div>
-                <button class="modal-close" id="smartPlaylistCloseBtn" title="Close">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body library-manager-body">
-                <form id="smartPlaylistForm" class="library-form-card">
-                    <h4><i class="fas fa-brain"></i> Playlist Details</h4>
-                    <p class="library-form-subtitle">Define rules that will automatically select matching tracks.</p>
-                    
-                    <div class="library-form-row">
-                        <label for="smartPlaylistNameInput">Playlist Name *</label>
-                        <input type="text" id="smartPlaylistNameInput" placeholder="Example: High Energy Workout" required>
-                    </div>
-                    
-                    <div class="library-form-row">
-                        <label for="smartPlaylistIconInput">Icon</label>
-                        <select id="smartPlaylistIconInput">
-                            <option value="fa-brain">🧠 Brain (Smart)</option>
-                            <option value="fa-dumbbell">💪 Dumbbell (Workout)</option>
-                            <option value="fa-heart">❤️ Heart (Love)</option>
-                            <option value="fa-fire">🔥 Fire (Hot)</option>
-                            <option value="fa-star">⭐ Star (Favorites)</option>
-                            <option value="fa-moon">🌙 Moon (Night)</option>
-                            <option value="fa-sun">☀️ Sun (Day)</option>
-                            <option value="fa-bolt">⚡ Bolt (Energy)</option>
-                        </select>
-                    </div>
-                    
-                    <div class="library-form-row">
-                        <label>Match Type</label>
-                        <select id="smartPlaylistMatchType">
-                            <option value="all">Match ALL rules (AND)</option>
-                            <option value="any">Match ANY rule (OR)</option>
-                        </select>
-                    </div>
-                    
-                    <div class="library-form-row">
-                        <label>Rules</label>
-                        <div id="smartPlaylistRules" class="smart-playlist-rules">
-                            <!-- Rules added dynamically -->
-                        </div>
-                        <button type="button" class="btn" id="addSmartRuleBtn">
-                            <i class="fas fa-plus"></i>
-                            <span>Add Rule</span>
-                        </button>
-                    </div>
-                    
-                    <button type="submit" class="btn library-submit-btn">
-                        <i class="fas fa-brain"></i>
-                        <span>Create Smart Playlist</span>
-                    </button>
-                </form>
-            </div>
-        </div>
-    </div>
-
     <!-- Modern Folder Browser Modal -->
     <div class="modal" id="folderBrowserModal">
         <div class="modal-content folder-browser-content">
@@ -977,10 +822,9 @@
         </aside>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/nouislider@15.8.1/dist/nouislider.min.js"></script>
     <script src="m3u-parser.js"></script>
     <script src="visualizer.js"></script>
-    <script src="visualizer-3d.js"></script>
     <script src="audio-device-selector.js"></script>
     <script src="data.js"></script>
     <script src="player.js"></script>
