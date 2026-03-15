@@ -3090,9 +3090,7 @@ function setupEventListeners() {
 
     const historyCalendarNav = document.getElementById('historyCalendarNav');
     if (historyCalendarNav) {
-        historyCalendarNav.addEventListener('click', () => {
-            showNotification('Calendar Feature', 'Listening History Calendar coming soon! Track your music journey over time.', 'info');
-        });
+        historyCalendarNav.addEventListener('click', showHistoryCalendar);
     }
 
     // Theme toggle
@@ -3258,6 +3256,43 @@ function setupEventListeners() {
     if (addSmartRuleBtn) {
         addSmartRuleBtn.addEventListener('click', addSmartPlaylistRule);
     }
+
+    // Speed Control event listeners
+    const speedBtn = document.getElementById('speedBtn');
+    if (speedBtn) {
+        speedBtn.addEventListener('click', openSpeedModal);
+    }
+
+    const speedModalCloseBtn = document.getElementById('speedModalCloseBtn');
+    if (speedModalCloseBtn) {
+        speedModalCloseBtn.addEventListener('click', closeSpeedModal);
+    }
+
+    const speedModal = document.getElementById('speedModal');
+    if (speedModal) {
+        speedModal.addEventListener('click', (e) => {
+            if (e.target === speedModal) {
+                closeSpeedModal();
+            }
+        });
+    }
+
+    const speedSlider = document.getElementById('speedSlider');
+    if (speedSlider) {
+        speedSlider.addEventListener('input', (e) => {
+            handleSpeedSliderChange(e.target.value);
+        });
+    }
+
+    const speedPresetBtns = document.querySelectorAll('.speed-preset-btn');
+    speedPresetBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const speed = Number(btn.dataset.speed);
+            if (Number.isFinite(speed)) {
+                handleSpeedPresetClick(speed);
+            }
+        });
+    });
 
     // Modern Folder Browser Controls
     const folderBrowserCloseBtn = document.getElementById('folderBrowserCloseBtn');
@@ -4574,9 +4609,63 @@ function showError() {
 }
 
 // Playback Speed Functions
-function loadPlaybackSpeedFromStorage() {
-    // Stub - feature to be fully implemented
-    console.log('Playback speed feature loading...');
+function openSpeedModal() {
+    const modal = document.getElementById('speedModal');
+    if (!modal) return;
+    
+    // Set current speed in slider and display
+    const speedSlider = document.getElementById('speedSlider');
+    const speedValueDisplay = document.getElementById('speedValueDisplay');
+    
+    if (speedSlider) {
+        speedSlider.value = currentPlaybackSpeed;
+    }
+    
+    if (speedValueDisplay) {
+        speedValueDisplay.textContent = `${currentPlaybackSpeed.toFixed(1)}x`;
+    }
+    
+    // Update preset buttons
+    updateSpeedPresetButtons();
+    
+    modal.classList.add('show');
+}
+
+function closeSpeedModal() {
+    const modal = document.getElementById('speedModal');
+    if (!modal) return;
+    modal.classList.remove('show');
+}
+
+function updateSpeedPresetButtons() {
+    const presetButtons = document.querySelectorAll('.speed-preset-btn');
+    presetButtons.forEach(btn => {
+        const btnSpeed = Number(btn.dataset.speed);
+        const isActive = Math.abs(btnSpeed - currentPlaybackSpeed) < 0.01;
+        btn.classList.toggle('active', isActive);
+    });
+}
+
+function handleSpeedSliderChange(value) {
+    const speed = Number(value);
+    if (!Number.isFinite(speed)) return;
+    
+    const speedValueDisplay = document.getElementById('speedValueDisplay');
+    if (speedValueDisplay) {
+        speedValueDisplay.textContent = `${speed.toFixed(1)}x`;
+    }
+    
+    setPlaybackSpeed(speed);
+    updateSpeedPresetButtons();
+}
+
+function handleSpeedPresetClick(speed) {
+    const speedSlider = document.getElementById('speedSlider');
+    if (speedSlider) {
+        speedSlider.value = speed;
+    }
+    
+    handleSpeedSliderChange(speed);
 }
 
 // Session Management Functions
@@ -4748,6 +4837,30 @@ function showSmartPlaylists() {
     
     renderSmartPlaylists();
     updateStatsForSmartPlaylists();
+    updateWorkspaceStatus();
+}
+
+function showHistoryCalendar() {
+    currentView = 'history';
+    selectedGenre = null;
+    
+    setActiveMainNav('historyCalendarNav');
+    setActiveGenreItem(null);
+    
+    clearGlobalSearchState();
+    
+    renderBreadcrumb([
+        { label: 'Genre Library', action: 'show-all' },
+        { label: 'Listening History', current: true }
+    ]);
+    
+    // Call the render function from listening-history.js
+    if (typeof renderHistoryCalendar === 'function') {
+        renderHistoryCalendar();
+    } else {
+        showNotification('Feature Loading', 'Listening History Calendar is loading...', 'info');
+    }
+    
     updateWorkspaceStatus();
 }
 

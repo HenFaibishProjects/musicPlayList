@@ -125,7 +125,13 @@ function playTrack() {
     currentPlayer.play().catch(err => console.error('Error playing audio:', err));
     isPlaying = true;
     const currentTrack = currentPlaylist[currentTrackIndex];
-    if (currentTrack) addTrackToRecentlyPlayed(currentTrack, currentPlaylistContext);
+    if (currentTrack) {
+        addTrackToRecentlyPlayed(currentTrack, currentPlaylistContext);
+        // Track in listening history calendar
+        if (typeof trackPlayInHistory === 'function') {
+            trackPlayInHistory(currentTrack, currentPlaylistContext);
+        }
+    }
     updatePlayButton();
 }
 
@@ -152,6 +158,59 @@ function toggleCrossfade() {
     const btn = document.getElementById('crossfadeBtn');
     btn.classList.toggle('active', crossfadeEnabled);
     btn.title = crossfadeEnabled ? `Crossfade: ${crossfadeDuration}s` : 'Crossfade: Off';
+}
+
+// Playback Speed Control
+function setPlaybackSpeed(speed) {
+    const validSpeed = Math.max(0.25, Math.min(2.0, Number(speed) || 1.0));
+    currentPlaybackSpeed = validSpeed;
+    
+    // Apply to both players
+    if (audioPlayer) audioPlayer.playbackRate = validSpeed;
+    if (audioPlayerB) audioPlayerB.playbackRate = validSpeed;
+    
+    // Update UI
+    updateSpeedButton();
+    
+    // Save to localStorage
+    savePlaybackSpeedToStorage();
+}
+
+function updateSpeedButton() {
+    const speedBtn = document.getElementById('speedBtn');
+    const speedIndicator = speedBtn?.querySelector('.speed-indicator');
+    
+    if (speedBtn) {
+        speedBtn.title = `Playback Speed: ${currentPlaybackSpeed.toFixed(2)}x`;
+        speedBtn.classList.toggle('active', currentPlaybackSpeed !== 1.0);
+    }
+    
+    if (speedIndicator) {
+        speedIndicator.textContent = `${currentPlaybackSpeed.toFixed(1)}x`;
+    }
+}
+
+function savePlaybackSpeedToStorage() {
+    try {
+        localStorage.setItem(PLAYBACK_SPEED_STORAGE_KEY, String(currentPlaybackSpeed));
+    } catch (error) {
+        console.warn('Failed to save playback speed:', error);
+    }
+}
+
+function loadPlaybackSpeedFromStorage() {
+    try {
+        const raw = localStorage.getItem(PLAYBACK_SPEED_STORAGE_KEY);
+        if (raw) {
+            const speed = Number(raw);
+            if (Number.isFinite(speed) && speed >= 0.25 && speed <= 2.0) {
+                currentPlaybackSpeed = speed;
+                updateSpeedButton();
+            }
+        }
+    } catch (error) {
+        console.warn('Failed to load playback speed:', error);
+    }
 }
 
 function formatTime(seconds) {

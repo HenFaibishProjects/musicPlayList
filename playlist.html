@@ -259,6 +259,10 @@
             <button class="control-btn" id="crossfadeBtn" title="Crossfade: Off">
                 <i class="fas fa-wave-square"></i>
             </button>
+            <button class="control-btn" id="speedBtn" title="Playback Speed: 1.0x">
+                <i class="fas fa-gauge-high"></i>
+                <span class="speed-indicator">1.0x</span>
+            </button>
             <button class="control-btn" id="playlistBtn" title="Current Playlist">
                 <i class="fas fa-list-ul"></i>
             </button>
@@ -831,6 +835,56 @@
         </div>
     </div>
 
+    <!-- Playback Speed Modal -->
+    <div class="modal" id="speedModal">
+        <div class="modal-content speed-modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-gauge-high"></i> Playback Speed</h3>
+                <button class="modal-close" id="speedModalCloseBtn">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body speed-selector">
+                <div class="speed-slider-container">
+                    <input type="range" id="speedSlider" class="speed-slider" min="0.25" max="2.0" step="0.05" value="1.0">
+                    <div class="speed-value-display" id="speedValueDisplay">1.0x</div>
+                </div>
+                
+                <div class="speed-presets">
+                    <button type="button" class="speed-preset-btn" data-speed="0.5">
+                        <i class="fas fa-turtle"></i>
+                        <span>0.5x</span>
+                    </button>
+                    <button type="button" class="speed-preset-btn" data-speed="0.75">
+                        <i class="fas fa-walking"></i>
+                        <span>0.75x</span>
+                    </button>
+                    <button type="button" class="speed-preset-btn active" data-speed="1.0">
+                        <i class="fas fa-play"></i>
+                        <span>1.0x</span>
+                    </button>
+                    <button type="button" class="speed-preset-btn" data-speed="1.25">
+                        <i class="fas fa-forward"></i>
+                        <span>1.25x</span>
+                    </button>
+                    <button type="button" class="speed-preset-btn" data-speed="1.5">
+                        <i class="fas fa-forward-fast"></i>
+                        <span>1.5x</span>
+                    </button>
+                    <button type="button" class="speed-preset-btn" data-speed="2.0">
+                        <i class="fas fa-rocket"></i>
+                        <span>2.0x</span>
+                    </button>
+                </div>
+                
+                <div class="speed-info">
+                    <i class="fas fa-info-circle"></i>
+                    <p>Adjust playback speed from 0.25x (slower) to 2.0x (faster). Perfect for podcasts, audiobooks, or learning music by ear.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Notification Modal -->
     <div class="notification-overlay" id="notificationOverlay">
         <div class="notification-modal">
@@ -890,6 +944,7 @@
     <script src="visualizer-3d.js"></script>
     <script src="audio-device-selector.js"></script>
     <script src="data.js"></script>
+    <script src="listening-history.js"></script>
     <script src="player.js"></script>
     <script src="playlists.js"></script>
     <script src="ui.js"></script>
