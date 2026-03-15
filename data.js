@@ -1,13 +1,22 @@
 // Data Management & API
 const DEFAULT_COVER = 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=400&fit=crop';
 const RECENT_TRACKS_STORAGE_KEY = 'musicvault_recent_tracks_v1';
+const SMART_PLAYLISTS_STORAGE_KEY = 'musicvault_smart_playlists_v1';
+const SESSION_STORAGE_KEY = 'musicvault_listening_session_v1';
+const PINNED_PLAYLISTS_STORAGE_KEY = 'musicvault_pinned_playlists_v1';
+const PLAYBACK_SPEED_STORAGE_KEY = 'musicvault_playback_speed_v1';
 const MAX_RECENT_TRACKS = 100;
+const MAX_PINNED_PLAYLISTS = 10;
 
 // Global state
 let libraryData = null;
 let apiAvailable = false;
 let isRescanningLibrary = false;
 let recentTracks = [];
+let smartPlaylists = [];
+let listeningSession = null;
+let sessionSaveTimer = null;
+let pinnedPlaylists = [];
 
 // Utility functions
 function escapeHtml(value) {
