@@ -1,5 +1,5 @@
 // UI state variables are in playlists.js (currentView, selectedGenre, currentSort, etc.)
-// Data variables are in data.js (libraryData, apiAvailable, recentTracks, smartPlaylists, etc.)
+// Data variables are in data.js (libraryData, apiAvailable, recentTracks, etc.)
 // Player state variables are in player.js (audioPlayer, currentPlaylist, isPlaying, etc.)
 
 // Script-specific state (modalFormBaseline, notificationAutoCloseTimer, pendingDeletePlaylist, editingGenreContext are in ui.js)
@@ -10,6 +10,100 @@ let folderBrowserState = {
     targetInputId: null,
     onSelect: null
 };
+
+let quickPlayObjectUrl = null;
+let volumeSliderInstance = null;
+let isUpdatingVolumeSlider = false;
+let lastVolume = -1;
+
+function isQuickPlayTrack(track) {
+    return Boolean(track && track.__quickPlay === true);
+}
+
+function isQuickPlayModeActive() {
+    return currentPlaylist.length === 1 && isQuickPlayTrack(currentPlaylist[0]);
+}
+
+function releaseQuickPlayObjectUrl({ exceptUrl = '' } = {}) {
+    if (!quickPlayObjectUrl) return;
+    if (exceptUrl && quickPlayObjectUrl === exceptUrl) return;
+
+    try {
+        URL.revokeObjectURL(quickPlayObjectUrl);
+    } catch (error) {
+        console.warn('Failed to revoke Quick Play object URL:', error);
+    }
+
+    quickPlayObjectUrl = null;
+}
+
+function getFileNameWithoutExtension(fileName = '') {
+    const value = String(fileName || '').trim();
+    if (!value) return 'Quick Play';
+
+    const extensionIndex = value.lastIndexOf('.');
+    if (extensionIndex <= 0) {
+        return value;
+    }
+
+    return value.slice(0, extensionIndex);
+}
+
+function createQuickPlayTrack(file, fileUrl) {
+    const fileName = String(file?.name || 'Quick Play').trim() || 'Quick Play';
+    return {
+        id: `quick-play-${Date.now()}`,
+        title: getFileNameWithoutExtension(fileName),
+        artist: 'Duration: --:--',
+        album: '',
+        duration: '--:--',
+        cover: DEFAULT_COVER,
+        file: fileUrl,
+        __quickPlay: true,
+        __quickPlayFileName: fileName
+    };
+}
+
+function openQuickPlayFilePicker() {
+    const fileInput = document.getElementById('quickPlayFileInput');
+    if (!fileInput) return;
+
+    // Reset so selecting the same file twice still triggers change event
+    fileInput.value = '';
+    fileInput.click();
+}
+
+function playQuickPlayFile(file) {
+    if (!file) return;
+
+    const isLikelyAudio = (file.type || '').startsWith('audio/') || /\.(mp3|wav|flac|m4a|ogg)$/i.test(file.name || '');
+    if (!isLikelyAudio) {
+        showNotification('Unsupported File', 'Please choose an audio file (mp3, wav, flac, m4a, ogg).', 'warning');
+        return;
+    }
+
+    releaseQuickPlayObjectUrl();
+    const objectUrl = URL.createObjectURL(file);
+    quickPlayObjectUrl = objectUrl;
+
+    const quickTrack = createQuickPlayTrack(file, objectUrl);
+    currentPlaylistContext = {
+        playlistName: 'Quick Play',
+        genreName: ''
+    };
+
+    currentPlaylist = [quickTrack];
+    currentTrackIndex = 0;
+    rebuildPlaybackOrder(0);
+    loadTrack(quickTrack);
+    playTrack();
+}
+
+function handleQuickPlayFileChange(event) {
+    const file = event?.target?.files?.[0];
+    if (!file) return;
+    playQuickPlayFile(file);
+}
 
 function serializeFormState(form) {
     if (!form) return '';
@@ -1822,7 +1916,6 @@ async function init() {
     try {
         createBackgroundParticles();
         loadRecentTracksFromStorage();
-        loadSmartPlaylists();
         setupEventListeners();
         initializePlayer();
 
@@ -1873,11 +1966,7 @@ function initializePlayer() {
     audioPlayer.volume = currentVolume;
     audioPlayerB.volume = currentVolume;
     
-    const volumeFill = document.getElementById('volumeFill');
-    if (volumeFill) {
-        volumeFill.style.width = (currentVolume * 100) + '%';
-    }
-    
+    initializeVolumeSlider();
     updateVolumeIcon();
     
     // Initialize visualizer safely
@@ -1915,16 +2004,6 @@ function initializePlayer() {
     
     // Volume controls
     document.getElementById('volumeBtn').addEventListener('click', toggleMute);
-    const volumeBar = document.getElementById('volumeBar');
-    volumeBar.addEventListener('click', setVolume);
-    volumeBar.addEventListener('mousedown', startVolumeDrag);
-    volumeBar.addEventListener('touchstart', startVolumeDrag, { passive: false });
-
-    document.addEventListener('mousemove', onVolumeDrag);
-    document.addEventListener('touchmove', onVolumeDrag, { passive: false });
-    document.addEventListener('mouseup', stopVolumeDrag);
-    document.addEventListener('touchend', stopVolumeDrag);
-    document.addEventListener('touchcancel', stopVolumeDrag);
     
     // Audio events for both players
     audioPlayer.addEventListener('timeupdate', updateProgress);
@@ -1960,57 +2039,73 @@ function initializePlayer() {
     });
 }
 
-function getPointerClientX(e) {
-    if (e.touches && e.touches.length > 0) {
-        return e.touches[0].clientX;
+function updateVolumeUI(volume) {
+    const nextVolume = Math.max(0, Math.min(1, Number(volume) || 0));
+    if (Math.abs(nextVolume - lastVolume) < 0.005) return;
+
+    lastVolume = nextVolume;
+
+    if (volumeSliderInstance && !isUpdatingVolumeSlider) {
+        isUpdatingVolumeSlider = true;
+        volumeSliderInstance.set(Math.round(nextVolume * 100));
+        isUpdatingVolumeSlider = false;
     }
-    if (e.changedTouches && e.changedTouches.length > 0) {
-        return e.changedTouches[0].clientX;
-    }
-    return e.clientX;
-}
 
-function setVolumeFromClientX(clientX) {
-    const volumeBar = document.getElementById('volumeBar');
-    if (!volumeBar || typeof clientX !== 'number') return;
-
-    const rect = volumeBar.getBoundingClientRect();
-    if (!rect.width) return;
-
-    const percent = (clientX - rect.left) / rect.width;
-    const nextVolume = Math.max(0, Math.min(1, percent));
-    const changed = Math.abs(nextVolume - currentVolume) > 0.001;
-
-    currentVolume = nextVolume;
-    audioPlayer.volume = currentVolume;
-    document.getElementById('volumeFill').style.width = (currentVolume * 100) + '%';
-    updateVolumePercentage(currentVolume);
+    updateVolumePercentage(nextVolume);
     updateVolumeIcon();
-
-    if (changed) {
-        scheduleSystemVolumeSync();
-    }
 }
 
-function startVolumeDrag(e) {
-    isDraggingVolume = true;
-    if (e.cancelable) {
-        e.preventDefault();
-    }
-    setVolumeFromClientX(getPointerClientX(e));
-}
+function initializeVolumeSlider() {
+    const volumeBar = document.getElementById('volumeBar');
+    if (!volumeBar || !window.noUiSlider) return;
 
-function onVolumeDrag(e) {
-    if (!isDraggingVolume) return;
-    if (e.cancelable) {
-        e.preventDefault();
+    if (volumeBar.noUiSlider) {
+        volumeBar.noUiSlider.destroy();
     }
-    setVolumeFromClientX(getPointerClientX(e));
-}
 
-function stopVolumeDrag() {
-    isDraggingVolume = false;
-    syncVolumeToSystem({ immediate: true });
+    noUiSlider.create(volumeBar, {
+        start: Math.round(currentVolume * 100),
+        range: {
+            min: 0,
+            max: 100
+        },
+        step: 1,
+        connect: [true, false]
+    });
+
+    volumeSliderInstance = volumeBar.noUiSlider;
+
+    volumeSliderInstance.on('start', () => {
+        isDraggingVolume = true;
+    });
+
+    volumeSliderInstance.on('update', (values) => {
+        if (isUpdatingVolumeSlider) return;
+
+        const value = Number(values?.[0]);
+        if (!Number.isFinite(value)) return;
+
+        const volume = Math.max(0, Math.min(1, value / 100));
+        const changed = Math.abs(volume - currentVolume) > 0.001;
+
+        currentVolume = volume;
+        audioPlayer.volume = volume;
+        if (!fadeIntervals.B) {
+            audioPlayerB.volume = volume;
+        }
+
+        updateVolumePercentage(volume);
+        updateVolumeIcon();
+
+        if (changed) {
+            scheduleSystemVolumeSync();
+        }
+    });
+
+    volumeSliderInstance.on('end', () => {
+        isDraggingVolume = false;
+        syncVolumeToSystem({ immediate: true });
+    });
 }
 
 // Resize visualizer canvas
@@ -2055,6 +2150,10 @@ function loadPlaylist(playlist, genreName = '') {
 
 // Load a specific track
 function loadTrack(track) {
+    if (!isQuickPlayTrack(track)) {
+        releaseQuickPlayObjectUrl();
+    }
+
     // Cancel any ongoing crossfade
     if (crossfadeTimer) {
         clearTimeout(crossfadeTimer);
@@ -2082,7 +2181,9 @@ function loadTrack(track) {
     activePlayer = 'A';
     
     document.getElementById('playerTitle').textContent = track.title;
-    document.getElementById('playerArtist').textContent = track.artist;
+    document.getElementById('playerArtist').textContent = isQuickPlayTrack(track)
+        ? `Duration: ${track.duration || '--:--'}`
+        : track.artist;
     const playerCover = document.getElementById('playerCover');
     if (playerCover) {
         playerCover.src = track.cover || DEFAULT_COVER;
@@ -2097,6 +2198,11 @@ function loadTrack(track) {
 // Play track
 function playTrack() {
     const currentPlayer = getActivePlayer();
+
+    if (currentPlayer && currentPlayer.ended) {
+        currentPlayer.currentTime = 0;
+    }
+
     currentPlayer.play().catch(err => {
         console.error('Error playing audio:', err);
         showNotification(
@@ -2107,7 +2213,7 @@ function playTrack() {
     });
     isPlaying = true;
     const currentTrack = currentPlaylist[currentTrackIndex];
-    if (currentTrack) {
+    if (currentTrack && !isQuickPlayTrack(currentTrack)) {
         addTrackToRecentlyPlayed(currentTrack, currentPlaylistContext);
     }
     updatePlayButton();
@@ -2178,7 +2284,20 @@ function playPrevious() {
 }
 
 // Handle track end
-function handleTrackEnd() {
+function handleTrackEnd(event) {
+    const activeTrack = currentPlaylist[currentTrackIndex];
+    if (isQuickPlayTrack(activeTrack)) {
+        const currentPlayer = getActivePlayer();
+        if (currentPlayer) {
+            currentPlayer.pause();
+            currentPlayer.currentTime = 0;
+        }
+        isPlaying = false;
+        updatePlayButton();
+        updateProgress();
+        return;
+    }
+
     // Only handle if the ended player is the active one
     const endedPlayer = event?.target || audioPlayer;
     const currentPlayer = getActivePlayer();
@@ -2407,7 +2526,24 @@ function updateProgress() {
 // Update duration display
 function updateDuration() {
     const currentPlayer = getActivePlayer();
-    document.getElementById('totalTime').textContent = formatTime(currentPlayer.duration);
+    const formatted = formatTime(currentPlayer.duration);
+    document.getElementById('totalTime').textContent = formatted;
+
+    const currentTrack = currentPlaylist[currentTrackIndex];
+    if (currentTrack && isFinite(currentPlayer.duration)) {
+        currentTrack.duration = formatted;
+
+        if (isQuickPlayTrack(currentTrack)) {
+            const playerArtist = document.getElementById('playerArtist');
+            if (playerArtist) {
+                playerArtist.textContent = `Duration: ${formatted}`;
+            }
+        }
+
+        if (isQueuePanelOpen) {
+            renderQueuePanel();
+        }
+    }
 }
 
 // Seek to position
@@ -2429,27 +2565,23 @@ function seekTo(e) {
     }
 }
 
-// Set volume
-function setVolume(e) {
-    setVolumeFromClientX(getPointerClientX(e));
-}
-
 // Toggle mute
 function toggleMute() {
     if (audioPlayer.volume > 0) {
-        audioPlayer.volume = 0;
         currentVolume = 0;
-        document.getElementById('volumeFill').style.width = '0%';
-        updateVolumePercentage(0);
+        if (!fadeIntervals.A) audioPlayer.volume = 0;
+        if (!fadeIntervals.B) audioPlayerB.volume = 0;
+        updateVolumeUI(0);
     } else {
         if (currentVolume <= 0) {
             currentVolume = 0.5;
         }
-        audioPlayer.volume = currentVolume;
-        document.getElementById('volumeFill').style.width = (currentVolume * 100) + '%';
-        updateVolumePercentage(currentVolume);
+
+        if (!fadeIntervals.A) audioPlayer.volume = currentVolume;
+        if (!fadeIntervals.B) audioPlayerB.volume = currentVolume;
+        updateVolumeUI(currentVolume);
     }
-    updateVolumeIcon();
+
     syncVolumeToSystem({ immediate: true });
 }
 
@@ -2484,10 +2616,8 @@ function applyVolumeToUI(volume) {
     // Update both players' base volume (active player might be fading)
     if (!fadeIntervals.A) audioPlayer.volume = next;
     if (!fadeIntervals.B) audioPlayerB.volume = next;
-    
-    document.getElementById('volumeFill').style.width = (next * 100) + '%';
-    updateVolumePercentage(next);
-    updateVolumeIcon();
+
+    updateVolumeUI(next);
 }
 
 async function fetchSystemVolume() {
@@ -2854,6 +2984,7 @@ function removeTrackFromQueue(index) {
     currentPlaylist.splice(index, 1);
 
     if (currentPlaylist.length === 0) {
+        releaseQuickPlayObjectUrl();
         pauseTrack();
         audioPlayer.removeAttribute('src');
         audioPlayer.load();
@@ -2896,6 +3027,7 @@ function clearCurrentQueue() {
     currentTrackIndex = 0;
     playbackOrder = [];
     playbackOrderPosition = 0;
+    releaseQuickPlayObjectUrl();
     pauseTrack();
     audioPlayer.removeAttribute('src');
     audioPlayer.load();
@@ -3158,6 +3290,16 @@ function setupEventListeners() {
     const importM3UForm = document.getElementById('importM3UForm');
     if (importM3UForm) {
         importM3UForm.addEventListener('submit', importM3UPlaylist);
+    }
+
+    const quickPlayBtn = document.getElementById('quickPlayBtn');
+    if (quickPlayBtn) {
+        quickPlayBtn.addEventListener('click', openQuickPlayFilePicker);
+    }
+
+    const quickPlayFileInput = document.getElementById('quickPlayFileInput');
+    if (quickPlayFileInput) {
+        quickPlayFileInput.addEventListener('change', handleQuickPlayFileChange);
     }
 
     const methodBtns = document.querySelectorAll('.method-btn');
@@ -4930,6 +5072,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (typeof initializeProgressWaveform === 'function') {
         setTimeout(initializeProgressWaveform, 100);
     }
+});
+
+window.addEventListener('beforeunload', () => {
+    releaseQuickPlayObjectUrl();
 });
 
 // Initialize on page load

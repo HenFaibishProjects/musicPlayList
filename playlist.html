@@ -6,6 +6,7 @@
     <title>Music Playlist Manager - Professional Edition</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nouislider@15.8.1/dist/nouislider.min.css">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -34,10 +35,15 @@
                         <i class="fas fa-clock"></i>
                         <span>Recently Played</span>
                     </div>
-                    <div class="nav-item" id="smartPlaylistsNav">
-                        <i class="fas fa-brain"></i>
-                        <span>Smart Playlists</span>
+                     <div class="nav-item" id="importM3UBtn" title="Import M3U/M3U8 playlist">
+                        <i class="fas fa-file-import"></i>
+                        <span>Import M3U</span>
                     </div>
+                      <div class="btn-nav" id="quickPlayBtn" title="Play a single local audio file instantly">
+                        <i class="fas fa-bolt"></i>
+                        <span>Quick Play</span>
+                    </div>
+                   
                 </div>
 
                 <div class="nav-section">
@@ -165,10 +171,7 @@
                         <i class="fas fa-folder-plus"></i>
                         <span>Add Playlist</span>
                     </div>
-                    <div class="btn" id="importM3UBtn" title="Import M3U/M3U8 playlist">
-                        <i class="fas fa-file-import"></i>
-                        <span>Import M3U</span>
-                    </div>
+                    
                     <div class="btn" id="rescanBtn" title="Rescan all playlist folders for songs">
                         <i class="fas fa-rotate"></i>
                         <span>Rescan Playlist Libraries</span>
@@ -235,9 +238,7 @@
             <button class="control-btn" id="volumeBtn" title="Volume">
                 <i class="fas fa-volume-up"></i>
             </button>
-            <div class="volume-bar" id="volumeBar">
-                <div class="volume-fill" id="volumeFill"></div>
-            </div>
+            <div class="volume-bar" id="volumeBar"></div>
             <span class="volume-percent" id="volumePercent">70%</span>
             <button class="control-btn" id="shuffleBtn" title="Shuffle">
                 <i class="fas fa-random"></i>
@@ -257,6 +258,12 @@
     <!-- Audio Elements (dual players for crossfade) -->
     <audio id="audioPlayer"></audio>
     <audio id="audioPlayerB"></audio>
+    <input
+        type="file"
+        id="quickPlayFileInput"
+        accept=".mp3,.wav,.flac,.m4a,.ogg,audio/*"
+        style="display: none;"
+    >
 
     <!-- Audio Device Selector Modal -->
     <div class="modal" id="deviceSelectorModal">
@@ -705,71 +712,6 @@
         </div>
     </div>
 
-    <!-- Smart Playlist Modal -->
-    <div class="modal" id="smartPlaylistModal">
-        <div class="modal-content library-manager-content">
-            <div class="modal-header library-modal-header">
-                <div class="library-modal-heading">
-                    <span class="library-modal-kicker">Smart Playlists</span>
-                    <h3><i class="fas fa-brain"></i> Create Smart Playlist</h3>
-                    <p>Auto-updating playlists based on intelligent rules and filters.</p>
-                </div>
-                <button class="modal-close" id="smartPlaylistCloseBtn" title="Close">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body library-manager-body">
-                <form id="smartPlaylistForm" class="library-form-card">
-                    <h4><i class="fas fa-brain"></i> Playlist Details</h4>
-                    <p class="library-form-subtitle">Define rules that will automatically select matching tracks.</p>
-                    
-                    <div class="library-form-row">
-                        <label for="smartPlaylistNameInput">Playlist Name *</label>
-                        <input type="text" id="smartPlaylistNameInput" placeholder="Example: High Energy Workout" required>
-                    </div>
-                    
-                    <div class="library-form-row">
-                        <label for="smartPlaylistIconInput">Icon</label>
-                        <select id="smartPlaylistIconInput">
-                            <option value="fa-brain">🧠 Brain (Smart)</option>
-                            <option value="fa-dumbbell">💪 Dumbbell (Workout)</option>
-                            <option value="fa-heart">❤️ Heart (Love)</option>
-                            <option value="fa-fire">🔥 Fire (Hot)</option>
-                            <option value="fa-star">⭐ Star (Favorites)</option>
-                            <option value="fa-moon">🌙 Moon (Night)</option>
-                            <option value="fa-sun">☀️ Sun (Day)</option>
-                            <option value="fa-bolt">⚡ Bolt (Energy)</option>
-                        </select>
-                    </div>
-                    
-                    <div class="library-form-row">
-                        <label>Match Type</label>
-                        <select id="smartPlaylistMatchType">
-                            <option value="all">Match ALL rules (AND)</option>
-                            <option value="any">Match ANY rule (OR)</option>
-                        </select>
-                    </div>
-                    
-                    <div class="library-form-row">
-                        <label>Rules</label>
-                        <div id="smartPlaylistRules" class="smart-playlist-rules">
-                            <!-- Rules added dynamically -->
-                        </div>
-                        <button type="button" class="btn" id="addSmartRuleBtn">
-                            <i class="fas fa-plus"></i>
-                            <span>Add Rule</span>
-                        </button>
-                    </div>
-                    
-                    <button type="submit" class="btn library-submit-btn">
-                        <i class="fas fa-brain"></i>
-                        <span>Create Smart Playlist</span>
-                    </button>
-                </form>
-            </div>
-        </div>
-    </div>
-
     <!-- Modern Folder Browser Modal -->
     <div class="modal" id="folderBrowserModal">
         <div class="modal-content folder-browser-content">
@@ -880,6 +822,7 @@
         </aside>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/nouislider@15.8.1/dist/nouislider.min.js"></script>
     <script src="m3u-parser.js"></script>
     <script src="visualizer.js"></script>
     <script src="audio-device-selector.js"></script>

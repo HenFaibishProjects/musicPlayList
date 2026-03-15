@@ -612,6 +612,20 @@ body::before {
     gap: 8px;
 }
 
+.btn-nav {
+    padding: 11px 18px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    color: #eb65f5;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s var(--ease-smooth);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
 .btn:hover {
     background: rgba(255, 255, 255, 0.1);
     color: white;
@@ -1394,23 +1408,43 @@ body.is-playing .player-cover {
 .volume-bar {
     width: 120px;
     height: 8px;
+}
+
+.volume-bar.noUi-target {
+    border: 0;
+    box-shadow: none;
+    background: transparent;
+}
+
+.volume-bar .noUi-base {
+    border-radius: 999px;
+}
+
+.volume-bar .noUi-connects {
     background: rgba(255, 255, 255, 0.1);
     border-radius: 999px;
-    position: relative;
-    cursor: pointer;
-    transition: all 0.3s ease;
 }
 
-.volume-bar:hover {
-    height: 10px;
-}
-
-.volume-fill {
-    height: 100%;
+.volume-bar .noUi-connect {
     background: var(--gradient-secondary);
-    border-radius: 999px;
-    width: 70%;
     box-shadow: 0 0 16px rgba(34, 211, 238, 0.4);
+}
+
+.volume-bar .noUi-handle {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 0;
+    background: #fff;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35), 0 0 16px rgba(96, 165, 250, 0.45);
+    right: -7px;
+    top: -3px;
+    cursor: pointer;
+}
+
+.volume-bar .noUi-handle::before,
+.volume-bar .noUi-handle::after {
+    display: none;
 }
 
 .volume-percent {

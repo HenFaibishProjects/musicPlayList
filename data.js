@@ -1,7 +1,6 @@
 // Data Management & API
 const DEFAULT_COVER = 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=400&fit=crop';
 const RECENT_TRACKS_STORAGE_KEY = 'musicvault_recent_tracks_v1';
-const SMART_PLAYLISTS_STORAGE_KEY = 'musicvault_smart_playlists_v1';
 const MAX_RECENT_TRACKS = 100;
 
 // Global state
@@ -9,7 +8,6 @@ let libraryData = null;
 let apiAvailable = false;
 let isRescanningLibrary = false;
 let recentTracks = [];
-let smartPlaylists = [];
 
 // Utility functions
 function escapeHtml(value) {
@@ -127,51 +125,6 @@ function addTrackToRecentlyPlayed(track, context = {}) {
     recentTracks.unshift(normalizedTrack);
     recentTracks = recentTracks.slice(0, MAX_RECENT_TRACKS);
     saveRecentTracksToStorage();
-}
-
-// Smart Playlists Storage
-function loadSmartPlaylists() {
-    try {
-        const raw = localStorage.getItem(SMART_PLAYLISTS_STORAGE_KEY);
-        if (!raw) {
-            smartPlaylists = getDefaultSmartPlaylists();
-            saveSmartPlaylists();
-            return;
-        }
-        const parsed = JSON.parse(raw);
-        smartPlaylists = Array.isArray(parsed) ? parsed : getDefaultSmartPlaylists();
-    } catch (error) {
-        console.warn('Failed to load smart playlists:', error);
-        smartPlaylists = getDefaultSmartPlaylists();
-    }
-}
-
-function saveSmartPlaylists() {
-    try {
-        localStorage.setItem(SMART_PLAYLISTS_STORAGE_KEY, JSON.stringify(smartPlaylists));
-    } catch (error) {
-        console.warn('Failed to save smart playlists:', error);
-    }
-}
-
-function getDefaultSmartPlaylists() {
-    return [
-        {
-            id: 'smart-high-energy', name: 'High Energy Workout', icon: 'fa-dumbbell',
-            color: '#f97316', matchType: 'all',
-            rules: [{ field: 'bpm', operator: 'greater', value: '120' }]
-        },
-        {
-            id: 'smart-classics', name: 'Classic Oldies', icon: 'fa-compact-disc',
-            color: '#3b82f6', matchType: 'all',
-            rules: [{ field: 'year', operator: 'less', value: '1990' }]
-        },
-        {
-            id: 'smart-recent', name: 'Recently Added', icon: 'fa-clock',
-            color: '#10b981', matchType: 'all',
-            rules: [{ field: 'addedDays', operator: 'less', value: '30' }]
-        }
-    ];
 }
 
 function getAllTracksWithContext() {
