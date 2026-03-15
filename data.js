@@ -2,7 +2,10 @@
 const DEFAULT_COVER = 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=400&fit=crop';
 const RECENT_TRACKS_STORAGE_KEY = 'musicvault_recent_tracks_v1';
 const SMART_PLAYLISTS_STORAGE_KEY = 'musicvault_smart_playlists_v1';
+const SESSION_STORAGE_KEY = 'musicvault_listening_session_v1';
+const PINNED_PLAYLISTS_STORAGE_KEY = 'musicvault_pinned_playlists_v1';
 const MAX_RECENT_TRACKS = 100;
+const MAX_PINNED_PLAYLISTS = 10;
 
 // Global state
 let libraryData = null;
@@ -10,6 +13,9 @@ let apiAvailable = false;
 let isRescanningLibrary = false;
 let recentTracks = [];
 let smartPlaylists = [];
+let listeningSession = null;
+let sessionSaveTimer = null;
+let pinnedPlaylists = [];
 
 // Utility functions
 function escapeHtml(value) {
@@ -211,4 +217,148 @@ function formatRelativeTime(timestamp) {
     if (minutes < 60) return `${minutes}m ago`;
     if (hours < 24) return `${hours}h ago`;
     return `${days}d ago`;
+}
+
+// Session Management
+function saveListeningSession(track, trackIndex, currentTime, playlistData, context) {
+    if (!track || !playlistData) return;
+    
+    const session = {
+        track: {
+            title: track.title,
+            artist: track.artist,
+            file: track.file,
+            cover: track.cover || DEFAULT_COVER,
+            duration: track.duration
+        },
+        trackIndex: trackIndex,
+        currentTime: currentTime || 0,
+        playlist: {
+            name: playlistData.name || context.playlistName || '',
+            genreName: context.genreName || '',
+            trackCount: playlistData.length || 0
+        },
+        timestamp: Date.now()
+    };
+    
+    listeningSession = session;
+    
+    try {
+        localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+    } catch (error) {
+        console.warn('Failed to save listening session:', error);
+    }
+}
+
+function loadListeningSession() {
+    try {
+        const raw = localStorage.getItem(SESSION_STORAGE_KEY);
+        if (!raw) {
+            listeningSession = null;
+            return null;
+        }
+        
+        const session = JSON.parse(raw);
+        
+        // Validate session (not older than 7 days)
+        const age = Date.now() - (session.timestamp || 0);
+        const sevenDays = 7 * 24 * 60 * 60 * 1000;
+        
+        if (age > sevenDays) {
+            clearListeningSession();
+            return null;
+        }
+        
+        listeningSession = session;
+        return session;
+    } catch (error) {
+        console.warn('Failed to load listening session:', error);
+        listeningSession = null;
+        return null;
+    }
+}
+
+function clearListeningSession() {
+    listeningSession = null;
+    try {
+        localStorage.removeItem(SESSION_STORAGE_KEY);
+    } catch (error) {
+        console.warn('Failed to clear listening session:', error);
+    }
+}
+
+function scheduleSessionSave(track, trackIndex, currentTime, playlistData, context) {
+    if (sessionSaveTimer) {
+        clearTimeout(sessionSaveTimer);
+    }
+    
+    sessionSaveTimer = setTimeout(() => {
+        saveListeningSession(track, trackIndex, currentTime, playlistData, context);
+        sessionSaveTimer = null;
+    }, 2000);
+}
+
+// Pinned Playlists Management
+function loadPinnedPlaylists() {
+    try {
+        const raw = localStorage.getItem(PINNED_PLAYLISTS_STORAGE_KEY);
+        if (!raw) {
+            pinnedPlaylists = [];
+            return;
+        }
+        
+        const parsed = JSON.parse(raw);
+        pinnedPlaylists = Array.isArray(parsed) ? parsed.slice(0, MAX_PINNED_PLAYLISTS) : [];
+    } catch (error) {
+        console.warn('Failed to load pinned playlists:', error);
+        pinnedPlaylists = [];
+    }
+}
+
+function savePinnedPlaylists() {
+    try {
+        localStorage.setItem(PINNED_PLAYLISTS_STORAGE_KEY, JSON.stringify(pinnedPlaylists.slice(0, MAX_PINNED_PLAYLISTS)));
+    } catch (error) {
+        console.warn('Failed to save pinned playlists:', error);
+    }
+}
+
+function pinPlaylist(playlistId, playlistName, genreName, genreColor) {
+    if (!playlistId) return false;
+    
+    // Check if already pinned
+    const existingIndex = pinnedPlaylists.findIndex(p => p.id === playlistId);
+    if (existingIndex >= 0) return false;
+    
+    // Check max limit
+    if (pinnedPlaylists.length >= MAX_PINNED_PLAYLISTS) {
+        return 'limit_reached';
+    }
+    
+    pinnedPlaylists.push({
+        id: playlistId,
+        name: playlistName,
+        genreName: genreName || '',
+        genreColor: genreColor || '#6366f1',
+        pinnedAt: Date.now()
+    });
+    
+    savePinnedPlaylists();
+    return true;
+}
+
+function unpinPlaylist(playlistId) {
+    const originalLength = pinnedPlaylists.length;
+    pinnedPlaylists = pinnedPlaylists.filter(p => p.id !== playlistId);
+    
+    if (pinnedPlaylists.length < originalLength) {
+        savePinnedPlaylists();
+        return true;
+    }
+    
+    return false;
+}
+
+function isPlaylistPinned(playlistId) {
+    return pinnedPlaylists.some(p => p.id === playlistId);
 }

@@ -22,6 +22,8 @@ let queuedSystemVolumeValue = null;
 let pendingVolumePushTimer = null;
 let lastSyncedSystemVolume = null;
 let currentPlaylistContext = { playlistName: '', genreName: '' };
+let currentPlaybackSpeed = 1.0;
+const PLAYBACK_SPEED_STORAGE_KEY = 'musicvault_playback_speed';
 
 function shuffleArrayInPlace(arr) {
     for (let i = arr.length - 1; i > 0; i--) {
@@ -61,6 +63,8 @@ function loadTrack(track) {
     audioPlayer.pause(); audioPlayerB.pause();
     audioPlayer.currentTime = 0; audioPlayerB.currentTime = 0;
     audioPlayer.volume = currentVolume; audioPlayerB.volume = currentVolume;
+    audioPlayer.playbackRate = currentPlaybackSpeed;
+    audioPlayerB.playbackRate = currentPlaybackSpeed;
     audioPlayer.src = track.file;
     activePlayer = 'A';
     document.getElementById('playerTitle').textContent = track.title;
