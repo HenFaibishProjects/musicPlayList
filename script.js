@@ -3088,6 +3088,13 @@ function setupEventListeners() {
         smartPlaylistsNav.addEventListener('click', showSmartPlaylists);
     }
 
+    const historyCalendarNav = document.getElementById('historyCalendarNav');
+    if (historyCalendarNav) {
+        historyCalendarNav.addEventListener('click', () => {
+            showNotification('Calendar Feature', 'Listening History Calendar coming soon! Track your music journey over time.', 'info');
+        });
+    }
+
     // Theme toggle
     document.getElementById('themeToggle').addEventListener('click', toggleTheme);
 

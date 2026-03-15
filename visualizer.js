@@ -147,6 +147,13 @@ class AudioVisualizer {
             this.drawBackground(timestamp);
 
             switch (this.visualizationType) {
+                case '3d':
+                    // 3D mode handled by visualizer-3d.js
+                    if (typeof start3DVisualizer === 'function') {
+                        this.stopVisualization();
+                        start3DVisualizer();
+                    }
+                    return;
                 case 'wave':
                     this.drawWave(timestamp);
                     break;
@@ -442,7 +449,7 @@ class AudioVisualizer {
     }
 
     setVisualizationType(type) {
-        const allowed = new Set(['bars', 'wave', 'circular', 'particles']);
+        const allowed = new Set(['bars', 'wave', 'circular', 'particles', '3d']);
         if (!allowed.has(type)) return;
         this.visualizationType = type;
     }
