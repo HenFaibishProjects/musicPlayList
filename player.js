@@ -23,7 +23,6 @@ let pendingVolumePushTimer = null;
 let lastSyncedSystemVolume = null;
 let currentPlaylistContext = { playlistName: '', genreName: '' };
 let currentPlaybackSpeed = 1.0;
-const PLAYBACK_SPEED_STORAGE_KEY = 'musicvault_playback_speed';
 
 function shuffleArrayInPlace(arr) {
     for (let i = arr.length - 1; i > 0; i--) {

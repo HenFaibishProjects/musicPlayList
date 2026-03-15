@@ -1916,6 +1916,10 @@ async function init() {
     try {
         createBackgroundParticles();
         loadRecentTracksFromStorage();
+        loadSmartPlaylists();
+        loadPlaybackSpeedFromStorage();
+        loadListeningSession();
+        loadPinnedPlaylists();
         setupEventListeners();
         initializePlayer();
 
@@ -4560,6 +4564,24 @@ function showError() {
             <p>Could not connect to the backend API. Start the server with <strong>npm start</strong> and reload.</p>
         </div>
     `;
+}
+
+// Playback Speed Functions
+function loadPlaybackSpeedFromStorage() {
+    // Stub - feature to be fully implemented
+    console.log('Playback speed feature loading...');
+}
+
+// Session Management Functions
+function loadListeningSession() {
+    // Stub - feature to be fully implemented
+    console.log('Session management loading...');
+}
+
+// Pinned Playlists Functions
+function loadPinnedPlaylists() {
+    // Stub - feature to be fully implemented
+    console.log('Pinned playlists loading...');
 }
 
 // Smart Playlists Functions
