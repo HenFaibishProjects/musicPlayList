@@ -1,7 +1,7 @@
 {
-  "name": "music-playlist-manager-enterprise",
+  "name": "lidamixplay",
   "version": "2.0.0",
-  "description": "Enterprise music playlist manager with automatic folder scanning and metadata extraction",
+  "description": "LidaMixPlay with automatic folder scanning and metadata extraction",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

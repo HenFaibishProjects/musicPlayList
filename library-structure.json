@@ -31,16 +31,6 @@
         "description": "",
         "subfolders": [
           {
-            "id": "playlist-playname-mmn3km4d",
-            "name": "playname",
-            "artists": "artist",
-            "path": "F:\\music\\Blues and Jazz\\Classic Jazz",
-            "link": "F:\\music\\Blues and Jazz\\Classic Jazz",
-            "isFavorite": false,
-            "coverImage": null,
-            "images": []
-          },
-          {
             "id": "playlist-newplay-mmn3yq81",
             "name": "newPlay",
             "artists": "NewArtist",

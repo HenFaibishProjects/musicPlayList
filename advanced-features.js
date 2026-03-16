@@ -524,65 +524,6 @@ function replaySearch(index) {
     performAdvancedSearch();
 }
 
-// Smart Playlists
-function showSmartPlaylists() {
-    const grid = document.getElementById('folderGrid');
-    
-    document.getElementById('breadcrumb').innerHTML = '<span>Smart Playlists</span>';
-    document.getElementById('pageTitle').textContent = 'Smart Playlists';
-    document.getElementById('pageSubtitle').textContent = 'AI-generated playlists based on your genre and playlist libraries';
-    
-    const smartPlaylists = [
-        {
-            name: 'High Energy Workout',
-            description: 'Tracks with BPM > 120',
-            icon: 'fa-dumbbell',
-            color: '#f97316',
-            filter: track => track.bpm && track.bpm > 120
-        },
-        {
-            name: 'Classic Oldies',
-            description: 'Tracks from before 1990',
-            icon: 'fa-compact-disc',
-            color: '#3b82f6',
-            filter: track => track.year && track.year < 1990
-        },
-        {
-            name: 'Epic Tracks',
-            description: 'Mood: Epic',
-            icon: 'fa-crown',
-            color: '#a855f7',
-            filter: track => track.mood === 'Epic'
-        }
-    ];
-    
-    grid.innerHTML = smartPlaylists.map((playlist, index) => {
-        let allTracks = [];
-        libraryData.library.folders.forEach(folder => {
-            folder.subfolders.forEach(pl => {
-                if (pl.tracks) {
-                    allTracks.push(...pl.tracks.filter(playlist.filter));
-                }
-            });
-        });
-        
-        return `
-            <div class="playlist-card fade-in" style="animation-delay: ${index * 0.1}s;">
-                <div class="card-icon" style="background: linear-gradient(135deg, ${playlist.color}22, ${playlist.color}11);">
-                    <i class="fas ${playlist.icon}" style="color: ${playlist.color}"></i>
-                </div>
-                <h3 class="card-title">${playlist.name}</h3>
-                <p class="card-description">${playlist.description}</p>
-                <div class="card-stats">
-                    <div class="card-stat">
-                        <i class="fas fa-music"></i>
-                        <span>${allTracks.length} tracks</span>
-                    </div>
-                </div>
-            </div>
-        `;
-    }).join('');
-}
 
 // Initialize when document loads
 if (document.readyState === 'loading') {

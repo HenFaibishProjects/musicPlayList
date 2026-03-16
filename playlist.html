@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Music Playlist Manager - Professional Edition</title>
+    <title>LidaMixPlay</title>
+    <link rel="icon" type="image/png" href="favicon.png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nouislider@15.8.1/dist/nouislider.min.css">
@@ -16,9 +17,11 @@
     <div class="app-container">
         <!-- Sidebar -->
         <aside class="sidebar">
+            
             <div class="logo">
-                <i class="fas fa-headphones"></i>
-                <h1>MusicVault</h1>
+                <img src="favicon.png" alt="App logo"
+                    style="width: 52px; height: 52px; margin-right: 12px;">
+                <h1>LidaMixPlay</h1>
             </div>
 
             <nav>
@@ -30,14 +33,6 @@
                     <div class="nav-item" id="favoritesNav">
                         <i class="fas fa-star"></i>
                         <span>Favorites</span>
-                    </div>
-                    <div class="nav-item" id="recentlyPlayedNav">
-                        <i class="fas fa-clock"></i>
-                        <span>Recently Played</span>
-                    </div>
-                    <div class="nav-item" id="smartPlaylistsNav">
-                        <i class="fas fa-brain"></i>
-                        <span>Smart Playlists</span>
                     </div>
                     <div class="nav-item" id="historyCalendarNav">
                         <i class="fas fa-calendar-days"></i>
@@ -67,7 +62,7 @@
             <section class="workspace-strip" id="workspaceStrip">
                 <div class="workspace-title-wrap">
                     <p class="workspace-overline">Your Music Space</p>
-                    <h3 class="workspace-title">MusicVault</h3>
+                    <h3 class="workspace-title">LidaMixPlay</h3>
                 </div>
                 <div class="workspace-chips" id="workspaceChips">
                     <span class="workspace-chip" id="apiStatusChip">
@@ -689,13 +684,7 @@
                         <label for="importGenreSelect">Target Genre *</label>
                         <select id="importGenreSelect">
                             <option value="">Select existing genre...</option>
-                            <option value="__new__">+ Create New Genre</option>
                         </select>
-                    </div>
-                    
-                    <div class="library-form-row hidden" id="newGenreNameRow">
-                        <label for="newGenreNameInput">New Genre Name *</label>
-                        <input type="text" id="newGenreNameInput" placeholder="e.g., Internet Radio">
                     </div>
                     
                     <div class="library-form-row">
@@ -720,6 +709,10 @@
                             <div class="progress-bar-fill" id="importProgressFill"></div>
                         </div>
                         <p id="importProgressText">Importing tracks...</p>
+                        <button type="button" class="btn hidden" id="skipMetadataBtn" style="margin-top:8px;font-size:0.85rem;">
+                            <i class="fas fa-forward"></i>
+                            <span>Skip &mdash; use what's loaded</span>
+                        </button>
                     </div>
                 </form>
             </div>
@@ -784,56 +777,6 @@
         </div>
     </div>
 
-    <!-- Smart Playlist Modal -->
-    <div class="modal" id="smartPlaylistModal">
-        <div class="modal-content library-manager-content">
-            <div class="modal-header library-modal-header">
-                <div class="library-modal-heading">
-                    <span class="library-modal-kicker">Smart Playlists</span>
-                    <h3><i class="fas fa-brain"></i> Create Smart Playlist</h3>
-                    <p>Auto-updating playlists based on rules</p>
-                </div>
-                <button class="modal-close" id="smartPlaylistCloseBtn">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body library-manager-body">
-                <form id="smartPlaylistForm" class="library-form-card">
-                    <div class="library-form-row">
-                        <label for="smartPlaylistNameInput">Playlist Name *</label>
-                        <input type="text" id="smartPlaylistNameInput" placeholder="e.g., High Energy Workout" required>
-                    </div>
-                    <div class="library-form-row">
-                        <label for="smartPlaylistIconInput">Icon</label>
-                        <select id="smartPlaylistIconInput">
-                            <option value="fa-brain">Brain</option>
-                            <option value="fa-dumbbell">Dumbbell</option>
-                            <option value="fa-fire">Fire</option>
-                            <option value="fa-bolt">Bolt</option>
-                            <option value="fa-star">Star</option>
-                        </select>
-                    </div>
-                    <div class="library-form-row">
-                        <label for="smartPlaylistMatchType">Match Type</label>
-                        <select id="smartPlaylistMatchType">
-                            <option value="all">Match ALL rules</option>
-                            <option value="any">Match ANY rule</option>
-                        </select>
-                    </div>
-                    <div class="library-form-row">
-                        <label>Rules</label>
-                        <div id="smartPlaylistRules"></div>
-                        <button type="button" class="btn" id="addSmartRuleBtn">
-                            <i class="fas fa-plus"></i> Add Rule
-                        </button>
-                    </div>
-                    <button type="submit" class="btn library-submit-btn">
-                        <i class="fas fa-brain"></i> Create Smart Playlist
-                    </button>
-                </form>
-            </div>
-        </div>
-    </div>
 
     <!-- Playback Speed Modal -->
     <div class="modal" id="speedModal">

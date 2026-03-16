@@ -1,4 +1,4 @@
-// Playlist & Smart Playlist Management
+// Playlist  Management
 let currentView = 'all';
 let selectedGenre = null;
 let currentSort = 'name';
@@ -9,58 +9,7 @@ let viewMode = 'grid';
 let isGlobalSearchActive = false;
 let currentGlobalSearchTracks = [];
 let currentRecentViewTracks = [];
-let currentSmartPlaylistTracks = [];
 
-function evaluateSmartPlaylistRule(track, rule) {
-    const field = rule.field;
-    const operator = rule.operator;
-    const value = rule.value;
-    
-    switch (field) {
-        case 'bpm':
-            const trackBpm = Number(track.bpm) || 0;
-            const targetBpm = Number(value) || 0;
-            if (operator === 'greater') return trackBpm > targetBpm;
-            if (operator === 'less') return trackBpm < targetBpm;
-            if (operator === 'equals') return trackBpm === targetBpm;
-            break;
-        case 'year':
-            const trackYear = Number(track.year) || 0;
-            const targetYear = Number(value) || 0;
-            if (operator === 'greater') return trackYear > targetYear;
-            if (operator === 'less') return trackYear < targetYear;
-            if (operator === 'equals') return trackYear === targetYear;
-            break;
-        case 'mood':
-            if (operator === 'equals') return String(track.mood || '').toLowerCase() === String(value || '').toLowerCase();
-            if (operator === 'contains') return String(track.mood || '').toLowerCase().includes(String(value || '').toLowerCase());
-            break;
-        case 'title':
-        case 'artist':
-            const trackVal = String(track[field] || '').toLowerCase();
-            if (operator === 'contains') return trackVal.includes(String(value || '').toLowerCase());
-            break;
-        case 'tags':
-            const trackTags = Array.isArray(track.tags) ? track.tags.join(' ').toLowerCase() : '';
-            if (operator === 'contains') return trackTags.includes(String(value || '').toLowerCase());
-            break;
-    }
-    return false;
-}
-
-function evaluateSmartPlaylist(smartPlaylist) {
-    const allTracks = getAllTracksWithContext();
-    const matchType = smartPlaylist.matchType || 'all';
-    const rules = smartPlaylist.rules || [];
-    if (rules.length === 0) return [];
-    return allTracks.filter(track => {
-        if (matchType === 'all') {
-            return rules.every(rule => evaluateSmartPlaylistRule(track, rule));
-        } else {
-            return rules.some(rule => evaluateSmartPlaylistRule(track, rule));
-        }
-    });
-}
 
 function sortItems(items, isGenre = false) {
     const sorted = [...items];

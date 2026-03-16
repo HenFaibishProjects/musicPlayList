@@ -271,37 +271,70 @@ function isValidM3U(content) {
 
 /**
  * Fetch live stream metadata (for radio stations)
- * This attempts to get current playing info from Icecast/Shoutcast streams
+ * Uses server-side proxy to avoid CORS issues with external streaming servers
  */
-async function fetchStreamMetadata(streamUrl) {
-    try {
-        // Try to fetch stream info from common metadata endpoints
-        const url = new URL(streamUrl);
-        const statsUrl = `${url.protocol}//${url.host}/status-json.xsl`;
-        
-        const response = await fetch(statsUrl);
-        if (response.ok) {
-            const data = await response.json();
-            
-            // Parse Icecast JSON format
-            if (data.icestats && data.icestats.source) {
-                const source = Array.isArray(data.icestats.source) 
-                    ? data.icestats.source[0] 
-                    : data.icestats.source;
-                
-                return {
-                    title: source.title || source.server_name,
-                    artist: source.artist || '',
-                    genre: source.genre || '',
-                    bitrate: source.bitrate || '',
-                    listeners: source.listeners || 0
-                };
-            }
+async function fetchStreamMetadata(streamUrl, signal, timeoutMs = 4000) {
+    // Use server-side proxy to fetch stream metadata (avoids CORS)
+    const proxyUrl = `/api/stream-metadata?url=${encodeURIComponent(streamUrl)}`;
+
+    const requestController = new AbortController();
+    const safeTimeout = Number.isFinite(timeoutMs) ? Math.max(1000, timeoutMs) : 4000;
+
+    const abortRequest = () => {
+        try {
+            requestController.abort();
+        } catch {
+            // no-op
         }
-    } catch (error) {
-        // Metadata fetch failed, will use fallback
-        console.log('Stream metadata fetch failed:', error.message);
+    };
+
+    let cleanupParentAbort = null;
+    if (signal) {
+        if (signal.aborted) {
+            abortRequest();
+        } else {
+            signal.addEventListener('abort', abortRequest, { once: true });
+            cleanupParentAbort = () => signal.removeEventListener('abort', abortRequest);
+        }
     }
-    
-    return null;
+
+    let timeoutId = null;
+    try {
+        const metadataPromise = fetch(proxyUrl, { signal: requestController.signal })
+            .then(async response => {
+                if (!response.ok) return null;
+
+                const data = await response.json();
+                if (!data) return null;
+
+                return {
+                    title: data.title || '',
+                    artist: data.artist || '',
+                    genre: data.genre || '',
+                    bitrate: data.bitrate || '',
+                    listeners: data.listeners || 0
+                };
+            })
+            .catch(error => {
+                if (error?.name === 'AbortError') return null;
+                console.log('Stream metadata fetch failed:', error?.message || error);
+                return null;
+            });
+
+        const timeoutPromise = new Promise(resolve => {
+            timeoutId = setTimeout(() => {
+                abortRequest();
+                resolve(null);
+            }, safeTimeout);
+        });
+
+        return await Promise.race([metadataPromise, timeoutPromise]);
+    } finally {
+        if (timeoutId) {
+            clearTimeout(timeoutId);
+        }
+        if (cleanupParentAbort) {
+            cleanupParentAbort();
+        }
+    }
 }

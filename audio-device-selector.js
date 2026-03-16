@@ -4,7 +4,7 @@ class AudioDeviceManager {
         this.audio = audioElement;
         this.devices = [];
         this.currentDeviceId = 'default';
-        this.storageKey = 'musicvault.audio.outputDeviceId';
+        this.storageKey = 'lidaplay.audio.outputDeviceId';
     }
 
     getSavedDeviceId() {

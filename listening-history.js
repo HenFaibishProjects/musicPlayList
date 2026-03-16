@@ -1,5 +1,5 @@
 // Listening History Calendar
-const LISTENING_HISTORY_STORAGE_KEY = 'musicvault_listening_history_v1';
+const LISTENING_HISTORY_STORAGE_KEY = 'lidaplay_listening_history_v1';
 const MAX_HISTORY_DAYS = 365; // Keep 1 year of history
 
 let listeningHistory = new Map(); // Date string -> array of plays

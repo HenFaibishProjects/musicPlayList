@@ -15,6 +15,45 @@ let quickPlayObjectUrl = null;
 let volumeSliderInstance = null;
 let isUpdatingVolumeSlider = false;
 let lastVolume = -1;
+const IMPORTED_PLAYLISTS_STORAGE_KEY = 'lidaplay_imported_playlists';
+const STREAM_PROXY_PATH = '/api/stream-proxy?url=';
+
+// Compatibility guards: keep app booting even if Smart Playlist feature is removed.
+if (typeof globalThis.smartPlaylists === 'undefined') {
+    globalThis.smartPlaylists = [];
+}
+
+if (typeof globalThis.currentSmartPlaylistTracks === 'undefined') {
+    globalThis.currentSmartPlaylistTracks = [];
+}
+
+if (typeof globalThis.loadSmartPlaylists !== 'function') {
+    globalThis.loadSmartPlaylists = function loadSmartPlaylistsFallback() {
+        // Smart Playlists feature removed/disabled.
+    };
+}
+
+if (typeof globalThis.closeSmartPlaylistModal !== 'function') {
+    globalThis.closeSmartPlaylistModal = function closeSmartPlaylistModalFallback() {};
+}
+
+if (typeof globalThis.createSmartPlaylist !== 'function') {
+    globalThis.createSmartPlaylist = function createSmartPlaylistFallback(event) {
+        event?.preventDefault?.();
+    };
+}
+
+if (typeof globalThis.addSmartPlaylistRule !== 'function') {
+    globalThis.addSmartPlaylistRule = function addSmartPlaylistRuleFallback() {};
+}
+
+if (typeof globalThis.updateStatsForSmartPlaylists !== 'function') {
+    globalThis.updateStatsForSmartPlaylists = function updateStatsForSmartPlaylistsFallback() {};
+}
+
+if (typeof globalThis.deleteSmartPlaylist !== 'function') {
+    globalThis.deleteSmartPlaylist = function deleteSmartPlaylistFallback() {};
+}
 
 function isQuickPlayTrack(track) {
     return Boolean(track && track.__quickPlay === true);
@@ -237,6 +276,20 @@ function renderBreadcrumb(items = []) {
     });
 }
 
+function setHistoryLayoutMode(isHistoryMode) {
+    const mainContent = document.querySelector('.main-content');
+    const folderGrid = document.getElementById('folderGrid');
+
+    if (!mainContent || !folderGrid) return;
+
+    mainContent.classList.toggle('history-mode', Boolean(isHistoryMode));
+    folderGrid.classList.toggle('history-grid', Boolean(isHistoryMode));
+
+    if (isHistoryMode) {
+        folderGrid.classList.remove('list-view');
+    }
+}
+
 function getTrackSortIconClass() {
     return trackSortDirection === 'asc' ? 'fas fa-arrow-up-1-9' : 'fas fa-arrow-down-9-1';
 }
@@ -308,6 +361,134 @@ function normalizeLibraryPayload(payload) {
     }
 
     return { library: payload };
+}
+
+function getImportedPlaylistRecordsFromLegacyPayload(payload) {
+    const records = [];
+    const folders = payload?.library?.folders || [];
+
+    folders.forEach(folder => {
+        (folder?.subfolders || []).forEach(playlist => {
+            if (!playlist?.isImported) return;
+            records.push({
+                genreId: folder?.id || '',
+                genreName: folder?.name || 'Imported',
+                playlist
+            });
+        });
+    });
+
+    return records;
+}
+
+function normalizeImportedPlaylistRecord(record) {
+    if (!record || typeof record !== 'object') return null;
+    const playlist = record.playlist;
+    if (!playlist || typeof playlist !== 'object') return null;
+    if (!playlist.id || !Array.isArray(playlist.tracks)) return null;
+
+    const normalizedTracks = normalizeImportedTrackSources(playlist.tracks);
+
+    return {
+        genreId: String(record.genreId || '').trim(),
+        genreName: String(record.genreName || '').trim() || 'Imported',
+        playlist: {
+            ...playlist,
+            tracks: normalizedTracks,
+            isImported: true
+        }
+    };
+}
+
+function loadImportedPlaylistRecords() {
+    try {
+        const raw = localStorage.getItem(IMPORTED_PLAYLISTS_STORAGE_KEY);
+        if (!raw) return [];
+
+        const parsed = JSON.parse(raw);
+        const records = Array.isArray(parsed)
+            ? parsed
+            : getImportedPlaylistRecordsFromLegacyPayload(parsed);
+
+        const normalized = records
+            .map(normalizeImportedPlaylistRecord)
+            .filter(Boolean);
+
+        if (!Array.isArray(parsed)) {
+            saveImportedPlaylistRecords(normalized);
+        }
+
+        return normalized;
+    } catch (error) {
+        console.warn('Failed to load imported playlists:', error);
+        return [];
+    }
+}
+
+function saveImportedPlaylistRecords(records = []) {
+    try {
+        localStorage.setItem(IMPORTED_PLAYLISTS_STORAGE_KEY, JSON.stringify(records));
+    } catch (error) {
+        console.warn('Failed to save imported playlists:', error);
+    }
+}
+
+function upsertImportedPlaylistRecord(record) {
+    const normalized = normalizeImportedPlaylistRecord(record);
+    if (!normalized) return;
+
+    const records = loadImportedPlaylistRecords();
+    const deduped = records.filter(item => item?.playlist?.id !== normalized.playlist.id);
+    deduped.push(normalized);
+    saveImportedPlaylistRecords(deduped);
+}
+
+function mergeImportedPlaylistsIntoLibrary(payload) {
+    const normalized = normalizeLibraryPayload(payload);
+    const records = loadImportedPlaylistRecords();
+
+    if (!records.length) {
+        return normalized;
+    }
+
+    if (!normalized.library) {
+        normalized.library = { name: 'My Music Collection', folders: [] };
+    }
+    if (!Array.isArray(normalized.library.folders)) {
+        normalized.library.folders = [];
+    }
+
+    records.forEach(record => {
+        let genre = normalized.library.folders.find(folder => folder.id === record.genreId);
+        if (!genre) {
+            genre = normalized.library.folders.find(folder =>
+                String(folder?.name || '').trim().toLowerCase() === record.genreName.toLowerCase()
+            );
+        }
+
+        if (!genre) {
+            genre = {
+                id: record.genreId || `imported-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                name: record.genreName || 'Imported',
+                icon: 'fa-file-import',
+                color: '#10b981',
+                description: 'Imported playlists',
+                subfolders: []
+            };
+            normalized.library.folders.push(genre);
+        }
+
+        if (!Array.isArray(genre.subfolders)) {
+            genre.subfolders = [];
+        }
+
+        const exists = genre.subfolders.some(playlist => playlist?.id === record.playlist.id);
+        if (!exists) {
+            genre.subfolders.push(JSON.parse(JSON.stringify(record.playlist)));
+        }
+    });
+
+    return normalized;
 }
 
 function normalizeRecentTrack(track = {}) {
@@ -395,6 +576,18 @@ function addTrackToRecentlyPlayed(track, context = {}) {
         updateStatsForRecentlyPlayed();
         updateWorkspaceStatus();
     }
+}
+
+function addTrackToListeningHistory(track, context = {}) {
+    if (!track || typeof trackPlayInHistory !== 'function') return;
+
+    const isQuickPlay = isQuickPlayTrack(track);
+    const historyContext = {
+        playlistName: context.playlistName || track.playlistName || (isQuickPlay ? 'Quick Play' : ''),
+        genreName: context.genreName || track.genreName || (isQuickPlay ? 'Quick Play' : '')
+    };
+
+    trackPlayInHistory(track, historyContext);
 }
 
 function formatRelativeTime(timestamp) {
@@ -555,7 +748,7 @@ async function fetchLibraryData({ forceRescan = false } = {}) {
     const endpoint = forceRescan ? 'http://localhost:3000/api/rescan' : 'http://localhost:3000/api/library';
     const method = forceRescan ? 'POST' : 'GET';
     const payload = await apiRequest(endpoint, { method });
-    return normalizeLibraryPayload(payload);
+    return mergeImportedPlaylistsIntoLibrary(payload);
 }
 
 function refreshLibraryUI() {
@@ -649,6 +842,9 @@ function updateWorkspaceStatus() {
         } else if (currentView === 'recent') {
             if (viewIcon) viewIcon.className = 'fas fa-clock';
             if (viewText) viewText.textContent = 'Recently Played';
+        } else if (currentView === 'history') {
+            if (viewIcon) viewIcon.className = 'fas fa-calendar-days';
+            if (viewText) viewText.textContent = 'Listening History';
         } else if (currentView === 'genre' && selectedGenre?.name) {
             if (viewIcon) viewIcon.className = 'fas fa-folder-open';
             if (viewText) viewText.textContent = `Genre: ${selectedGenre.name}`;
@@ -1617,15 +1813,15 @@ function closeImportM3UModal() {
 function populateImportGenreSelect() {
     const select = document.getElementById('importGenreSelect');
     if (!select) return;
-    
+
     const genres = getGenresFromLibraryState();
-    
-    // Clear existing options except the first two
-    while (select.options.length > 2) {
-        select.remove(2);
+
+    // Clear existing options except the first placeholder
+    while (select.options.length > 1) {
+        select.remove(1);
     }
-    
-    // Add genre options
+
+    // Add genre options from existing genres only
     genres.forEach(genre => {
         const option = document.createElement('option');
         option.value = genre.id;
@@ -1642,16 +1838,28 @@ function toggleImportMethod(method) {
         btn.classList.toggle('active', btn.dataset.method === method);
     });
     
-    // Toggle input visibility
+    // Toggle input visibility and disable the inactive input
     const fileRow = document.getElementById('fileInputRow');
     const urlRow = document.getElementById('urlInputRow');
+    const fileInput = document.getElementById('m3uFileInput');
+    const urlInput = document.getElementById('m3uUrlInput');
     
     if (method === 'file') {
         fileRow.classList.remove('hidden');
         urlRow.classList.add('hidden');
+        if (fileInput) fileInput.disabled = false;
+        if (urlInput) { urlInput.disabled = true; urlInput.value = ''; }
     } else {
         fileRow.classList.add('hidden');
         urlRow.classList.remove('hidden');
+        if (fileInput) { fileInput.disabled = true; fileInput.value = ''; }
+        if (urlInput) urlInput.disabled = false;
+        // Reset file display
+        const display = document.getElementById('fileInputDisplay');
+        if (display) {
+            display.innerHTML = '<i class="fas fa-file-audio"></i><span>Choose a file...</span>';
+            display.classList.remove('has-file');
+        }
     }
 }
 
@@ -1666,6 +1874,90 @@ function handleFileSelect(event) {
         display.innerHTML = '<i class="fas fa-file-audio"></i><span>Choose a file...</span>';
         display.classList.remove('has-file');
     }
+}
+
+function normalizeImportedTrackSource(source) {
+    const value = String(source || '').trim();
+    if (!value) return '';
+
+    // Already compatible with the web app
+    if (value.startsWith('/api/media?')) {
+        // Ensure imported tracks can be streamed even when not part of scanned playlist roots
+        if (!/[?&]imported=1(?:&|$)/.test(value)) {
+            return `${value}${value.includes('?') ? '&' : '?'}imported=1`;
+        }
+        return value;
+    }
+    if (value.startsWith(STREAM_PROXY_PATH)) {
+        return value;
+    }
+
+    if (/^https?:\/\//i.test(value)) {
+        // If the source is already a local API path exposed as absolute URL, keep it local.
+        try {
+            const parsed = new URL(value);
+            const isLocalApi = parsed.origin === window.location.origin && parsed.pathname.startsWith('/api/');
+            if (isLocalApi) {
+                return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+            }
+        } catch {
+            // Fall through to proxying
+        }
+
+        // Route external streams through same-origin proxy to avoid CORS and MIME issues.
+        return `${STREAM_PROXY_PATH}${encodeURIComponent(value)}`;
+    }
+
+    // Handle file:// URLs
+    let localPath = value;
+    if (/^file:\/\//i.test(value)) {
+        try {
+            const parsed = new URL(value);
+            localPath = decodeURIComponent(parsed.pathname || '');
+            if (/^\/[a-zA-Z]:\//.test(localPath)) {
+                // /C:/Music/song.mp3 -> C:\Music\song.mp3
+                localPath = localPath.slice(1);
+            }
+            localPath = localPath.replace(/\//g, '\\');
+        } catch {
+            localPath = decodeURIComponent(value.replace(/^file:\/\//i, ''));
+        }
+    }
+
+    const isWindowsAbsolute = /^[a-zA-Z]:[\\/]/.test(localPath);
+    const isUncPath = /^\\\\[^\\]/.test(localPath);
+    const isUnixAbsolute = localPath.startsWith('/');
+
+    // Convert local absolute paths to backend media endpoint
+    if (isWindowsAbsolute || isUncPath || isUnixAbsolute) {
+        return `/api/media?imported=1&path=${encodeURIComponent(localPath)}`;
+    }
+
+    return value;
+}
+
+function normalizeImportedTrackSources(tracks = []) {
+    return tracks.map(track => {
+        if (!track || typeof track !== 'object') return track;
+
+        const originalFile = track.file;
+        const normalizedFile = normalizeImportedTrackSource(originalFile);
+        const normalizedValue = String(normalizedFile || '').trim();
+        const unresolvedRelativeImport = Boolean(
+            normalizedValue &&
+            !normalizedValue.startsWith('/api/media?') &&
+            !normalizedValue.startsWith(STREAM_PROXY_PATH) &&
+            !/^https?:\/\//i.test(normalizedValue) &&
+            !/^[a-zA-Z]+:\/\//.test(normalizedValue)
+        );
+
+        return {
+            ...track,
+            originalFile,
+            file: normalizedFile,
+            unresolvedRelativeImport
+        };
+    });
 }
 
 async function importM3UPlaylist(event) {
@@ -1704,6 +1996,9 @@ async function importM3UPlaylist(event) {
             
             tracks = await fetchM3U(url);
         }
+
+        // Normalize source URLs/paths so imported local tracks can play via backend proxy
+        tracks = normalizeImportedTrackSources(tracks);
         
         if (tracks.length === 0) {
             throw new Error('No valid tracks found in playlist');
@@ -1725,18 +2020,7 @@ async function importM3UPlaylist(event) {
             throw new Error('Please enter a playlist name');
         }
         
-        // Handle new genre creation
         let targetGenreId = genreValue;
-        if (genreValue === '__new__') {
-            const newGenreName = document.getElementById('newGenreNameInput').value.trim();
-            if (!newGenreName) {
-                throw new Error('Please enter a name for the new genre');
-            }
-            
-            // Create new genre
-            progressText.textContent = 'Creating new genre...';
-            targetGenreId = await createGenreForImport(newGenreName);
-        }
         
         progressFill.style.width = '60%';
         progressText.textContent = 'Processing tracks...';
@@ -1765,9 +2049,20 @@ async function importM3UPlaylist(event) {
                 `Imported ${tracks.length} tracks into "${playlistName}"`,
                 'success'
             );
-            
-            // Refresh library
-            refreshLibraryUI();
+
+            // Clear search and navigate to target genre so the imported playlist is immediately visible
+            searchQuery = '';
+            const searchInput = document.getElementById('searchInput');
+            const clearSearch = document.getElementById('clearSearch');
+            if (searchInput) searchInput.value = '';
+            if (clearSearch) clearSearch.classList.remove('visible');
+
+            const targetGenre = (libraryData?.library?.folders || []).find(folder => folder.id === targetGenreId);
+            if (targetGenre) {
+                showGenre(targetGenre);
+            } else {
+                refreshLibraryUI();
+            }
         }, 1000);
         
     } catch (error) {
@@ -1818,25 +2113,82 @@ async function createGenreForImport(genreName) {
     return payload.genre.id;
 }
 
+let _metadataAbortController = null;
+
 async function enrichTracksWithMetadata(tracks) {
-    // Try to fetch metadata for streams (limit concurrent requests)
-    const maxConcurrent = 3;
-    for (let i = 0; i < tracks.length; i += maxConcurrent) {
-        const batch = tracks.slice(i, i + maxConcurrent);
-        await Promise.all(batch.map(async track => {
-            if (track.file.startsWith('http')) {
+    const progressText = document.getElementById('importProgressText');
+    const progressFill = document.getElementById('importProgressFill');
+    const skipBtn = document.getElementById('skipMetadataBtn');
+    const httpTracks = tracks.filter(track => {
+        const metadataSource = String(track?.originalFile || track?.file || '').trim();
+        return /^https?:\/\//i.test(metadataSource);
+    });
+    const total = httpTracks.length;
+    
+    if (total === 0) return;
+    
+    // Create abort controller so user can skip
+    _metadataAbortController = new AbortController();
+    const signal = _metadataAbortController.signal;
+    
+    // Show skip button
+    if (skipBtn) {
+        skipBtn.classList.remove('hidden');
+        skipBtn.onclick = () => {
+            if (_metadataAbortController) _metadataAbortController.abort();
+        };
+    }
+    
+    let completed = 0;
+    let enriched = 0;
+    const maxConcurrent = 10;
+    
+    try {
+        for (let i = 0; i < httpTracks.length; i += maxConcurrent) {
+            if (signal.aborted) break;
+            
+            const batch = httpTracks.slice(i, i + maxConcurrent);
+            await Promise.all(batch.map(async track => {
+                if (signal.aborted) return;
                 try {
-                    const metadata = await fetchStreamMetadata(track.file);
-                    if (metadata) {
-                        track.title = metadata.title || track.title;
+                    const metadataSource = String(track?.originalFile || track?.file || '').trim();
+                    if (!/^https?:\/\//i.test(metadataSource)) {
+                        return;
+                    }
+
+                    const metadata = await fetchStreamMetadata(metadataSource, signal);
+                    if (metadata && !signal.aborted) {
+                        if (metadata.title) { track.title = metadata.title; enriched++; }
                         track.artist = metadata.artist || track.artist;
                         track.genre = metadata.genre || track.genre;
                     }
                 } catch (e) {
                     // Metadata fetch failed, keep original
+                } finally {
+                    completed++;
+                    if (progressText && !signal.aborted) {
+                        progressText.textContent = `Fetching stream metadata... (${completed}/${total}) — ${enriched} enriched`;
+                    }
+                    if (progressFill && !signal.aborted) {
+                        const pct = 40 + Math.round((completed / total) * 30);
+                        progressFill.style.width = `${pct}%`;
+                    }
                 }
-            }
-        }));
+            }));
+        }
+    } catch (e) {
+        // aborted or error — continue with what we have
+    }
+    
+    // Hide skip button
+    if (skipBtn) skipBtn.classList.add('hidden');
+    _metadataAbortController = null;
+    
+    if (progressText) {
+        const skipped = signal.aborted;
+        progressText.textContent = skipped 
+            ? `Metadata skipped — ${enriched} of ${total} streams enriched`
+            : `Metadata complete — ${enriched} of ${total} streams enriched`;
     }
 }
 
@@ -1866,13 +2218,13 @@ async function addImportedPlaylistToLibrary(genreId, playlistName, tracks) {
         genre.subfolders = [];
     }
     genre.subfolders.push(newPlaylist);
-    
-    // Save to localStorage for persistence
-    try {
-        localStorage.setItem('musicvault_imported_playlists', JSON.stringify(libraryData));
-    } catch (e) {
-        console.warn('Failed to save to localStorage:', e);
-    }
+
+    // Persist imported playlist records so they survive reload/API refresh
+    upsertImportedPlaylistRecord({
+        genreId,
+        genreName: genre.name || 'Imported',
+        playlist: newPlaylist
+    });
 }
 
 function calculateTotalDuration(tracks) {
@@ -1916,7 +2268,9 @@ async function init() {
     try {
         createBackgroundParticles();
         loadRecentTracksFromStorage();
-        loadSmartPlaylists();
+        if (typeof loadSmartPlaylists === 'function') {
+            loadSmartPlaylists();
+        }
         loadPlaybackSpeedFromStorage();
         loadListeningSession();
         loadPinnedPlaylists();
@@ -1933,7 +2287,7 @@ async function init() {
             console.log('✅ Loaded from API with folder-based scanning');
         } catch (apiError) {
             console.log('⚠️ API not available, starting with empty library structure');
-            libraryData = getEmptyLibraryData();
+            libraryData = mergeImportedPlaylistsIntoLibrary(getEmptyLibraryData());
             apiAvailable = false;
             showNotification(
                 'Server Not Connected',
@@ -2180,6 +2534,17 @@ function loadTrack(track) {
     audioPlayer.volume = currentVolume;
     audioPlayerB.volume = currentVolume;
     
+    // For external streams: try without crossOrigin first so audio plays even if CORS is missing
+    // (visualizer won't get data for non-CORS streams, but audio will still be audible)
+    const isExternalUrl = track.file && /^https?:\/\//i.test(track.file) && !track.file.startsWith(window.location.origin);
+    if (isExternalUrl) {
+        audioPlayer.removeAttribute('crossorigin');
+        audioPlayerB.removeAttribute('crossorigin');
+    } else {
+        audioPlayer.crossOrigin = 'anonymous';
+        audioPlayerB.crossOrigin = 'anonymous';
+    }
+    
     // Load into player A and make it active
     audioPlayer.src = track.file;
     activePlayer = 'A';
@@ -2202,25 +2567,65 @@ function loadTrack(track) {
 // Play track
 function playTrack() {
     const currentPlayer = getActivePlayer();
+    if (!currentPlayer) return;
+
+    const currentTrack = currentPlaylist[currentTrackIndex];
+    const maxAttempts = Math.max(1, currentPlaylist.length || 1);
+    const remainingAttempts = Number(playTrack.remainingAttempts) || maxAttempts;
 
     if (currentPlayer && currentPlayer.ended) {
         currentPlayer.currentTime = 0;
     }
 
-    currentPlayer.play().catch(err => {
-        console.error('Error playing audio:', err);
-        showNotification(
-            'Unable to Play Track',
-            'This audio file is unavailable right now. Check that the file exists, then rescan your playlist libraries.',
-            'warning'
-        );
-    });
-    isPlaying = true;
-    const currentTrack = currentPlaylist[currentTrackIndex];
-    if (currentTrack && !isQuickPlayTrack(currentTrack)) {
-        addTrackToRecentlyPlayed(currentTrack, currentPlaylistContext);
-    }
-    updatePlayButton();
+    currentPlayer.play()
+        .then(() => {
+            isPlaying = true;
+            if (currentTrack && !isQuickPlayTrack(currentTrack)) {
+                addTrackToRecentlyPlayed(currentTrack, currentPlaylistContext);
+            }
+            if (currentTrack) {
+                addTrackToListeningHistory(currentTrack, currentPlaylistContext);
+            }
+            updatePlayButton();
+        })
+        .catch(err => {
+            console.error('Error playing audio:', err);
+
+            // Try next track automatically so a broken imported URL/path won't freeze playback.
+            const canRetryOnNext = currentPlaylist.length > 1 && remainingAttempts > 1;
+            if (canRetryOnNext) {
+                const moved = moveToNextTrack({ autoplay: false, allowWrap: repeatMode === 1 });
+                if (moved) {
+                    playTrack.remainingAttempts = remainingAttempts - 1;
+                    playTrack();
+                    return;
+                }
+            }
+
+            playTrack.remainingAttempts = maxAttempts;
+            isPlaying = false;
+            updatePlayButton();
+
+            const importedPathHint = currentTrack?.originalFile && currentTrack?.originalFile !== currentTrack?.file;
+            const unresolvedRelativeImportHint = currentTrack?.unresolvedRelativeImport;
+            const remoteStreamProxyHint = String(currentTrack?.file || '').startsWith(STREAM_PROXY_PATH);
+            showNotification(
+                'Unable to Play Track',
+                unresolvedRelativeImportHint
+                    ? 'This imported M3U entry uses a relative file path, so the app cannot resolve its real location. Use absolute paths in the M3U (or re-export it), then import again.'
+                    : remoteStreamProxyHint
+                    ? 'This stream is currently unavailable or uses an unsupported codec in your browser. Try another station URL, or open the stream directly in VLC to verify the source.'
+                    : importedPathHint
+                    ? 'Imported track points to a local path that is not accessible yet. Add that folder as a playlist source (Add Playlist), rescan, then retry.'
+                    : 'This audio file is unavailable right now. Check that the file exists, then rescan your playlist libraries.',
+                'warning'
+            );
+        })
+        .finally(() => {
+            if (playTrack.remainingAttempts !== maxAttempts) {
+                playTrack.remainingAttempts = maxAttempts;
+            }
+        });
 }
 
 // Pause track
@@ -2462,6 +2867,7 @@ function startCrossfade() {
         
         // Add to recently played
         addTrackToRecentlyPlayed(nextTrack, currentPlaylistContext);
+        addTrackToListeningHistory(nextTrack, currentPlaylistContext);
         
         // Update queue if open
         if (isQueuePanelOpen) {
@@ -3084,7 +3490,7 @@ function setupEventListeners() {
     }
 
     const smartPlaylistsNav = document.getElementById('smartPlaylistsNav');
-    if (smartPlaylistsNav) {
+    if (smartPlaylistsNav && typeof showSmartPlaylists === 'function') {
         smartPlaylistsNav.addEventListener('click', showSmartPlaylists);
     }
 
@@ -3243,17 +3649,17 @@ function setupEventListeners() {
     }
     
     const smartPlaylistCloseBtn = document.getElementById('smartPlaylistCloseBtn');
-    if (smartPlaylistCloseBtn) {
+    if (smartPlaylistCloseBtn && typeof closeSmartPlaylistModal === 'function') {
         smartPlaylistCloseBtn.addEventListener('click', closeSmartPlaylistModal);
     }
     
     const smartPlaylistForm = document.getElementById('smartPlaylistForm');
-    if (smartPlaylistForm) {
+    if (smartPlaylistForm && typeof createSmartPlaylist === 'function') {
         smartPlaylistForm.addEventListener('submit', createSmartPlaylist);
     }
     
     const addSmartRuleBtn = document.getElementById('addSmartRuleBtn');
-    if (addSmartRuleBtn) {
+    if (addSmartRuleBtn && typeof addSmartPlaylistRule === 'function') {
         addSmartRuleBtn.addEventListener('click', addSmartPlaylistRule);
     }
 
@@ -3367,17 +3773,6 @@ function setupEventListeners() {
         });
     }
 
-    const importGenreSelect = document.getElementById('importGenreSelect');
-    if (importGenreSelect) {
-        importGenreSelect.addEventListener('change', (e) => {
-            const newGenreRow = document.getElementById('newGenreNameRow');
-            if (e.target.value === '__new__') {
-                newGenreRow.classList.remove('hidden');
-            } else {
-                newGenreRow.classList.add('hidden');
-            }
-        });
-    }
 
     const breadcrumb = document.getElementById('breadcrumb');
     if (breadcrumb) {
@@ -3897,6 +4292,7 @@ function playTrackFromGlobalSearch(index) {
 function showAllGenres() {
     currentView = 'all';
     selectedGenre = null;
+    setHistoryLayoutMode(false);
     
     setActiveMainNav('allGenresNav');
     setActiveGenreItem(null);
@@ -3921,6 +4317,7 @@ function showAllGenres() {
 function showFavorites() {
     currentView = 'favorites';
     selectedGenre = null;
+    setHistoryLayoutMode(false);
 
     setActiveMainNav('favoritesNav');
     setActiveGenreItem(null);
@@ -3948,6 +4345,7 @@ function showFavorites() {
 function showRecentlyPlayed() {
     currentView = 'recent';
     selectedGenre = null;
+    setHistoryLayoutMode(false);
 
     setActiveMainNav('recentlyPlayedNav');
     setActiveGenreItem(null);
@@ -4063,6 +4461,7 @@ function playTrackFromRecent(index) {
 function showGenre(folder) {
     currentView = 'genre';
     selectedGenre = folder;
+    setHistoryLayoutMode(false);
 
     setActiveMainNav(null);
     setActiveGenreItem(folder.id);
@@ -4680,32 +5079,6 @@ function loadPinnedPlaylists() {
     console.log('Pinned playlists loading...');
 }
 
-// Smart Playlists Functions
-function loadSmartPlaylists() {
-    try {
-        const raw = localStorage.getItem(SMART_PLAYLISTS_STORAGE_KEY);
-        if (!raw) {
-            smartPlaylists = getDefaultSmartPlaylists();
-            saveSmartPlaylists();
-            return;
-        }
-        
-        const parsed = JSON.parse(raw);
-        smartPlaylists = Array.isArray(parsed) ? parsed : getDefaultSmartPlaylists();
-    } catch (error) {
-        console.warn('Failed to load smart playlists:', error);
-        smartPlaylists = getDefaultSmartPlaylists();
-    }
-}
-
-function saveSmartPlaylists() {
-    try {
-        localStorage.setItem(SMART_PLAYLISTS_STORAGE_KEY, JSON.stringify(smartPlaylists));
-    } catch (error) {
-        console.warn('Failed to save smart playlists:', error);
-    }
-}
-
 function getDefaultSmartPlaylists() {
     return [
         {
@@ -4816,6 +5189,7 @@ function evaluateSmartPlaylist(smartPlaylist) {
 function showSmartPlaylists() {
     currentView = 'smart';
     selectedGenre = null;
+    setHistoryLayoutMode(false);
     
     setActiveMainNav('smartPlaylistsNav');
     setActiveGenreItem(null);
@@ -4830,9 +5204,7 @@ function showSmartPlaylists() {
     
     renderBreadcrumb([
         { label: 'Genre Library', action: 'show-all' },
-        { label: 'Smart Playlists', current: true }
     ]);
-    document.getElementById('pageTitle').textContent = 'Smart Playlists';
     document.getElementById('pageSubtitle').textContent = 'AI-generated playlists based on your music rules';
     
     renderSmartPlaylists();
@@ -4843,6 +5215,15 @@ function showSmartPlaylists() {
 function showHistoryCalendar() {
     currentView = 'history';
     selectedGenre = null;
+    setHistoryLayoutMode(true);
+
+    if (searchQuery.trim()) {
+        searchQuery = '';
+        const searchInput = document.getElementById('searchInput');
+        const clearSearch = document.getElementById('clearSearch');
+        if (searchInput) searchInput.value = '';
+        if (clearSearch) clearSearch.classList.remove('visible');
+    }
     
     setActiveMainNav('historyCalendarNav');
     setActiveGenreItem(null);
@@ -4853,6 +5234,9 @@ function showHistoryCalendar() {
         { label: 'Genre Library', action: 'show-all' },
         { label: 'Listening History', current: true }
     ]);
+
+    document.getElementById('pageTitle').textContent = 'Listening History';
+    document.getElementById('pageSubtitle').textContent = 'Review daily plays, trends, and top tracks';
     
     // Call the render function from listening-history.js
     if (typeof renderHistoryCalendar === 'function') {
@@ -4951,35 +5335,6 @@ function renderSmartPlaylists() {
     grid.appendChild(createCard);
 }
 
-function updateStatsForSmartPlaylists() {
-    const statsBar = document.getElementById('statsBar');
-    const totalPlaylists = smartPlaylists.length;
-    const totalTracks = smartPlaylists.reduce((sum, sp) => sum + evaluateSmartPlaylist(sp).length, 0);
-    
-    statsBar.innerHTML = `
-        <div class="stat-item">
-            <i class="fas fa-brain"></i>
-            <div>
-                <div class="stat-value">${totalPlaylists}</div>
-                <div class="stat-label">Smart Playlists</div>
-            </div>
-        </div>
-        <div class="stat-item">
-            <i class="fas fa-music"></i>
-            <div>
-                <div class="stat-value">${totalTracks}</div>
-                <div class="stat-label">Matching Tracks</div>
-            </div>
-        </div>
-        <div class="stat-item">
-            <i class="fas fa-magic"></i>
-            <div>
-                <div class="stat-value">Auto</div>
-                <div class="stat-label">Updates</div>
-            </div>
-        </div>
-    `;
-}
 
 function playSmartPlaylist(smartPlaylist) {
     const tracks = evaluateSmartPlaylist(smartPlaylist);
@@ -5010,7 +5365,6 @@ function showSmartPlaylistTracks(smartPlaylist) {
     
     renderBreadcrumb([
         { label: 'Genre Library', action: 'show-all' },
-        { label: 'Smart Playlists', action: 'show-smart' },
         { label: smartPlaylist.name, current: true }
     ]);
     document.getElementById('pageTitle').textContent = smartPlaylist.name;
@@ -5092,12 +5446,6 @@ function playTrackFromSmart(index) {
     playTrack();
 }
 
-function deleteSmartPlaylist(id) {
-    smartPlaylists = smartPlaylists.filter(sp => sp.id !== id);
-    saveSmartPlaylists();
-    showSmartPlaylists();
-    showNotification('Smart Playlist Deleted', 'The smart playlist has been removed.', 'success');
-}
 
 function openSmartPlaylistModal() {
     const modal = document.getElementById('smartPlaylistModal');
@@ -5159,55 +5507,6 @@ function addSmartPlaylistRule() {
     rulesContainer.appendChild(ruleDiv);
 }
 
-function createSmartPlaylist(event) {
-    event.preventDefault();
-    
-    const name = document.getElementById('smartPlaylistNameInput').value.trim();
-    const icon = document.getElementById('smartPlaylistIconInput').value;
-    const matchType = document.getElementById('smartPlaylistMatchType').value;
-    
-    if (!name) {
-        showNotification('Missing Name', 'Please enter a name for the smart playlist.', 'warning');
-        return;
-    }
-    
-    const ruleElements = document.querySelectorAll('.smart-rule');
-    if (ruleElements.length === 0) {
-        showNotification('No Rules', 'Please add at least one rule for the smart playlist.', 'warning');
-        return;
-    }
-    
-    const rules = Array.from(ruleElements).map(ruleEl => ({
-        field: ruleEl.querySelector('.smart-rule-field').value,
-        operator: ruleEl.querySelector('.smart-rule-operator').value,
-        value: ruleEl.querySelector('.smart-rule-value').value.trim()
-    })).filter(rule => rule.value);
-    
-    if (rules.length === 0) {
-        showNotification('Empty Rules', 'Please fill in at least one rule with a value.', 'warning');
-        return;
-    }
-    
-    const newSmartPlaylist = {
-        id: `smart-${Date.now()}`,
-        name,
-        icon,
-        color: '#6366f1',
-        matchType,
-        rules
-    };
-    
-    smartPlaylists.push(newSmartPlaylist);
-    saveSmartPlaylists();
-    closeSmartPlaylistModal();
-    showSmartPlaylists();
-    
-    showNotification(
-        'Smart Playlist Created',
-        `"${name}" will automatically update with ${evaluateSmartPlaylist(newSmartPlaylist).length} matching tracks.`,
-        'success'
-    );
-}
 
 // Initialize waveform on load
 document.addEventListener('DOMContentLoaded', () => {

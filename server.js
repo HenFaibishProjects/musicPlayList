@@ -4,6 +4,7 @@ const path = require('path');
 const cors = require('cors');
 const { execFile } = require('child_process');
 const { promisify } = require('util');
+const { Readable } = require('stream');
 
 const app = express();
 const PORT = 3000;
@@ -425,25 +426,31 @@ async function extractMetadata(filePath, fileName) {
 app.get('/api/media', async (req, res) => {
     try {
         const requestedPath = req.query.path;
+        const isImportedRequest = ['1', 'true', 'yes'].includes(String(req.query.imported || '').toLowerCase());
         if (!requestedPath || typeof requestedPath !== 'string') {
             return res.status(400).json({ error: 'Missing media file path' });
         }
 
         const normalizedPath = path.normalize(requestedPath);
+        if (isImportedRequest && !path.isAbsolute(normalizedPath)) {
+            return res.status(400).json({ error: 'Imported media path must be absolute' });
+        }
         const resolvedPath = path.resolve(normalizedPath);
 
         if (!isMediaFile(resolvedPath)) {
             return res.status(400).json({ error: 'Unsupported media format' });
         }
 
-        const allowedRoots = await getAllowedMediaRoots();
-        if (!allowedRoots.length) {
-            return res.status(403).json({ error: 'No approved media folders configured' });
-        }
+        if (!isImportedRequest) {
+            const allowedRoots = await getAllowedMediaRoots();
+            if (!allowedRoots.length) {
+                return res.status(403).json({ error: 'No approved media folders configured' });
+            }
 
-        const isAllowedPath = allowedRoots.some(root => isPathInsideRoot(resolvedPath, root));
-        if (!isAllowedPath) {
-            return res.status(403).json({ error: 'Media path is outside approved library folders' });
+            const isAllowedPath = allowedRoots.some(root => isPathInsideRoot(resolvedPath, root));
+            if (!isAllowedPath) {
+                return res.status(403).json({ error: 'Media path is outside approved library folders' });
+            }
         }
 
         const stat = await fs.stat(resolvedPath);
@@ -1209,6 +1216,160 @@ app.get('/api/playlist/:id', async (req, res) => {
     }
 });
 
+// API: Proxy for fetching stream metadata (avoids CORS issues)
+app.get('/api/stream-metadata', async (req, res) => {
+    try {
+        const streamUrl = req.query.url;
+        if (!streamUrl || typeof streamUrl !== 'string') {
+            return res.status(400).json({ error: 'Missing stream URL parameter' });
+        }
+
+        // Validate it's an HTTP(S) URL
+        let parsedUrl;
+        try {
+            parsedUrl = new URL(streamUrl);
+            if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+                return res.status(400).json({ error: 'Only HTTP/HTTPS URLs are supported' });
+            }
+        } catch {
+            return res.status(400).json({ error: 'Invalid URL' });
+        }
+
+        // Build the Icecast/Shoutcast status URL
+        const statsUrl = `${parsedUrl.protocol}//${parsedUrl.host}/status-json.xsl`;
+
+        // Use dynamic import for node-fetch or built-in fetch
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 3000);
+
+        try {
+            const response = await fetch(statsUrl, {
+                signal: controller.signal,
+                headers: {
+                    'User-Agent': 'LidaPlay/1.0'
+                }
+            });
+            clearTimeout(timeout);
+
+            if (!response.ok) {
+                return res.status(502).json({ error: `Upstream returned ${response.status}` });
+            }
+
+            const data = await response.json();
+
+            // Parse Icecast JSON format
+            if (data.icestats && data.icestats.source) {
+                const source = Array.isArray(data.icestats.source)
+                    ? data.icestats.source[0]
+                    : data.icestats.source;
+
+                return res.json({
+                    title: source.title || source.server_name || '',
+                    artist: source.artist || '',
+                    genre: source.genre || '',
+                    bitrate: source.bitrate || '',
+                    listeners: source.listeners || 0
+                });
+            }
+
+            return res.json(null);
+        } catch (fetchError) {
+            clearTimeout(timeout);
+            if (fetchError.name === 'AbortError') {
+                return res.status(504).json({ error: 'Upstream request timed out' });
+            }
+            return res.status(502).json({ error: `Failed to fetch from upstream: ${fetchError.message}` });
+        }
+    } catch (error) {
+        console.error('Error proxying stream metadata:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// API: Proxy remote audio streams through same-origin endpoint (avoids browser CORS restrictions)
+app.get('/api/stream-proxy', async (req, res) => {
+    try {
+        const streamUrl = String(req.query.url || '').trim();
+        if (!streamUrl) {
+            return res.status(400).json({ error: 'Missing stream URL parameter' });
+        }
+
+        let parsedUrl;
+        try {
+            parsedUrl = new URL(streamUrl);
+        } catch {
+            return res.status(400).json({ error: 'Invalid URL' });
+        }
+
+        if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+            return res.status(400).json({ error: 'Only HTTP/HTTPS URLs are supported' });
+        }
+
+        const upstreamResponse = await fetch(parsedUrl.toString(), {
+            method: 'GET',
+            redirect: 'follow',
+            headers: {
+                'User-Agent': req.get('user-agent') || 'LidaPlay/1.0',
+                'Accept': req.get('accept') || '*/*',
+                'Accept-Language': req.get('accept-language') || 'en-US,en;q=0.9',
+                'Range': req.get('range') || '',
+                'Icy-MetaData': req.get('icy-metadata') || '1'
+            }
+        });
+
+        const passthroughHeaders = [
+            'content-type',
+            'content-length',
+            'content-range',
+            'accept-ranges',
+            'cache-control',
+            'pragma',
+            'expires',
+            'etag',
+            'last-modified',
+            'icy-name',
+            'icy-genre',
+            'icy-url',
+            'icy-br',
+            'icy-metaint'
+        ];
+
+        res.status(upstreamResponse.status);
+        for (const headerName of passthroughHeaders) {
+            const value = upstreamResponse.headers.get(headerName);
+            if (value) {
+                res.setHeader(headerName, value);
+            }
+        }
+
+        if (!upstreamResponse.body) {
+            return res.end();
+        }
+
+        const upstreamStream = Readable.fromWeb(upstreamResponse.body);
+        upstreamStream.on('error', (error) => {
+            if (!res.headersSent) {
+                res.status(502).json({ error: `Upstream stream error: ${error.message}` });
+            } else {
+                res.end();
+            }
+        });
+
+        req.on('close', () => {
+            try {
+                upstreamStream.destroy();
+            } catch {
+                // no-op
+            }
+        });
+
+        return upstreamStream.pipe(res);
+    } catch (error) {
+        console.error('Error proxying stream audio:', error);
+        return res.status(502).json({ error: error.message || 'Failed to proxy remote stream' });
+    }
+});
+
 // API: Upload new tracks
 app.post('/api/upload', async (req, res) => {
     // This would handle file uploads in a real implementation
@@ -1217,7 +1378,7 @@ app.post('/api/upload', async (req, res) => {
 
 // Start server
 app.listen(PORT, () => {
-    console.log(`\n🎵 Music Playlist Manager Server`);
+    console.log(`\n🎵 LidaPlay Server`);
     console.log(`Server running on http://localhost:${PORT}`);
     console.log(`\nAPI Endpoints:`);
     console.log(`  GET  /api/library-structure - Get editable library folder structure`);
