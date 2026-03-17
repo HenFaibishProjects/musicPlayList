@@ -1,0 +1,7 @@
+#EXTM3U
+#EXTINF:123,Artist 1 - Song 1
+http://example.com/song1.mp3
+#EXTINF:456,Artist 2 - Song 2
+http://example.com/song2.mp3
+#EXTINF:789,Artist 3 - Song 3
+http://example.com/song3.mp3

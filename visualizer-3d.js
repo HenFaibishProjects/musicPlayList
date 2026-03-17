@@ -250,10 +250,15 @@ function animate3DVisualizer() {
     // Get audio data
     let audioIntensity = 0.5;
     let bassIntensity = 0.5;
-    
-    if (typeof analyser !== 'undefined' && analyser) {
-        const dataArray = new Uint8Array(analyser.frequencyBinCount);
-        analyser.getByteFrequencyData(dataArray);
+
+    const activeAnalyser =
+        (typeof visualizer !== 'undefined' && visualizer && visualizer.analyser)
+            ? visualizer.analyser
+            : ((typeof analyser !== 'undefined' && analyser) ? analyser : null);
+
+    if (activeAnalyser) {
+        const dataArray = new Uint8Array(activeAnalyser.frequencyBinCount);
+        activeAnalyser.getByteFrequencyData(dataArray);
         
         // Calculate average intensity
         let sum = 0;
@@ -378,5 +383,6 @@ function resize3DVisualizer(width, height) {
 
 // Export functions
 window.init3DVisualizer = init3DVisualizer;
+window.start3DVisualizer = init3DVisualizer;
 window.stop3DVisualizer = stop3DVisualizer;
 window.resize3DVisualizer = resize3DVisualizer;

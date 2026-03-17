@@ -1,0 +1,29 @@
+{
+  "playlists": [
+    {
+      "id": "pl_mmul2sst_d6llw",
+      "name": "bach",
+      "source": "m3u",
+      "createdAt": 1773750209357,
+      "tracks": [
+        {
+          "title": "AutoDJ: Kayser Medienverlag - klassik0402 - Brandenburgisches Konzert Nr. 4 3. Presto",
+          "artist": "Unknown Artist",
+          "album": "",
+          "duration": "",
+          "cover": "",
+          "year": 0,
+          "mood": "",
+          "tags": [],
+          "genre": "Classical music",
+          "tvgName": "",
+          "groupTitle": "",
+          "file": "/api/stream-proxy?url=https%3A%2F%2Fec3.yesstreaming.net%3A3625%2Fstream",
+          "id": 1,
+          "originalFile": "/api/stream-proxy?url=https%3A%2F%2Fec3.yesstreaming.net%3A3625%2Fstream",
+          "unresolvedRelativeImport": false
+        }
+      ]
+    }
+  ]
+}

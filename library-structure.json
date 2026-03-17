@@ -70,6 +70,15 @@
         "imageUrl": null,
         "description": "",
         "subfolders": []
+      },
+      {
+        "id": "genre-live-mmtd2p7a",
+        "name": "live",
+        "icon": "fa-music",
+        "color": "#6366f1",
+        "imageUrl": null,
+        "description": "",
+        "subfolders": []
       }
     ]
   }

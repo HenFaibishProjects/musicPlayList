@@ -1,17 +1,14 @@
 // Data Management & API
 const DEFAULT_COVER = 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=400&fit=crop';
-const RECENT_TRACKS_STORAGE_KEY = 'lidaplay_recent_tracks_v1';
 const SESSION_STORAGE_KEY = 'lidaplay_listening_session_v1';
 const PINNED_PLAYLISTS_STORAGE_KEY = 'lidaplay_pinned_playlists_v1';
 const PLAYBACK_SPEED_STORAGE_KEY = 'lidaplay_playback_speed_v1';
-const MAX_RECENT_TRACKS = 100;
 const MAX_PINNED_PLAYLISTS = 10;
 
 // Global state
 let libraryData = null;
 let apiAvailable = false;
 let isRescanningLibrary = false;
-let recentTracks = [];
 let listeningSession = null;
 let sessionSaveTimer = null;
 let pinnedPlaylists = [];
@@ -74,64 +71,6 @@ async function fetchLibraryData({ forceRescan = false } = {}) {
     const method = forceRescan ? 'POST' : 'GET';
     const payload = await apiRequest(endpoint, { method });
     return normalizeLibraryPayload(payload);
-}
-
-// Recent Tracks Storage
-function normalizeRecentTrack(track = {}) {
-    const title = track.title || 'Unknown Title';
-    const artist = track.artist || 'Unknown Artist';
-    const file = track.file || '';
-    const id = track.id || file || `${title}::${artist}`;
-    return {
-        id, title, artist,
-        album: track.album || '',
-        duration: track.duration || '--:--',
-        cover: track.cover || DEFAULT_COVER,
-        file,
-        playlistName: track.playlistName || '',
-        genreName: track.genreName || '',
-        playedAt: Number(track.playedAt) || Date.now()
-    };
-}
-
-function loadRecentTracksFromStorage() {
-    try {
-        const raw = localStorage.getItem(RECENT_TRACKS_STORAGE_KEY);
-        if (!raw) { recentTracks = []; return; }
-        const parsed = JSON.parse(raw);
-        if (!Array.isArray(parsed)) { recentTracks = []; return; }
-        recentTracks = parsed.map(normalizeRecentTrack)
-            .filter(track => track.file || track.title).slice(0, MAX_RECENT_TRACKS);
-    } catch (error) {
-        console.warn('Failed to load recently played tracks from storage:', error);
-        recentTracks = [];
-    }
-}
-
-function saveRecentTracksToStorage() {
-    try {
-        localStorage.setItem(RECENT_TRACKS_STORAGE_KEY, JSON.stringify(recentTracks.slice(0, MAX_RECENT_TRACKS)));
-    } catch (error) {
-        console.warn('Failed to persist recently played tracks:', error);
-    }
-}
-
-function addTrackToRecentlyPlayed(track, context = {}) {
-    if (!track) return;
-    const normalizedTrack = normalizeRecentTrack({
-        ...track,
-        playlistName: context.playlistName || track.playlistName || '',
-        genreName: context.genreName || track.genreName || '',
-        playedAt: Date.now()
-    });
-    const latestTrack = recentTracks[0];
-    if (latestTrack && latestTrack.id === normalizedTrack.id && 
-        Date.now() - Number(latestTrack.playedAt || 0) < 15000) return;
-    const dedupeIndex = recentTracks.findIndex(item => item.id === normalizedTrack.id);
-    if (dedupeIndex >= 0) recentTracks.splice(dedupeIndex, 1);
-    recentTracks.unshift(normalizedTrack);
-    recentTracks = recentTracks.slice(0, MAX_RECENT_TRACKS);
-    saveRecentTracksToStorage();
 }
 
 function getAllTracksWithContext() {

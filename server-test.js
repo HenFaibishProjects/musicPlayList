@@ -7,7 +7,7 @@ const { promisify } = require('util');
 const { Readable } = require('stream');
 
 const app = express();
-const PORT = 3000;
+const PORT = 3001;
 const LIBRARY_STRUCTURE_FILE = 'library-structure.json';
 const IMPORTED_PLAYLISTS_FILE = 'imported-playlists.json';
 const execFileAsync = promisify(execFile);
@@ -1408,8 +1408,7 @@ app.get('/api/imported-playlists', async (req, res) => {
 // API: Create imported playlist
 app.post('/api/imported-playlists', async (req, res) => {
     try {
-        console.log('POST /api/imported-playlists req.body:', req.body);
-        const { name, tracks, genreId, genreName } = req.body || {};
+        const { name, tracks } = req.body || {};
         if (!name || typeof name !== 'string' || !name.trim()) {
             return res.status(400).json({ error: 'Playlist name is required' });
         }
@@ -1425,14 +1424,6 @@ app.post('/api/imported-playlists', async (req, res) => {
             createdAt: Date.now(),
             tracks: tracks
         };
-
-        // Add genre information if provided
-        if (genreId && typeof genreId === 'string' && genreId.trim()) {
-            newPlaylist.genreId = genreId.trim();
-        }
-        if (genreName && typeof genreName === 'string' && genreName.trim()) {
-            newPlaylist.genreName = genreName.trim();
-        }
 
         playlists.push(newPlaylist);
         await saveImportedPlaylists(playlists);

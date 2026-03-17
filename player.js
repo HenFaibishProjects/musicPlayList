@@ -126,7 +126,6 @@ function playTrack() {
     isPlaying = true;
     const currentTrack = currentPlaylist[currentTrackIndex];
     if (currentTrack) {
-        addTrackToRecentlyPlayed(currentTrack, currentPlaylistContext);
         // Track in listening history calendar
         if (typeof trackPlayInHistory === 'function') {
             trackPlayInHistory(currentTrack, currentPlaylistContext);

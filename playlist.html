@@ -274,30 +274,6 @@
         style="display: none;"
     >
 
-    <!-- Audio Device Selector Modal -->
-    <div class="modal" id="deviceSelectorModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3><i class="fas fa-volume-up"></i> Audio Output Device</h3>
-                <button class="modal-close" id="deviceSelectorCloseBtn">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="device-selector-info">
-                    <i class="fas fa-info-circle"></i>
-                    <p>Select which audio device to use for playback. Works on Windows, Mac, and Linux.</p>
-                </div>
-                <div id="deviceList" class="device-list">
-                    <!-- Populated dynamically -->
-                </div>
-                <button class="btn btn-refresh" id="refreshDevicesBtn">
-                    <i class="fas fa-sync"></i> Refresh Devices
-                </button>
-            </div>
-        </div>
-    </div>
-
     <!-- Add Genre Modal -->
     <div class="modal" id="addGenreModal">
         <div class="modal-content library-manager-content add-genre-content">
@@ -885,7 +861,6 @@
     <script src="m3u-parser.js"></script>
     <script src="visualizer.js"></script>
     <script src="visualizer-3d.js"></script>
-    <script src="audio-device-selector.js"></script>
     <script src="data.js"></script>
     <script src="listening-history.js"></script>
     <script src="player.js"></script>

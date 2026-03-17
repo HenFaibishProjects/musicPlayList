@@ -8,7 +8,6 @@ let searchQuery = '';
 let viewMode = 'grid';
 let isGlobalSearchActive = false;
 let currentGlobalSearchTracks = [];
-let currentRecentViewTracks = [];
 
 
 function sortItems(items, isGenre = false) {

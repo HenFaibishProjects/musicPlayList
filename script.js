@@ -1,5 +1,5 @@
 // UI state variables are in playlists.js (currentView, selectedGenre, currentSort, etc.)
-// Data variables are in data.js (libraryData, apiAvailable, recentTracks, etc.)
+// Data variables are in data.js (libraryData, apiAvailable, etc.)
 // Player state variables are in player.js (audioPlayer, currentPlaylist, isPlaying, etc.)
 
 // Script-specific state (modalFormBaseline, notificationAutoCloseTimer, pendingDeletePlaylist, editingGenreContext are in ui.js)
@@ -17,43 +17,6 @@ let isUpdatingVolumeSlider = false;
 let lastVolume = -1;
 const IMPORTED_PLAYLISTS_STORAGE_KEY = 'lidaplay_imported_playlists';
 const STREAM_PROXY_PATH = '/api/stream-proxy?url=';
-
-// Compatibility guards: keep app booting even if Smart Playlist feature is removed.
-if (typeof globalThis.smartPlaylists === 'undefined') {
-    globalThis.smartPlaylists = [];
-}
-
-if (typeof globalThis.currentSmartPlaylistTracks === 'undefined') {
-    globalThis.currentSmartPlaylistTracks = [];
-}
-
-if (typeof globalThis.loadSmartPlaylists !== 'function') {
-    globalThis.loadSmartPlaylists = function loadSmartPlaylistsFallback() {
-        // Smart Playlists feature removed/disabled.
-    };
-}
-
-if (typeof globalThis.closeSmartPlaylistModal !== 'function') {
-    globalThis.closeSmartPlaylistModal = function closeSmartPlaylistModalFallback() {};
-}
-
-if (typeof globalThis.createSmartPlaylist !== 'function') {
-    globalThis.createSmartPlaylist = function createSmartPlaylistFallback(event) {
-        event?.preventDefault?.();
-    };
-}
-
-if (typeof globalThis.addSmartPlaylistRule !== 'function') {
-    globalThis.addSmartPlaylistRule = function addSmartPlaylistRuleFallback() {};
-}
-
-if (typeof globalThis.updateStatsForSmartPlaylists !== 'function') {
-    globalThis.updateStatsForSmartPlaylists = function updateStatsForSmartPlaylistsFallback() {};
-}
-
-if (typeof globalThis.deleteSmartPlaylist !== 'function') {
-    globalThis.deleteSmartPlaylist = function deleteSmartPlaylistFallback() {};
-}
 
 function isQuickPlayTrack(track) {
     return Boolean(track && track.__quickPlay === true);
@@ -400,52 +363,125 @@ function normalizeImportedPlaylistRecord(record) {
     };
 }
 
-function loadImportedPlaylistRecords() {
+async function loadImportedPlaylistRecords() {
     try {
-        const raw = localStorage.getItem(IMPORTED_PLAYLISTS_STORAGE_KEY);
-        if (!raw) return [];
+        if (!apiAvailable) {
+            // Fallback to localStorage if API is not available
+            try {
+                const raw = localStorage.getItem(IMPORTED_PLAYLISTS_STORAGE_KEY);
+                if (!raw) return [];
 
-        const parsed = JSON.parse(raw);
-        const records = Array.isArray(parsed)
-            ? parsed
-            : getImportedPlaylistRecordsFromLegacyPayload(parsed);
+                const parsed = JSON.parse(raw);
+                const records = Array.isArray(parsed)
+                    ? parsed
+                    : getImportedPlaylistRecordsFromLegacyPayload(parsed);
+
+                const normalized = records
+                    .map(normalizeImportedPlaylistRecord)
+                    .filter(Boolean);
+
+                if (!Array.isArray(parsed)) {
+                    await saveImportedPlaylistRecords(normalized);
+                }
+
+                return normalized;
+            } catch (localError) {
+                console.warn('Failed to load imported playlists from localStorage:', localError);
+                return [];
+            }
+        }
+
+        // Use API endpoint
+        const response = await apiRequest('http://localhost:3000/api/imported-playlists');
+        const playlists = response?.playlists || [];
+        
+        // Convert API format to internal format
+        const records = playlists.map(playlist => ({
+            genreId: playlist.genreId || 'imported',
+            genreName: playlist.genreName || 'Imported',
+            playlist: {
+                ...playlist,
+                isImported: true,
+                tracks: playlist.tracks || []
+            }
+        }));
 
         const normalized = records
             .map(normalizeImportedPlaylistRecord)
             .filter(Boolean);
 
-        if (!Array.isArray(parsed)) {
-            saveImportedPlaylistRecords(normalized);
-        }
-
         return normalized;
     } catch (error) {
-        console.warn('Failed to load imported playlists:', error);
-        return [];
+        console.warn('Failed to load imported playlists from API:', error);
+        // Fallback to localStorage
+        try {
+            const raw = localStorage.getItem(IMPORTED_PLAYLISTS_STORAGE_KEY);
+            if (!raw) return [];
+            const parsed = JSON.parse(raw);
+            const records = Array.isArray(parsed)
+                ? parsed
+                : getImportedPlaylistRecordsFromLegacyPayload(parsed);
+            const normalized = records
+                .map(normalizeImportedPlaylistRecord)
+                .filter(Boolean);
+            return normalized;
+        } catch (localError) {
+            console.warn('Failed to load imported playlists from localStorage fallback:', localError);
+            return [];
+        }
     }
 }
 
-function saveImportedPlaylistRecords(records = []) {
+async function saveImportedPlaylistRecords(records = []) {
     try {
+        if (!apiAvailable) {
+            // Fallback to localStorage if API is not available
+            localStorage.setItem(IMPORTED_PLAYLISTS_STORAGE_KEY, JSON.stringify(records));
+            return;
+        }
+
+        // Save each playlist individually via API
+        for (const record of records) {
+            const playlist = record.playlist;
+            if (!playlist) continue;
+            
+            // Send ONE playlist per request with name and tracks
+            await apiRequest('http://localhost:3000/api/imported-playlists', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: playlist.name || 'Imported Playlist',
+                    tracks: playlist.tracks || []
+                })
+            });
+        }
+
+        // Also save to localStorage as backup
         localStorage.setItem(IMPORTED_PLAYLISTS_STORAGE_KEY, JSON.stringify(records));
     } catch (error) {
         console.warn('Failed to save imported playlists:', error);
+        // Fallback to localStorage
+        try {
+            localStorage.setItem(IMPORTED_PLAYLISTS_STORAGE_KEY, JSON.stringify(records));
+        } catch (localError) {
+            console.warn('Failed to save imported playlists to localStorage:', localError);
+        }
     }
 }
 
-function upsertImportedPlaylistRecord(record) {
+async function upsertImportedPlaylistRecord(record) {
     const normalized = normalizeImportedPlaylistRecord(record);
     if (!normalized) return;
 
-    const records = loadImportedPlaylistRecords();
+    const records = await loadImportedPlaylistRecords();
     const deduped = records.filter(item => item?.playlist?.id !== normalized.playlist.id);
     deduped.push(normalized);
-    saveImportedPlaylistRecords(deduped);
+    await saveImportedPlaylistRecords(deduped);
 }
 
-function mergeImportedPlaylistsIntoLibrary(payload) {
+async function mergeImportedPlaylistsIntoLibrary(payload) {
     const normalized = normalizeLibraryPayload(payload);
-    const records = loadImportedPlaylistRecords();
+    const records = await loadImportedPlaylistRecords();
 
     if (!records.length) {
         return normalized;
@@ -489,93 +525,6 @@ function mergeImportedPlaylistsIntoLibrary(payload) {
     });
 
     return normalized;
-}
-
-function normalizeRecentTrack(track = {}) {
-    const title = track.title || 'Unknown Title';
-    const artist = track.artist || 'Unknown Artist';
-    const file = track.file || '';
-    const id = track.id || file || `${title}::${artist}`;
-
-    return {
-        id,
-        title,
-        artist,
-        album: track.album || '',
-        duration: track.duration || '--:--',
-        cover: track.cover || DEFAULT_COVER,
-        file,
-        playlistName: track.playlistName || '',
-        genreName: track.genreName || '',
-        playedAt: Number(track.playedAt) || Date.now()
-    };
-}
-
-function loadRecentTracksFromStorage() {
-    try {
-        const raw = localStorage.getItem(RECENT_TRACKS_STORAGE_KEY);
-        if (!raw) {
-            recentTracks = [];
-            return;
-        }
-
-        const parsed = JSON.parse(raw);
-        if (!Array.isArray(parsed)) {
-            recentTracks = [];
-            return;
-        }
-
-        recentTracks = parsed
-            .map(normalizeRecentTrack)
-            .filter(track => track.file || track.title)
-            .slice(0, MAX_RECENT_TRACKS);
-    } catch (error) {
-        console.warn('Failed to load recently played tracks from storage:', error);
-        recentTracks = [];
-    }
-}
-
-function saveRecentTracksToStorage() {
-    try {
-        localStorage.setItem(RECENT_TRACKS_STORAGE_KEY, JSON.stringify(recentTracks.slice(0, MAX_RECENT_TRACKS)));
-    } catch (error) {
-        console.warn('Failed to persist recently played tracks:', error);
-    }
-}
-
-function addTrackToRecentlyPlayed(track, context = {}) {
-    if (!track) return;
-
-    const normalizedTrack = normalizeRecentTrack({
-        ...track,
-        playlistName: context.playlistName || track.playlistName || '',
-        genreName: context.genreName || track.genreName || '',
-        playedAt: Date.now()
-    });
-
-    const latestTrack = recentTracks[0];
-    if (
-        latestTrack &&
-        latestTrack.id === normalizedTrack.id &&
-        Date.now() - Number(latestTrack.playedAt || 0) < 15000
-    ) {
-        return;
-    }
-
-    const dedupeIndex = recentTracks.findIndex(item => item.id === normalizedTrack.id);
-    if (dedupeIndex >= 0) {
-        recentTracks.splice(dedupeIndex, 1);
-    }
-
-    recentTracks.unshift(normalizedTrack);
-    recentTracks = recentTracks.slice(0, MAX_RECENT_TRACKS);
-    saveRecentTracksToStorage();
-
-    if (currentView === 'recent') {
-        renderRecentlyPlayed();
-        updateStatsForRecentlyPlayed();
-        updateWorkspaceStatus();
-    }
 }
 
 function addTrackToListeningHistory(track, context = {}) {
@@ -748,7 +697,7 @@ async function fetchLibraryData({ forceRescan = false } = {}) {
     const endpoint = forceRescan ? 'http://localhost:3000/api/rescan' : 'http://localhost:3000/api/library';
     const method = forceRescan ? 'POST' : 'GET';
     const payload = await apiRequest(endpoint, { method });
-    return mergeImportedPlaylistsIntoLibrary(payload);
+    return await mergeImportedPlaylistsIntoLibrary(payload);
 }
 
 function refreshLibraryUI() {
@@ -769,8 +718,6 @@ function refreshLibraryUI() {
         }
     } else if (currentView === 'favorites') {
         showFavorites();
-    } else if (currentView === 'recent') {
-        showRecentlyPlayed();
     } else {
         showAllGenres();
     }
@@ -839,9 +786,6 @@ function updateWorkspaceStatus() {
         } else if (currentView === 'favorites') {
             if (viewIcon) viewIcon.className = 'fas fa-star';
             if (viewText) viewText.textContent = 'Favorites';
-        } else if (currentView === 'recent') {
-            if (viewIcon) viewIcon.className = 'fas fa-clock';
-            if (viewText) viewText.textContent = 'Recently Played';
         } else if (currentView === 'history') {
             if (viewIcon) viewIcon.className = 'fas fa-calendar-days';
             if (viewText) viewText.textContent = 'Listening History';
@@ -2220,7 +2164,7 @@ async function addImportedPlaylistToLibrary(genreId, playlistName, tracks) {
     genre.subfolders.push(newPlaylist);
 
     // Persist imported playlist records so they survive reload/API refresh
-    upsertImportedPlaylistRecord({
+    await upsertImportedPlaylistRecord({
         genreId,
         genreName: genre.name || 'Imported',
         playlist: newPlaylist
@@ -2267,10 +2211,6 @@ function extractCovers(tracks) {
 async function init() {
     try {
         createBackgroundParticles();
-        loadRecentTracksFromStorage();
-        if (typeof loadSmartPlaylists === 'function') {
-            loadSmartPlaylists();
-        }
         loadPlaybackSpeedFromStorage();
         loadListeningSession();
         loadPinnedPlaylists();
@@ -2287,7 +2227,7 @@ async function init() {
             console.log('✅ Loaded from API with folder-based scanning');
         } catch (apiError) {
             console.log('⚠️ API not available, starting with empty library structure');
-            libraryData = mergeImportedPlaylistsIntoLibrary(getEmptyLibraryData());
+            libraryData = await mergeImportedPlaylistsIntoLibrary(getEmptyLibraryData());
             apiAvailable = false;
             showNotification(
                 'Server Not Connected',
@@ -2533,6 +2473,8 @@ function loadTrack(track) {
     audioPlayerB.currentTime = 0;
     audioPlayer.volume = currentVolume;
     audioPlayerB.volume = currentVolume;
+    audioPlayer.playbackRate = currentPlaybackSpeed;
+    audioPlayerB.playbackRate = currentPlaybackSpeed;
     
     // For external streams: try without crossOrigin first so audio plays even if CORS is missing
     // (visualizer won't get data for non-CORS streams, but audio will still be audible)
@@ -2557,6 +2499,15 @@ function loadTrack(track) {
     if (playerCover) {
         playerCover.src = track.cover || DEFAULT_COVER;
     }
+
+    if (typeof initializeProgressWaveform === 'function') {
+        initializeProgressWaveform();
+    }
+
+    if (track.file && track.file.startsWith('http') && typeof setupStreamMetadataMonitoring === 'function') {
+        setupStreamMetadataMonitoring(track);
+    }
+
     if (isQueuePanelOpen) {
         renderQueuePanel();
     }
@@ -2580,9 +2531,6 @@ function playTrack() {
     currentPlayer.play()
         .then(() => {
             isPlaying = true;
-            if (currentTrack && !isQuickPlayTrack(currentTrack)) {
-                addTrackToRecentlyPlayed(currentTrack, currentPlaylistContext);
-            }
             if (currentTrack) {
                 addTrackToListeningHistory(currentTrack, currentPlaylistContext);
             }
@@ -2865,8 +2813,6 @@ function startCrossfade() {
             playerCover.src = nextTrack.cover || DEFAULT_COVER;
         }
         
-        // Add to recently played
-        addTrackToRecentlyPlayed(nextTrack, currentPlaylistContext);
         addTrackToListeningHistory(nextTrack, currentPlaylistContext);
         
         // Update queue if open
@@ -3484,16 +3430,6 @@ function setupEventListeners() {
         favoritesNav.addEventListener('click', showFavorites);
     }
 
-    const recentlyPlayedNav = document.getElementById('recentlyPlayedNav');
-    if (recentlyPlayedNav) {
-        recentlyPlayedNav.addEventListener('click', showRecentlyPlayed);
-    }
-
-    const smartPlaylistsNav = document.getElementById('smartPlaylistsNav');
-    if (smartPlaylistsNav && typeof showSmartPlaylists === 'function') {
-        smartPlaylistsNav.addEventListener('click', showSmartPlaylists);
-    }
-
     const historyCalendarNav = document.getElementById('historyCalendarNav');
     if (historyCalendarNav) {
         historyCalendarNav.addEventListener('click', showHistoryCalendar);
@@ -3648,21 +3584,6 @@ function setupEventListeners() {
         });
     }
     
-    const smartPlaylistCloseBtn = document.getElementById('smartPlaylistCloseBtn');
-    if (smartPlaylistCloseBtn && typeof closeSmartPlaylistModal === 'function') {
-        smartPlaylistCloseBtn.addEventListener('click', closeSmartPlaylistModal);
-    }
-    
-    const smartPlaylistForm = document.getElementById('smartPlaylistForm');
-    if (smartPlaylistForm && typeof createSmartPlaylist === 'function') {
-        smartPlaylistForm.addEventListener('submit', createSmartPlaylist);
-    }
-    
-    const addSmartRuleBtn = document.getElementById('addSmartRuleBtn');
-    if (addSmartRuleBtn && typeof addSmartPlaylistRule === 'function') {
-        addSmartRuleBtn.addEventListener('click', addSmartPlaylistRule);
-    }
-
     // Speed Control event listeners
     const speedBtn = document.getElementById('speedBtn');
     if (speedBtn) {
@@ -3785,8 +3706,6 @@ function setupEventListeners() {
                 showAllGenres();
             } else if (action === 'show-favorites') {
                 showFavorites();
-            } else if (action === 'show-recent') {
-                showRecentlyPlayed();
             } else if (action === 'show-selected-genre') {
                 const genreId = target.dataset.breadcrumbValue;
                 const genre = (libraryData?.library?.folders || []).find(folder => folder.id === genreId) || selectedGenre;
@@ -3809,12 +3728,8 @@ function setupEventListeners() {
             const action = playBtn.dataset.action;
             if (action === 'play-global-search') {
                 playTrackFromGlobalSearch(index);
-            } else if (action === 'play-recent') {
-                playTrackFromRecent(index);
             } else if (action === 'play-list') {
                 playTrackFromList(index);
-            } else if (action === 'play-smart') {
-                playTrackFromSmart(index);
             }
         });
     }
@@ -3863,8 +3778,6 @@ function performSearch() {
         showAllGenres();
     } else if (currentView === 'favorites') {
         showFavorites();
-    } else if (currentView === 'recent') {
-        showRecentlyPlayed();
     } else {
         if (selectedGenre) {
             showGenre(selectedGenre);
@@ -4342,120 +4255,6 @@ function showFavorites() {
     updateWorkspaceStatus();
 }
 
-function showRecentlyPlayed() {
-    currentView = 'recent';
-    selectedGenre = null;
-    setHistoryLayoutMode(false);
-
-    setActiveMainNav('recentlyPlayedNav');
-    setActiveGenreItem(null);
-
-    if (searchQuery.trim()) {
-        performSearch();
-        updateWorkspaceStatus();
-        return;
-    }
-
-    clearGlobalSearchState();
-
-    renderBreadcrumb([
-        { label: 'Genre Library', action: 'show-all' },
-        { label: 'Recently Played', current: true }
-    ]);
-    document.getElementById('pageTitle').textContent = 'Recently Played';
-    document.getElementById('pageSubtitle').textContent = 'Quickly return to your latest playback history';
-
-    renderRecentlyPlayed();
-    updateStatsForRecentlyPlayed();
-    updateWorkspaceStatus();
-}
-
-function renderRecentlyPlayed() {
-    const grid = document.getElementById('folderGrid');
-    grid.innerHTML = '';
-
-    let tracks = [...recentTracks];
-
-    if (searchQuery) {
-        tracks = tracks.filter(track => {
-            const haystack = `${track.title} ${track.artist} ${track.album || ''} ${track.playlistName || ''} ${track.genreName || ''}`.toLowerCase();
-            return haystack.includes(searchQuery);
-        });
-    }
-
-    if (currentSort === 'name') {
-        const direction = nameSortDirection === 'asc' ? 1 : -1;
-        tracks.sort((a, b) => (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base', numeric: true }) * direction);
-    } else {
-        tracks.sort((a, b) => Number(b.playedAt || 0) - Number(a.playedAt || 0));
-    }
-
-    currentRecentViewTracks = tracks;
-
-    if (!tracks.length) {
-        grid.innerHTML = `
-            <div class="empty-state">
-                <i class="fas fa-clock-rotate-left"></i>
-                <h3>No recently played tracks yet</h3>
-                <p>Play songs from any playlist and they will appear here automatically.</p>
-            </div>
-        `;
-        return;
-    }
-
-    const trackList = document.createElement('div');
-    trackList.className = 'track-list-view';
-
-    tracks.forEach((track, index) => {
-        const trackItem = document.createElement('div');
-        trackItem.className = 'track-row fade-in';
-        trackItem.style.animationDelay = `${index * 0.04}s`;
-
-        const tags = [track.playlistName, track.genreName].filter(Boolean);
-        const tagsHTML = tags.length
-            ? tags.map(tag => `<span class="track-tag">${escapeHtml(tag)}</span>`).join('')
-            : '<span class="track-tag">Recently Played</span>';
-
-        trackItem.innerHTML = `
-            <div class="track-number">${index + 1}</div>
-            <img src="${sanitizeImageUrl(track.cover || DEFAULT_COVER)}" alt="${escapeHtml(track.title || 'Track cover')}" class="track-thumb">
-            <div class="track-info">
-                <div class="track-title">${escapeHtml(track.title || 'Unknown Title')}</div>
-                <div class="track-artist">${escapeHtml(track.artist || 'Unknown Artist')}</div>
-            </div>
-            <div class="track-album">${escapeHtml(track.album || track.playlistName || '—')}</div>
-            <div class="track-meta">
-                <span><i class="fas fa-clock"></i> ${formatRelativeTime(track.playedAt)}</span>
-                ${track.genreName ? `<span><i class="fas fa-layer-group"></i> ${escapeHtml(track.genreName)}</span>` : ''}
-            </div>
-            <div class="track-tags">${tagsHTML}</div>
-            <div class="track-duration">${escapeHtml(track.duration || '--:--')}</div>
-            <button type="button" class="track-play-btn" data-action="play-recent" data-track-index="${index}">
-                <i class="fas fa-play"></i>
-            </button>
-        `;
-
-        trackList.appendChild(trackItem);
-    });
-
-    grid.appendChild(trackList);
-}
-
-function playTrackFromRecent(index) {
-    if (index < 0 || index >= currentRecentViewTracks.length) return;
-
-    currentPlaylist = currentRecentViewTracks.map(track => ({ ...track }));
-    rebuildPlaybackOrder(index);
-
-    const selectedTrack = currentPlaylist[currentTrackIndex];
-    currentPlaylistContext = {
-        playlistName: selectedTrack?.playlistName || 'Recently Played',
-        genreName: selectedTrack?.genreName || ''
-    };
-
-    loadTrack(selectedTrack);
-    playTrack();
-}
 
 // Show specific genre
 function showGenre(folder) {
@@ -4830,17 +4629,6 @@ function updateBreadcrumb(playlistName) {
         return;
     }
 
-    if (currentView === 'recent') {
-        renderBreadcrumb([
-            { label: 'Genre Library', action: 'show-all' },
-            { label: 'Recently Played', action: 'show-recent' },
-            { label: playlistName || 'Playlist', current: true }
-        ]);
-        document.getElementById('pageTitle').textContent = playlistName;
-        document.getElementById('pageSubtitle').textContent = 'Playback started from Recently Played';
-        return;
-    }
-
     if (currentView === 'favorites') {
         renderBreadcrumb([
             { label: 'Genre Library', action: 'show-all' },
@@ -4896,36 +4684,6 @@ function updateStatsForFavorites() {
     `;
 }
 
-function updateStatsForRecentlyPlayed() {
-    const statsBar = document.getElementById('statsBar');
-    const totalTracks = recentTracks.length;
-    const uniqueArtists = new Set(recentTracks.map(track => track.artist).filter(Boolean)).size;
-    const uniquePlaylists = new Set(recentTracks.map(track => track.playlistName).filter(Boolean)).size;
-
-    statsBar.innerHTML = `
-        <div class="stat-item">
-            <i class="fas fa-clock"></i>
-            <div>
-                <div class="stat-value">${totalTracks}</div>
-                <div class="stat-label">Recent Tracks</div>
-            </div>
-        </div>
-        <div class="stat-item">
-            <i class="fas fa-user-music"></i>
-            <div>
-                <div class="stat-value">${uniqueArtists}</div>
-                <div class="stat-label">Artists</div>
-            </div>
-        </div>
-        <div class="stat-item">
-            <i class="fas fa-list-music"></i>
-            <div>
-                <div class="stat-value">${uniquePlaylists}</div>
-                <div class="stat-label">Playlists</div>
-            </div>
-        </div>
-    `;
-}
 
 // Update stats bar
 function updateStats() {
@@ -5079,138 +4837,6 @@ function loadPinnedPlaylists() {
     console.log('Pinned playlists loading...');
 }
 
-function getDefaultSmartPlaylists() {
-    return [
-        {
-            id: 'smart-high-energy',
-            name: 'High Energy Workout',
-            icon: 'fa-dumbbell',
-            color: '#f97316',
-            matchType: 'all',
-            rules: [
-                { field: 'bpm', operator: 'greater', value: '120' }
-            ]
-        },
-        {
-            id: 'smart-classics',
-            name: 'Classic Oldies',
-            icon: 'fa-compact-disc',
-            color: '#3b82f6',
-            matchType: 'all',
-            rules: [
-                { field: 'year', operator: 'less', value: '1990' }
-            ]
-        },
-        {
-            id: 'smart-recent',
-            name: 'Recently Added',
-            icon: 'fa-clock',
-            color: '#10b981',
-            matchType: 'all',
-            rules: [
-                { field: 'addedDays', operator: 'less', value: '30' }
-            ]
-        }
-    ];
-}
-
-function evaluateSmartPlaylistRule(track, rule) {
-    const field = rule.field;
-    const operator = rule.operator;
-    const value = rule.value;
-    
-    switch (field) {
-        case 'bpm':
-            const trackBpm = Number(track.bpm) || 0;
-            const targetBpm = Number(value) || 0;
-            if (operator === 'greater') return trackBpm > targetBpm;
-            if (operator === 'less') return trackBpm < targetBpm;
-            if (operator === 'equals') return trackBpm === targetBpm;
-            break;
-            
-        case 'year':
-            const trackYear = Number(track.year) || 0;
-            const targetYear = Number(value) || 0;
-            if (operator === 'greater') return trackYear > targetYear;
-            if (operator === 'less') return trackYear < targetYear;
-            if (operator === 'equals') return trackYear === targetYear;
-            break;
-            
-        case 'mood':
-            if (operator === 'equals') return String(track.mood || '').toLowerCase() === String(value || '').toLowerCase();
-            if (operator === 'contains') return String(track.mood || '').toLowerCase().includes(String(value || '').toLowerCase());
-            break;
-            
-        case 'genre':
-            const trackGenre = String(track.genre || '').toLowerCase();
-            const targetGenre = String(value || '').toLowerCase();
-            if (operator === 'equals') return trackGenre === targetGenre;
-            if (operator === 'contains') return trackGenre.includes(targetGenre);
-            break;
-            
-        case 'title':
-            const trackTitle = String(track.title || '').toLowerCase();
-            const targetTitle = String(value || '').toLowerCase();
-            if (operator === 'contains') return trackTitle.includes(targetTitle);
-            break;
-            
-        case 'artist':
-            const trackArtist = String(track.artist || '').toLowerCase();
-            const targetArtist = String(value || '').toLowerCase();
-            if (operator === 'contains') return trackArtist.includes(targetArtist);
-            break;
-            
-        case 'tags':
-            const trackTags = Array.isArray(track.tags) ? track.tags.join(' ').toLowerCase() : '';
-            const targetTag = String(value || '').toLowerCase();
-            if (operator === 'contains') return trackTags.includes(targetTag);
-            break;
-    }
-    
-    return false;
-}
-
-function evaluateSmartPlaylist(smartPlaylist) {
-    const allTracks = getAllTracksWithContext();
-    const matchType = smartPlaylist.matchType || 'all';
-    const rules = smartPlaylist.rules || [];
-    
-    if (rules.length === 0) return [];
-    
-    return allTracks.filter(track => {
-        if (matchType === 'all') {
-            return rules.every(rule => evaluateSmartPlaylistRule(track, rule));
-        } else {
-            return rules.some(rule => evaluateSmartPlaylistRule(track, rule));
-        }
-    });
-}
-
-function showSmartPlaylists() {
-    currentView = 'smart';
-    selectedGenre = null;
-    setHistoryLayoutMode(false);
-    
-    setActiveMainNav('smartPlaylistsNav');
-    setActiveGenreItem(null);
-    
-    if (searchQuery.trim()) {
-        performSearch();
-        updateWorkspaceStatus();
-        return;
-    }
-    
-    clearGlobalSearchState();
-    
-    renderBreadcrumb([
-        { label: 'Genre Library', action: 'show-all' },
-    ]);
-    document.getElementById('pageSubtitle').textContent = 'AI-generated playlists based on your music rules';
-    
-    renderSmartPlaylists();
-    updateStatsForSmartPlaylists();
-    updateWorkspaceStatus();
-}
 
 function showHistoryCalendar() {
     currentView = 'history';
@@ -5248,264 +4874,6 @@ function showHistoryCalendar() {
     updateWorkspaceStatus();
 }
 
-function renderSmartPlaylists() {
-    const grid = document.getElementById('folderGrid');
-    grid.innerHTML = '';
-    
-    smartPlaylists.forEach((smartPlaylist, index) => {
-        const matchingTracks = evaluateSmartPlaylist(smartPlaylist);
-        const totalSeconds = matchingTracks.reduce((sum, track) => sum + parseTrackDurationToSeconds(track.duration), 0);
-        const duration = formatQueueDuration(totalSeconds);
-        
-        const card = document.createElement('div');
-        card.className = 'playlist-card fade-in';
-        card.style.animationDelay = `${index * 0.1}s`;
-        card.style.setProperty('--card-color', smartPlaylist.color || '#6366f1');
-        
-        const playlistImages = matchingTracks.slice(0, 4).map(t => t.cover).filter(Boolean);
-        const safeImages = (playlistImages.length ? playlistImages : [DEFAULT_COVER, DEFAULT_COVER, DEFAULT_COVER, DEFAULT_COVER]).slice(0, 4);
-        const imagesHTML = safeImages.map(img => `<img src="${sanitizeImageUrl(img)}" alt="Album cover">`).join('');
-        
-        card.innerHTML = `
-            <div class="playlist-card-actions">
-                <button class="playlist-action-btn delete-smart-playlist-btn" title="Delete Smart Playlist" data-smart-id="${smartPlaylist.id}">
-                    <i class="fas fa-trash"></i>
-                </button>
-            </div>
-            <div class="play-overlay">
-                <div class="play-btn">
-                    <i class="fas fa-play"></i>
-                </div>
-            </div>
-            <div class="card-icon" style="background: linear-gradient(135deg, ${smartPlaylist.color || '#6366f1'}22, ${smartPlaylist.color || '#6366f1'}11);">
-                <i class="fas ${smartPlaylist.icon || 'fa-brain'}" style="color: ${smartPlaylist.color || '#6366f1'}"></i>
-            </div>
-            <h3 class="card-title">${escapeHtml(smartPlaylist.name)}</h3>
-            <p class="card-description">${smartPlaylist.rules.length} rule${smartPlaylist.rules.length === 1 ? '' : 's'} · ${smartPlaylist.matchType === 'all' ? 'Match ALL' : 'Match ANY'}</p>
-            <div class="image-grid">
-                ${imagesHTML}
-            </div>
-            <div class="card-stats">
-                <div class="card-stat">
-                    <i class="fas fa-music"></i>
-                    <span>${matchingTracks.length} tracks</span>
-                </div>
-                <div class="card-stat">
-                    <i class="far fa-clock"></i>
-                    <span>${duration}</span>
-                </div>
-            </div>
-        `;
-        
-        const playOverlay = card.querySelector('.play-overlay');
-        playOverlay.addEventListener('click', (e) => {
-            e.stopPropagation();
-            playSmartPlaylist(smartPlaylist);
-        });
-        
-        const deleteBtn = card.querySelector('.delete-smart-playlist-btn');
-        if (deleteBtn) {
-            deleteBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                deleteSmartPlaylist(smartPlaylist.id);
-            });
-        }
-        
-        card.addEventListener('click', (e) => {
-            if (!e.target.closest('.play-overlay') && !e.target.closest('.playlist-card-actions')) {
-                showSmartPlaylistTracks(smartPlaylist);
-            }
-        });
-        
-        grid.appendChild(card);
-    });
-    
-    // Add "Create New" card
-    const createCard = document.createElement('div');
-    createCard.className = 'playlist-card fade-in create-new-card';
-    createCard.style.animationDelay = `${smartPlaylists.length * 0.1}s`;
-    createCard.innerHTML = `
-        <div class="card-icon" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(99, 102, 241, 0.1));">
-            <i class="fas fa-plus" style="color: #6366f1;"></i>
-        </div>
-        <h3 class="card-title">Create Smart Playlist</h3>
-        <p class="card-description">Auto-updating playlists based on rules</p>
-    `;
-    createCard.addEventListener('click', openSmartPlaylistModal);
-    grid.appendChild(createCard);
-}
-
-
-function playSmartPlaylist(smartPlaylist) {
-    const tracks = evaluateSmartPlaylist(smartPlaylist);
-    
-    if (tracks.length === 0) {
-        showNotification(
-            'No Matching Tracks',
-            'This smart playlist has no tracks matching the current rules.',
-            'info'
-        );
-        return;
-    }
-    
-    currentPlaylist = tracks;
-    currentTrackIndex = 0;
-    currentPlaylistContext = {
-        playlistName: smartPlaylist.name,
-        genreName: 'Smart Playlist'
-    };
-    rebuildPlaybackOrder(currentTrackIndex);
-    loadTrack(currentPlaylist[currentTrackIndex]);
-    playTrack();
-}
-
-function showSmartPlaylistTracks(smartPlaylist) {
-    const tracks = evaluateSmartPlaylist(smartPlaylist);
-    currentSmartPlaylistTracks = tracks;
-    
-    renderBreadcrumb([
-        { label: 'Genre Library', action: 'show-all' },
-        { label: smartPlaylist.name, current: true }
-    ]);
-    document.getElementById('pageTitle').textContent = smartPlaylist.name;
-    document.getElementById('pageSubtitle').textContent = `Auto-generated · ${tracks.length} matching tracks`;
-    
-    const grid = document.getElementById('folderGrid');
-    grid.innerHTML = '';
-    
-    if (tracks.length === 0) {
-        grid.innerHTML = `
-            <div class="empty-state">
-                <i class="fas fa-brain"></i>
-                <h3>No Matching Tracks</h3>
-                <p>No tracks in your library match the current rules. Try adjusting the smart playlist criteria.</p>
-            </div>
-        `;
-        return;
-    }
-    
-    const trackList = document.createElement('div');
-    trackList.className = 'track-list-view';
-    
-    tracks.forEach((track, index) => {
-        const trackItem = document.createElement('div');
-        trackItem.className = 'track-row fade-in';
-        trackItem.style.animationDelay = `${index * 0.02}s`;
-        
-        const tags = [track.__playlistName, track.__genreName].filter(Boolean);
-        const tagsHTML = tags.length
-            ? tags.map(tag => `<span class="track-tag">${escapeHtml(tag)}</span>`).join('')
-            : '<span class="track-tag">Smart</span>';
-        
-        trackItem.innerHTML = `
-            <div class="track-number">${index + 1}</div>
-            <img src="${sanitizeImageUrl(track.cover || DEFAULT_COVER)}" alt="${escapeHtml(track.title || 'Track cover')}" class="track-thumb">
-            <div class="track-info">
-                <div class="track-title">${escapeHtml(track.title || 'Unknown Title')}</div>
-                <div class="track-artist">${escapeHtml(track.artist || 'Unknown Artist')}</div>
-            </div>
-            <div class="track-album">${escapeHtml(track.album || track.__playlistName || '—')}</div>
-            <div class="track-meta">
-                ${track.year ? `<span><i class="fas fa-calendar"></i> ${escapeHtml(track.year)}</span>` : ''}
-                ${track.bpm ? `<span><i class="fas fa-drum"></i> ${escapeHtml(track.bpm)} BPM</span>` : ''}
-                ${track.mood ? `<span><i class="far fa-smile"></i> ${escapeHtml(track.mood)}</span>` : ''}
-            </div>
-            <div class="track-tags">${tagsHTML}</div>
-            <div class="track-duration">${escapeHtml(track.duration || '--:--')}</div>
-            <button type="button" class="track-play-btn" data-action="play-smart" data-track-index="${index}">
-                <i class="fas fa-play"></i>
-            </button>
-        `;
-        
-        trackList.appendChild(trackItem);
-    });
-    
-    grid.appendChild(trackList);
-    
-    // Store for playback
-    currentPlaylist = tracks;
-    currentPlaylistContext = {
-        playlistName: smartPlaylist.name,
-        genreName: 'Smart Playlist'
-    };
-    if (currentTrackIndex >= currentPlaylist.length) {
-        currentTrackIndex = 0;
-    }
-    rebuildPlaybackOrder(currentTrackIndex);
-    if (isQueuePanelOpen) {
-        renderQueuePanel();
-    }
-}
-
-function playTrackFromSmart(index) {
-    if (index < 0 || index >= currentSmartPlaylistTracks.length) return;
-    
-    currentPlaylist = currentSmartPlaylistTracks;
-    rebuildPlaybackOrder(index);
-    loadTrack(currentPlaylist[currentTrackIndex]);
-    playTrack();
-}
-
-
-function openSmartPlaylistModal() {
-    const modal = document.getElementById('smartPlaylistModal');
-    if (!modal) return;
-    
-    // Reset form
-    document.getElementById('smartPlaylistForm').reset();
-    document.getElementById('smartPlaylistRules').innerHTML = '';
-    
-    // Add one default rule
-    addSmartPlaylistRule();
-    
-    modal.classList.add('show');
-}
-
-function closeSmartPlaylistModal() {
-    const modal = document.getElementById('smartPlaylistModal');
-    if (!modal) return;
-    modal.classList.remove('show');
-}
-
-let smartRuleCounter = 0;
-
-function addSmartPlaylistRule() {
-    const rulesContainer = document.getElementById('smartPlaylistRules');
-    const ruleId = ++smartRuleCounter;
-    
-    const ruleDiv = document.createElement('div');
-    ruleDiv.className = 'smart-rule';
-    ruleDiv.dataset.ruleId = ruleId;
-    
-    ruleDiv.innerHTML = `
-        <select class="smart-rule-field">
-            <option value="bpm">BPM</option>
-            <option value="year">Year</option>
-            <option value="mood">Mood</option>
-            <option value="genre">Genre</option>
-            <option value="title">Title</option>
-            <option value="artist">Artist</option>
-            <option value="tags">Tags</option>
-        </select>
-        <select class="smart-rule-operator">
-            <option value="greater">Greater than</option>
-            <option value="less">Less than</option>
-            <option value="equals">Equals</option>
-            <option value="contains">Contains</option>
-        </select>
-        <input type="text" class="smart-rule-value" placeholder="Value">
-        <button type="button" class="smart-rule-remove" title="Remove Rule">
-            <i class="fas fa-times"></i>
-        </button>
-    `;
-    
-    const removeBtn = ruleDiv.querySelector('.smart-rule-remove');
-    removeBtn.addEventListener('click', () => {
-        ruleDiv.remove();
-    });
-    
-    rulesContainer.appendChild(ruleDiv);
-}
 
 
 // Initialize waveform on load
