@@ -79,6 +79,15 @@
         "imageUrl": null,
         "description": "",
         "subfolders": []
+      },
+      {
+        "id": "genre-deeeee-mmw9w1vr",
+        "name": "deeeee",
+        "icon": "fa-music",
+        "color": "#6366f1",
+        "imageUrl": null,
+        "description": "",
+        "subfolders": []
       }
     ]
   }

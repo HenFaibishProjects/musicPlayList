@@ -1,5 +1,5 @@
 // UI state variables are in playlists.js (currentView, selectedGenre, currentSort, etc.)
-// Data variables are in data.js (libraryData, apiAvailable, etc.)
+// Data variables are in data.js (libraryData, apiAvailable, recentTracks, etc.)
 // Player state variables are in player.js (audioPlayer, currentPlaylist, isPlaying, etc.)
 
 // Script-specific state (modalFormBaseline, notificationAutoCloseTimer, pendingDeletePlaylist, editingGenreContext are in ui.js)
@@ -15,8 +15,6 @@ let quickPlayObjectUrl = null;
 let volumeSliderInstance = null;
 let isUpdatingVolumeSlider = false;
 let lastVolume = -1;
-const IMPORTED_PLAYLISTS_STORAGE_KEY = 'lidaplay_imported_playlists';
-const STREAM_PROXY_PATH = '/api/stream-proxy?url=';
 
 function isQuickPlayTrack(track) {
     return Boolean(track && track.__quickPlay === true);
@@ -239,20 +237,6 @@ function renderBreadcrumb(items = []) {
     });
 }
 
-function setHistoryLayoutMode(isHistoryMode) {
-    const mainContent = document.querySelector('.main-content');
-    const folderGrid = document.getElementById('folderGrid');
-
-    if (!mainContent || !folderGrid) return;
-
-    mainContent.classList.toggle('history-mode', Boolean(isHistoryMode));
-    folderGrid.classList.toggle('history-grid', Boolean(isHistoryMode));
-
-    if (isHistoryMode) {
-        folderGrid.classList.remove('list-view');
-    }
-}
-
 function getTrackSortIconClass() {
     return trackSortDirection === 'asc' ? 'fas fa-arrow-up-1-9' : 'fas fa-arrow-down-9-1';
 }
@@ -326,217 +310,91 @@ function normalizeLibraryPayload(payload) {
     return { library: payload };
 }
 
-function getImportedPlaylistRecordsFromLegacyPayload(payload) {
-    const records = [];
-    const folders = payload?.library?.folders || [];
-
-    folders.forEach(folder => {
-        (folder?.subfolders || []).forEach(playlist => {
-            if (!playlist?.isImported) return;
-            records.push({
-                genreId: folder?.id || '',
-                genreName: folder?.name || 'Imported',
-                playlist
-            });
-        });
-    });
-
-    return records;
-}
-
-function normalizeImportedPlaylistRecord(record) {
-    if (!record || typeof record !== 'object') return null;
-    const playlist = record.playlist;
-    if (!playlist || typeof playlist !== 'object') return null;
-    if (!playlist.id || !Array.isArray(playlist.tracks)) return null;
-
-    const normalizedTracks = normalizeImportedTrackSources(playlist.tracks);
+function normalizeRecentTrack(track = {}) {
+    const title = track.title || 'Unknown Title';
+    const artist = track.artist || 'Unknown Artist';
+    const file = track.file || '';
+    const id = track.id || file || `${title}::${artist}`;
 
     return {
-        genreId: String(record.genreId || '').trim(),
-        genreName: String(record.genreName || '').trim() || 'Imported',
-        playlist: {
-            ...playlist,
-            tracks: normalizedTracks,
-            isImported: true
-        }
+        id,
+        title,
+        artist,
+        album: track.album || '',
+        duration: track.duration || '--:--',
+        cover: track.cover || DEFAULT_COVER,
+        file,
+        playlistName: track.playlistName || '',
+        genreName: track.genreName || '',
+        playedAt: Number(track.playedAt) || Date.now()
     };
 }
 
-async function loadImportedPlaylistRecords() {
+function loadRecentTracksFromStorage() {
     try {
-        if (!apiAvailable) {
-            // Fallback to localStorage if API is not available
-            try {
-                const raw = localStorage.getItem(IMPORTED_PLAYLISTS_STORAGE_KEY);
-                if (!raw) return [];
-
-                const parsed = JSON.parse(raw);
-                const records = Array.isArray(parsed)
-                    ? parsed
-                    : getImportedPlaylistRecordsFromLegacyPayload(parsed);
-
-                const normalized = records
-                    .map(normalizeImportedPlaylistRecord)
-                    .filter(Boolean);
-
-                if (!Array.isArray(parsed)) {
-                    await saveImportedPlaylistRecords(normalized);
-                }
-
-                return normalized;
-            } catch (localError) {
-                console.warn('Failed to load imported playlists from localStorage:', localError);
-                return [];
-            }
-        }
-
-        // Use API endpoint
-        const response = await apiRequest('http://localhost:3000/api/imported-playlists');
-        const playlists = response?.playlists || [];
-        
-        // Convert API format to internal format
-        const records = playlists.map(playlist => ({
-            genreId: playlist.genreId || 'imported',
-            genreName: playlist.genreName || 'Imported',
-            playlist: {
-                ...playlist,
-                isImported: true,
-                tracks: playlist.tracks || []
-            }
-        }));
-
-        const normalized = records
-            .map(normalizeImportedPlaylistRecord)
-            .filter(Boolean);
-
-        return normalized;
-    } catch (error) {
-        console.warn('Failed to load imported playlists from API:', error);
-        // Fallback to localStorage
-        try {
-            const raw = localStorage.getItem(IMPORTED_PLAYLISTS_STORAGE_KEY);
-            if (!raw) return [];
-            const parsed = JSON.parse(raw);
-            const records = Array.isArray(parsed)
-                ? parsed
-                : getImportedPlaylistRecordsFromLegacyPayload(parsed);
-            const normalized = records
-                .map(normalizeImportedPlaylistRecord)
-                .filter(Boolean);
-            return normalized;
-        } catch (localError) {
-            console.warn('Failed to load imported playlists from localStorage fallback:', localError);
-            return [];
-        }
-    }
-}
-
-async function saveImportedPlaylistRecords(records = []) {
-    try {
-        if (!apiAvailable) {
-            // Fallback to localStorage if API is not available
-            localStorage.setItem(IMPORTED_PLAYLISTS_STORAGE_KEY, JSON.stringify(records));
+        const raw = localStorage.getItem(RECENT_TRACKS_STORAGE_KEY);
+        if (!raw) {
+            recentTracks = [];
             return;
         }
 
-        // Save each playlist individually via API
-        for (const record of records) {
-            const playlist = record.playlist;
-            if (!playlist) continue;
-            
-            // Send ONE playlist per request with name and tracks
-            await apiRequest('http://localhost:3000/api/imported-playlists', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name: playlist.name || 'Imported Playlist',
-                    tracks: playlist.tracks || []
-                })
-            });
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) {
+            recentTracks = [];
+            return;
         }
 
-        // Also save to localStorage as backup
-        localStorage.setItem(IMPORTED_PLAYLISTS_STORAGE_KEY, JSON.stringify(records));
+        recentTracks = parsed
+            .map(normalizeRecentTrack)
+            .filter(track => track.file || track.title)
+            .slice(0, MAX_RECENT_TRACKS);
     } catch (error) {
-        console.warn('Failed to save imported playlists:', error);
-        // Fallback to localStorage
-        try {
-            localStorage.setItem(IMPORTED_PLAYLISTS_STORAGE_KEY, JSON.stringify(records));
-        } catch (localError) {
-            console.warn('Failed to save imported playlists to localStorage:', localError);
-        }
+        console.warn('Failed to load recently played tracks from storage:', error);
+        recentTracks = [];
     }
 }
 
-async function upsertImportedPlaylistRecord(record) {
-    const normalized = normalizeImportedPlaylistRecord(record);
-    if (!normalized) return;
-
-    const records = await loadImportedPlaylistRecords();
-    const deduped = records.filter(item => item?.playlist?.id !== normalized.playlist.id);
-    deduped.push(normalized);
-    await saveImportedPlaylistRecords(deduped);
+function saveRecentTracksToStorage() {
+    try {
+        localStorage.setItem(RECENT_TRACKS_STORAGE_KEY, JSON.stringify(recentTracks.slice(0, MAX_RECENT_TRACKS)));
+    } catch (error) {
+        console.warn('Failed to persist recently played tracks:', error);
+    }
 }
 
-async function mergeImportedPlaylistsIntoLibrary(payload) {
-    const normalized = normalizeLibraryPayload(payload);
-    const records = await loadImportedPlaylistRecords();
+function addTrackToRecentlyPlayed(track, context = {}) {
+    if (!track) return;
 
-    if (!records.length) {
-        return normalized;
-    }
-
-    if (!normalized.library) {
-        normalized.library = { name: 'My Music Collection', folders: [] };
-    }
-    if (!Array.isArray(normalized.library.folders)) {
-        normalized.library.folders = [];
-    }
-
-    records.forEach(record => {
-        let genre = normalized.library.folders.find(folder => folder.id === record.genreId);
-        if (!genre) {
-            genre = normalized.library.folders.find(folder =>
-                String(folder?.name || '').trim().toLowerCase() === record.genreName.toLowerCase()
-            );
-        }
-
-        if (!genre) {
-            genre = {
-                id: record.genreId || `imported-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-                name: record.genreName || 'Imported',
-                icon: 'fa-file-import',
-                color: '#10b981',
-                description: 'Imported playlists',
-                subfolders: []
-            };
-            normalized.library.folders.push(genre);
-        }
-
-        if (!Array.isArray(genre.subfolders)) {
-            genre.subfolders = [];
-        }
-
-        const exists = genre.subfolders.some(playlist => playlist?.id === record.playlist.id);
-        if (!exists) {
-            genre.subfolders.push(JSON.parse(JSON.stringify(record.playlist)));
-        }
+    const normalizedTrack = normalizeRecentTrack({
+        ...track,
+        playlistName: context.playlistName || track.playlistName || '',
+        genreName: context.genreName || track.genreName || '',
+        playedAt: Date.now()
     });
 
-    return normalized;
-}
+    const latestTrack = recentTracks[0];
+    if (
+        latestTrack &&
+        latestTrack.id === normalizedTrack.id &&
+        Date.now() - Number(latestTrack.playedAt || 0) < 15000
+    ) {
+        return;
+    }
 
-function addTrackToListeningHistory(track, context = {}) {
-    if (!track || typeof trackPlayInHistory !== 'function') return;
+    const dedupeIndex = recentTracks.findIndex(item => item.id === normalizedTrack.id);
+    if (dedupeIndex >= 0) {
+        recentTracks.splice(dedupeIndex, 1);
+    }
 
-    const isQuickPlay = isQuickPlayTrack(track);
-    const historyContext = {
-        playlistName: context.playlistName || track.playlistName || (isQuickPlay ? 'Quick Play' : ''),
-        genreName: context.genreName || track.genreName || (isQuickPlay ? 'Quick Play' : '')
-    };
+    recentTracks.unshift(normalizedTrack);
+    recentTracks = recentTracks.slice(0, MAX_RECENT_TRACKS);
+    saveRecentTracksToStorage();
 
-    trackPlayInHistory(track, historyContext);
+    if (currentView === 'recent') {
+        renderRecentlyPlayed();
+        updateStatsForRecentlyPlayed();
+        updateWorkspaceStatus();
+    }
 }
 
 function formatRelativeTime(timestamp) {
@@ -697,7 +555,7 @@ async function fetchLibraryData({ forceRescan = false } = {}) {
     const endpoint = forceRescan ? 'http://localhost:3000/api/rescan' : 'http://localhost:3000/api/library';
     const method = forceRescan ? 'POST' : 'GET';
     const payload = await apiRequest(endpoint, { method });
-    return await mergeImportedPlaylistsIntoLibrary(payload);
+    return normalizeLibraryPayload(payload);
 }
 
 function refreshLibraryUI() {
@@ -718,6 +576,8 @@ function refreshLibraryUI() {
         }
     } else if (currentView === 'favorites') {
         showFavorites();
+    } else if (currentView === 'recent') {
+        showRecentlyPlayed();
     } else {
         showAllGenres();
     }
@@ -786,9 +646,9 @@ function updateWorkspaceStatus() {
         } else if (currentView === 'favorites') {
             if (viewIcon) viewIcon.className = 'fas fa-star';
             if (viewText) viewText.textContent = 'Favorites';
-        } else if (currentView === 'history') {
-            if (viewIcon) viewIcon.className = 'fas fa-calendar-days';
-            if (viewText) viewText.textContent = 'Listening History';
+        } else if (currentView === 'recent') {
+            if (viewIcon) viewIcon.className = 'fas fa-clock';
+            if (viewText) viewText.textContent = 'Recently Played';
         } else if (currentView === 'genre' && selectedGenre?.name) {
             if (viewIcon) viewIcon.className = 'fas fa-folder-open';
             if (viewText) viewText.textContent = `Genre: ${selectedGenre.name}`;
@@ -1757,15 +1617,15 @@ function closeImportM3UModal() {
 function populateImportGenreSelect() {
     const select = document.getElementById('importGenreSelect');
     if (!select) return;
-
+    
     const genres = getGenresFromLibraryState();
-
-    // Clear existing options except the first placeholder
-    while (select.options.length > 1) {
-        select.remove(1);
+    
+    // Clear existing options except the first two
+    while (select.options.length > 2) {
+        select.remove(2);
     }
-
-    // Add genre options from existing genres only
+    
+    // Add genre options
     genres.forEach(genre => {
         const option = document.createElement('option');
         option.value = genre.id;
@@ -1782,28 +1642,16 @@ function toggleImportMethod(method) {
         btn.classList.toggle('active', btn.dataset.method === method);
     });
     
-    // Toggle input visibility and disable the inactive input
+    // Toggle input visibility
     const fileRow = document.getElementById('fileInputRow');
     const urlRow = document.getElementById('urlInputRow');
-    const fileInput = document.getElementById('m3uFileInput');
-    const urlInput = document.getElementById('m3uUrlInput');
     
     if (method === 'file') {
         fileRow.classList.remove('hidden');
         urlRow.classList.add('hidden');
-        if (fileInput) fileInput.disabled = false;
-        if (urlInput) { urlInput.disabled = true; urlInput.value = ''; }
     } else {
         fileRow.classList.add('hidden');
         urlRow.classList.remove('hidden');
-        if (fileInput) { fileInput.disabled = true; fileInput.value = ''; }
-        if (urlInput) urlInput.disabled = false;
-        // Reset file display
-        const display = document.getElementById('fileInputDisplay');
-        if (display) {
-            display.innerHTML = '<i class="fas fa-file-audio"></i><span>Choose a file...</span>';
-            display.classList.remove('has-file');
-        }
     }
 }
 
@@ -1818,90 +1666,6 @@ function handleFileSelect(event) {
         display.innerHTML = '<i class="fas fa-file-audio"></i><span>Choose a file...</span>';
         display.classList.remove('has-file');
     }
-}
-
-function normalizeImportedTrackSource(source) {
-    const value = String(source || '').trim();
-    if (!value) return '';
-
-    // Already compatible with the web app
-    if (value.startsWith('/api/media?')) {
-        // Ensure imported tracks can be streamed even when not part of scanned playlist roots
-        if (!/[?&]imported=1(?:&|$)/.test(value)) {
-            return `${value}${value.includes('?') ? '&' : '?'}imported=1`;
-        }
-        return value;
-    }
-    if (value.startsWith(STREAM_PROXY_PATH)) {
-        return value;
-    }
-
-    if (/^https?:\/\//i.test(value)) {
-        // If the source is already a local API path exposed as absolute URL, keep it local.
-        try {
-            const parsed = new URL(value);
-            const isLocalApi = parsed.origin === window.location.origin && parsed.pathname.startsWith('/api/');
-            if (isLocalApi) {
-                return `${parsed.pathname}${parsed.search}${parsed.hash}`;
-            }
-        } catch {
-            // Fall through to proxying
-        }
-
-        // Route external streams through same-origin proxy to avoid CORS and MIME issues.
-        return `${STREAM_PROXY_PATH}${encodeURIComponent(value)}`;
-    }
-
-    // Handle file:// URLs
-    let localPath = value;
-    if (/^file:\/\//i.test(value)) {
-        try {
-            const parsed = new URL(value);
-            localPath = decodeURIComponent(parsed.pathname || '');
-            if (/^\/[a-zA-Z]:\//.test(localPath)) {
-                // /C:/Music/song.mp3 -> C:\Music\song.mp3
-                localPath = localPath.slice(1);
-            }
-            localPath = localPath.replace(/\//g, '\\');
-        } catch {
-            localPath = decodeURIComponent(value.replace(/^file:\/\//i, ''));
-        }
-    }
-
-    const isWindowsAbsolute = /^[a-zA-Z]:[\\/]/.test(localPath);
-    const isUncPath = /^\\\\[^\\]/.test(localPath);
-    const isUnixAbsolute = localPath.startsWith('/');
-
-    // Convert local absolute paths to backend media endpoint
-    if (isWindowsAbsolute || isUncPath || isUnixAbsolute) {
-        return `/api/media?imported=1&path=${encodeURIComponent(localPath)}`;
-    }
-
-    return value;
-}
-
-function normalizeImportedTrackSources(tracks = []) {
-    return tracks.map(track => {
-        if (!track || typeof track !== 'object') return track;
-
-        const originalFile = track.file;
-        const normalizedFile = normalizeImportedTrackSource(originalFile);
-        const normalizedValue = String(normalizedFile || '').trim();
-        const unresolvedRelativeImport = Boolean(
-            normalizedValue &&
-            !normalizedValue.startsWith('/api/media?') &&
-            !normalizedValue.startsWith(STREAM_PROXY_PATH) &&
-            !/^https?:\/\//i.test(normalizedValue) &&
-            !/^[a-zA-Z]+:\/\//.test(normalizedValue)
-        );
-
-        return {
-            ...track,
-            originalFile,
-            file: normalizedFile,
-            unresolvedRelativeImport
-        };
-    });
 }
 
 async function importM3UPlaylist(event) {
@@ -1940,9 +1704,6 @@ async function importM3UPlaylist(event) {
             
             tracks = await fetchM3U(url);
         }
-
-        // Normalize source URLs/paths so imported local tracks can play via backend proxy
-        tracks = normalizeImportedTrackSources(tracks);
         
         if (tracks.length === 0) {
             throw new Error('No valid tracks found in playlist');
@@ -1964,7 +1725,18 @@ async function importM3UPlaylist(event) {
             throw new Error('Please enter a playlist name');
         }
         
+        // Handle new genre creation
         let targetGenreId = genreValue;
+        if (genreValue === '__new__') {
+            const newGenreName = document.getElementById('newGenreNameInput').value.trim();
+            if (!newGenreName) {
+                throw new Error('Please enter a name for the new genre');
+            }
+            
+            // Create new genre
+            progressText.textContent = 'Creating new genre...';
+            targetGenreId = await createGenreForImport(newGenreName);
+        }
         
         progressFill.style.width = '60%';
         progressText.textContent = 'Processing tracks...';
@@ -1993,20 +1765,9 @@ async function importM3UPlaylist(event) {
                 `Imported ${tracks.length} tracks into "${playlistName}"`,
                 'success'
             );
-
-            // Clear search and navigate to target genre so the imported playlist is immediately visible
-            searchQuery = '';
-            const searchInput = document.getElementById('searchInput');
-            const clearSearch = document.getElementById('clearSearch');
-            if (searchInput) searchInput.value = '';
-            if (clearSearch) clearSearch.classList.remove('visible');
-
-            const targetGenre = (libraryData?.library?.folders || []).find(folder => folder.id === targetGenreId);
-            if (targetGenre) {
-                showGenre(targetGenre);
-            } else {
-                refreshLibraryUI();
-            }
+            
+            // Refresh library
+            refreshLibraryUI();
         }, 1000);
         
     } catch (error) {
@@ -2057,82 +1818,25 @@ async function createGenreForImport(genreName) {
     return payload.genre.id;
 }
 
-let _metadataAbortController = null;
-
 async function enrichTracksWithMetadata(tracks) {
-    const progressText = document.getElementById('importProgressText');
-    const progressFill = document.getElementById('importProgressFill');
-    const skipBtn = document.getElementById('skipMetadataBtn');
-    const httpTracks = tracks.filter(track => {
-        const metadataSource = String(track?.originalFile || track?.file || '').trim();
-        return /^https?:\/\//i.test(metadataSource);
-    });
-    const total = httpTracks.length;
-    
-    if (total === 0) return;
-    
-    // Create abort controller so user can skip
-    _metadataAbortController = new AbortController();
-    const signal = _metadataAbortController.signal;
-    
-    // Show skip button
-    if (skipBtn) {
-        skipBtn.classList.remove('hidden');
-        skipBtn.onclick = () => {
-            if (_metadataAbortController) _metadataAbortController.abort();
-        };
-    }
-    
-    let completed = 0;
-    let enriched = 0;
-    const maxConcurrent = 10;
-    
-    try {
-        for (let i = 0; i < httpTracks.length; i += maxConcurrent) {
-            if (signal.aborted) break;
-            
-            const batch = httpTracks.slice(i, i + maxConcurrent);
-            await Promise.all(batch.map(async track => {
-                if (signal.aborted) return;
+    // Try to fetch metadata for streams (limit concurrent requests)
+    const maxConcurrent = 3;
+    for (let i = 0; i < tracks.length; i += maxConcurrent) {
+        const batch = tracks.slice(i, i + maxConcurrent);
+        await Promise.all(batch.map(async track => {
+            if (track.file.startsWith('http')) {
                 try {
-                    const metadataSource = String(track?.originalFile || track?.file || '').trim();
-                    if (!/^https?:\/\//i.test(metadataSource)) {
-                        return;
-                    }
-
-                    const metadata = await fetchStreamMetadata(metadataSource, signal);
-                    if (metadata && !signal.aborted) {
-                        if (metadata.title) { track.title = metadata.title; enriched++; }
+                    const metadata = await fetchStreamMetadata(track.file);
+                    if (metadata) {
+                        track.title = metadata.title || track.title;
                         track.artist = metadata.artist || track.artist;
                         track.genre = metadata.genre || track.genre;
                     }
                 } catch (e) {
                     // Metadata fetch failed, keep original
-                } finally {
-                    completed++;
-                    if (progressText && !signal.aborted) {
-                        progressText.textContent = `Fetching stream metadata... (${completed}/${total}) — ${enriched} enriched`;
-                    }
-                    if (progressFill && !signal.aborted) {
-                        const pct = 40 + Math.round((completed / total) * 30);
-                        progressFill.style.width = `${pct}%`;
-                    }
                 }
-            }));
-        }
-    } catch (e) {
-        // aborted or error — continue with what we have
-    }
-    
-    // Hide skip button
-    if (skipBtn) skipBtn.classList.add('hidden');
-    _metadataAbortController = null;
-    
-    if (progressText) {
-        const skipped = signal.aborted;
-        progressText.textContent = skipped 
-            ? `Metadata skipped — ${enriched} of ${total} streams enriched`
-            : `Metadata complete — ${enriched} of ${total} streams enriched`;
+            }
+        }));
     }
 }
 
@@ -2162,13 +1866,13 @@ async function addImportedPlaylistToLibrary(genreId, playlistName, tracks) {
         genre.subfolders = [];
     }
     genre.subfolders.push(newPlaylist);
-
-    // Persist imported playlist records so they survive reload/API refresh
-    await upsertImportedPlaylistRecord({
-        genreId,
-        genreName: genre.name || 'Imported',
-        playlist: newPlaylist
-    });
+    
+    // Save to localStorage for persistence
+    try {
+        localStorage.setItem('musicvault_imported_playlists', JSON.stringify(libraryData));
+    } catch (e) {
+        console.warn('Failed to save to localStorage:', e);
+    }
 }
 
 function calculateTotalDuration(tracks) {
@@ -2211,9 +1915,7 @@ function extractCovers(tracks) {
 async function init() {
     try {
         createBackgroundParticles();
-        loadPlaybackSpeedFromStorage();
-        loadListeningSession();
-        loadPinnedPlaylists();
+        loadRecentTracksFromStorage();
         setupEventListeners();
         initializePlayer();
 
@@ -2227,7 +1929,7 @@ async function init() {
             console.log('✅ Loaded from API with folder-based scanning');
         } catch (apiError) {
             console.log('⚠️ API not available, starting with empty library structure');
-            libraryData = await mergeImportedPlaylistsIntoLibrary(getEmptyLibraryData());
+            libraryData = getEmptyLibraryData();
             apiAvailable = false;
             showNotification(
                 'Server Not Connected',
@@ -2473,19 +2175,6 @@ function loadTrack(track) {
     audioPlayerB.currentTime = 0;
     audioPlayer.volume = currentVolume;
     audioPlayerB.volume = currentVolume;
-    audioPlayer.playbackRate = currentPlaybackSpeed;
-    audioPlayerB.playbackRate = currentPlaybackSpeed;
-    
-    // For external streams: try without crossOrigin first so audio plays even if CORS is missing
-    // (visualizer won't get data for non-CORS streams, but audio will still be audible)
-    const isExternalUrl = track.file && /^https?:\/\//i.test(track.file) && !track.file.startsWith(window.location.origin);
-    if (isExternalUrl) {
-        audioPlayer.removeAttribute('crossorigin');
-        audioPlayerB.removeAttribute('crossorigin');
-    } else {
-        audioPlayer.crossOrigin = 'anonymous';
-        audioPlayerB.crossOrigin = 'anonymous';
-    }
     
     // Load into player A and make it active
     audioPlayer.src = track.file;
@@ -2499,15 +2188,6 @@ function loadTrack(track) {
     if (playerCover) {
         playerCover.src = track.cover || DEFAULT_COVER;
     }
-
-    if (typeof initializeProgressWaveform === 'function') {
-        initializeProgressWaveform();
-    }
-
-    if (track.file && track.file.startsWith('http') && typeof setupStreamMetadataMonitoring === 'function') {
-        setupStreamMetadataMonitoring(track);
-    }
-
     if (isQueuePanelOpen) {
         renderQueuePanel();
     }
@@ -2518,62 +2198,25 @@ function loadTrack(track) {
 // Play track
 function playTrack() {
     const currentPlayer = getActivePlayer();
-    if (!currentPlayer) return;
-
-    const currentTrack = currentPlaylist[currentTrackIndex];
-    const maxAttempts = Math.max(1, currentPlaylist.length || 1);
-    const remainingAttempts = Number(playTrack.remainingAttempts) || maxAttempts;
 
     if (currentPlayer && currentPlayer.ended) {
         currentPlayer.currentTime = 0;
     }
 
-    currentPlayer.play()
-        .then(() => {
-            isPlaying = true;
-            if (currentTrack) {
-                addTrackToListeningHistory(currentTrack, currentPlaylistContext);
-            }
-            updatePlayButton();
-        })
-        .catch(err => {
-            console.error('Error playing audio:', err);
-
-            // Try next track automatically so a broken imported URL/path won't freeze playback.
-            const canRetryOnNext = currentPlaylist.length > 1 && remainingAttempts > 1;
-            if (canRetryOnNext) {
-                const moved = moveToNextTrack({ autoplay: false, allowWrap: repeatMode === 1 });
-                if (moved) {
-                    playTrack.remainingAttempts = remainingAttempts - 1;
-                    playTrack();
-                    return;
-                }
-            }
-
-            playTrack.remainingAttempts = maxAttempts;
-            isPlaying = false;
-            updatePlayButton();
-
-            const importedPathHint = currentTrack?.originalFile && currentTrack?.originalFile !== currentTrack?.file;
-            const unresolvedRelativeImportHint = currentTrack?.unresolvedRelativeImport;
-            const remoteStreamProxyHint = String(currentTrack?.file || '').startsWith(STREAM_PROXY_PATH);
-            showNotification(
-                'Unable to Play Track',
-                unresolvedRelativeImportHint
-                    ? 'This imported M3U entry uses a relative file path, so the app cannot resolve its real location. Use absolute paths in the M3U (or re-export it), then import again.'
-                    : remoteStreamProxyHint
-                    ? 'This stream is currently unavailable or uses an unsupported codec in your browser. Try another station URL, or open the stream directly in VLC to verify the source.'
-                    : importedPathHint
-                    ? 'Imported track points to a local path that is not accessible yet. Add that folder as a playlist source (Add Playlist), rescan, then retry.'
-                    : 'This audio file is unavailable right now. Check that the file exists, then rescan your playlist libraries.',
-                'warning'
-            );
-        })
-        .finally(() => {
-            if (playTrack.remainingAttempts !== maxAttempts) {
-                playTrack.remainingAttempts = maxAttempts;
-            }
-        });
+    currentPlayer.play().catch(err => {
+        console.error('Error playing audio:', err);
+        showNotification(
+            'Unable to Play Track',
+            'This audio file is unavailable right now. Check that the file exists, then rescan your playlist libraries.',
+            'warning'
+        );
+    });
+    isPlaying = true;
+    const currentTrack = currentPlaylist[currentTrackIndex];
+    if (currentTrack && !isQuickPlayTrack(currentTrack)) {
+        addTrackToRecentlyPlayed(currentTrack, currentPlaylistContext);
+    }
+    updatePlayButton();
 }
 
 // Pause track
@@ -2813,7 +2456,8 @@ function startCrossfade() {
             playerCover.src = nextTrack.cover || DEFAULT_COVER;
         }
         
-        addTrackToListeningHistory(nextTrack, currentPlaylistContext);
+        // Add to recently played
+        addTrackToRecentlyPlayed(nextTrack, currentPlaylistContext);
         
         // Update queue if open
         if (isQueuePanelOpen) {
@@ -3430,9 +3074,14 @@ function setupEventListeners() {
         favoritesNav.addEventListener('click', showFavorites);
     }
 
-    const historyCalendarNav = document.getElementById('historyCalendarNav');
-    if (historyCalendarNav) {
-        historyCalendarNav.addEventListener('click', showHistoryCalendar);
+    const recentlyPlayedNav = document.getElementById('recentlyPlayedNav');
+    if (recentlyPlayedNav) {
+        recentlyPlayedNav.addEventListener('click', showRecentlyPlayed);
+    }
+
+    const smartPlaylistsNav = document.getElementById('smartPlaylistsNav');
+    if (smartPlaylistsNav) {
+        smartPlaylistsNav.addEventListener('click', showSmartPlaylists);
     }
 
     // Theme toggle
@@ -3584,42 +3233,20 @@ function setupEventListeners() {
         });
     }
     
-    // Speed Control event listeners
-    const speedBtn = document.getElementById('speedBtn');
-    if (speedBtn) {
-        speedBtn.addEventListener('click', openSpeedModal);
+    const smartPlaylistCloseBtn = document.getElementById('smartPlaylistCloseBtn');
+    if (smartPlaylistCloseBtn) {
+        smartPlaylistCloseBtn.addEventListener('click', closeSmartPlaylistModal);
     }
-
-    const speedModalCloseBtn = document.getElementById('speedModalCloseBtn');
-    if (speedModalCloseBtn) {
-        speedModalCloseBtn.addEventListener('click', closeSpeedModal);
+    
+    const smartPlaylistForm = document.getElementById('smartPlaylistForm');
+    if (smartPlaylistForm) {
+        smartPlaylistForm.addEventListener('submit', createSmartPlaylist);
     }
-
-    const speedModal = document.getElementById('speedModal');
-    if (speedModal) {
-        speedModal.addEventListener('click', (e) => {
-            if (e.target === speedModal) {
-                closeSpeedModal();
-            }
-        });
+    
+    const addSmartRuleBtn = document.getElementById('addSmartRuleBtn');
+    if (addSmartRuleBtn) {
+        addSmartRuleBtn.addEventListener('click', addSmartPlaylistRule);
     }
-
-    const speedSlider = document.getElementById('speedSlider');
-    if (speedSlider) {
-        speedSlider.addEventListener('input', (e) => {
-            handleSpeedSliderChange(e.target.value);
-        });
-    }
-
-    const speedPresetBtns = document.querySelectorAll('.speed-preset-btn');
-    speedPresetBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            const speed = Number(btn.dataset.speed);
-            if (Number.isFinite(speed)) {
-                handleSpeedPresetClick(speed);
-            }
-        });
-    });
 
     // Modern Folder Browser Controls
     const folderBrowserCloseBtn = document.getElementById('folderBrowserCloseBtn');
@@ -3694,6 +3321,17 @@ function setupEventListeners() {
         });
     }
 
+    const importGenreSelect = document.getElementById('importGenreSelect');
+    if (importGenreSelect) {
+        importGenreSelect.addEventListener('change', (e) => {
+            const newGenreRow = document.getElementById('newGenreNameRow');
+            if (e.target.value === '__new__') {
+                newGenreRow.classList.remove('hidden');
+            } else {
+                newGenreRow.classList.add('hidden');
+            }
+        });
+    }
 
     const breadcrumb = document.getElementById('breadcrumb');
     if (breadcrumb) {
@@ -3706,6 +3344,8 @@ function setupEventListeners() {
                 showAllGenres();
             } else if (action === 'show-favorites') {
                 showFavorites();
+            } else if (action === 'show-recent') {
+                showRecentlyPlayed();
             } else if (action === 'show-selected-genre') {
                 const genreId = target.dataset.breadcrumbValue;
                 const genre = (libraryData?.library?.folders || []).find(folder => folder.id === genreId) || selectedGenre;
@@ -3728,8 +3368,12 @@ function setupEventListeners() {
             const action = playBtn.dataset.action;
             if (action === 'play-global-search') {
                 playTrackFromGlobalSearch(index);
+            } else if (action === 'play-recent') {
+                playTrackFromRecent(index);
             } else if (action === 'play-list') {
                 playTrackFromList(index);
+            } else if (action === 'play-smart') {
+                playTrackFromSmart(index);
             }
         });
     }
@@ -3778,6 +3422,8 @@ function performSearch() {
         showAllGenres();
     } else if (currentView === 'favorites') {
         showFavorites();
+    } else if (currentView === 'recent') {
+        showRecentlyPlayed();
     } else {
         if (selectedGenre) {
             showGenre(selectedGenre);
@@ -4205,7 +3851,6 @@ function playTrackFromGlobalSearch(index) {
 function showAllGenres() {
     currentView = 'all';
     selectedGenre = null;
-    setHistoryLayoutMode(false);
     
     setActiveMainNav('allGenresNav');
     setActiveGenreItem(null);
@@ -4230,7 +3875,6 @@ function showAllGenres() {
 function showFavorites() {
     currentView = 'favorites';
     selectedGenre = null;
-    setHistoryLayoutMode(false);
 
     setActiveMainNav('favoritesNav');
     setActiveGenreItem(null);
@@ -4255,12 +3899,124 @@ function showFavorites() {
     updateWorkspaceStatus();
 }
 
+function showRecentlyPlayed() {
+    currentView = 'recent';
+    selectedGenre = null;
+
+    setActiveMainNav('recentlyPlayedNav');
+    setActiveGenreItem(null);
+
+    if (searchQuery.trim()) {
+        performSearch();
+        updateWorkspaceStatus();
+        return;
+    }
+
+    clearGlobalSearchState();
+
+    renderBreadcrumb([
+        { label: 'Genre Library', action: 'show-all' },
+        { label: 'Recently Played', current: true }
+    ]);
+    document.getElementById('pageTitle').textContent = 'Recently Played';
+    document.getElementById('pageSubtitle').textContent = 'Quickly return to your latest playback history';
+
+    renderRecentlyPlayed();
+    updateStatsForRecentlyPlayed();
+    updateWorkspaceStatus();
+}
+
+function renderRecentlyPlayed() {
+    const grid = document.getElementById('folderGrid');
+    grid.innerHTML = '';
+
+    let tracks = [...recentTracks];
+
+    if (searchQuery) {
+        tracks = tracks.filter(track => {
+            const haystack = `${track.title} ${track.artist} ${track.album || ''} ${track.playlistName || ''} ${track.genreName || ''}`.toLowerCase();
+            return haystack.includes(searchQuery);
+        });
+    }
+
+    if (currentSort === 'name') {
+        const direction = nameSortDirection === 'asc' ? 1 : -1;
+        tracks.sort((a, b) => (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base', numeric: true }) * direction);
+    } else {
+        tracks.sort((a, b) => Number(b.playedAt || 0) - Number(a.playedAt || 0));
+    }
+
+    currentRecentViewTracks = tracks;
+
+    if (!tracks.length) {
+        grid.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-clock-rotate-left"></i>
+                <h3>No recently played tracks yet</h3>
+                <p>Play songs from any playlist and they will appear here automatically.</p>
+            </div>
+        `;
+        return;
+    }
+
+    const trackList = document.createElement('div');
+    trackList.className = 'track-list-view';
+
+    tracks.forEach((track, index) => {
+        const trackItem = document.createElement('div');
+        trackItem.className = 'track-row fade-in';
+        trackItem.style.animationDelay = `${index * 0.04}s`;
+
+        const tags = [track.playlistName, track.genreName].filter(Boolean);
+        const tagsHTML = tags.length
+            ? tags.map(tag => `<span class="track-tag">${escapeHtml(tag)}</span>`).join('')
+            : '<span class="track-tag">Recently Played</span>';
+
+        trackItem.innerHTML = `
+            <div class="track-number">${index + 1}</div>
+            <img src="${sanitizeImageUrl(track.cover || DEFAULT_COVER)}" alt="${escapeHtml(track.title || 'Track cover')}" class="track-thumb">
+            <div class="track-info">
+                <div class="track-title">${escapeHtml(track.title || 'Unknown Title')}</div>
+                <div class="track-artist">${escapeHtml(track.artist || 'Unknown Artist')}</div>
+            </div>
+            <div class="track-album">${escapeHtml(track.album || track.playlistName || '—')}</div>
+            <div class="track-meta">
+                <span><i class="fas fa-clock"></i> ${formatRelativeTime(track.playedAt)}</span>
+                ${track.genreName ? `<span><i class="fas fa-layer-group"></i> ${escapeHtml(track.genreName)}</span>` : ''}
+            </div>
+            <div class="track-tags">${tagsHTML}</div>
+            <div class="track-duration">${escapeHtml(track.duration || '--:--')}</div>
+            <button type="button" class="track-play-btn" data-action="play-recent" data-track-index="${index}">
+                <i class="fas fa-play"></i>
+            </button>
+        `;
+
+        trackList.appendChild(trackItem);
+    });
+
+    grid.appendChild(trackList);
+}
+
+function playTrackFromRecent(index) {
+    if (index < 0 || index >= currentRecentViewTracks.length) return;
+
+    currentPlaylist = currentRecentViewTracks.map(track => ({ ...track }));
+    rebuildPlaybackOrder(index);
+
+    const selectedTrack = currentPlaylist[currentTrackIndex];
+    currentPlaylistContext = {
+        playlistName: selectedTrack?.playlistName || 'Recently Played',
+        genreName: selectedTrack?.genreName || ''
+    };
+
+    loadTrack(selectedTrack);
+    playTrack();
+}
 
 // Show specific genre
 function showGenre(folder) {
     currentView = 'genre';
     selectedGenre = folder;
-    setHistoryLayoutMode(false);
 
     setActiveMainNav(null);
     setActiveGenreItem(folder.id);
@@ -4629,6 +4385,17 @@ function updateBreadcrumb(playlistName) {
         return;
     }
 
+    if (currentView === 'recent') {
+        renderBreadcrumb([
+            { label: 'Genre Library', action: 'show-all' },
+            { label: 'Recently Played', action: 'show-recent' },
+            { label: playlistName || 'Playlist', current: true }
+        ]);
+        document.getElementById('pageTitle').textContent = playlistName;
+        document.getElementById('pageSubtitle').textContent = 'Playback started from Recently Played';
+        return;
+    }
+
     if (currentView === 'favorites') {
         renderBreadcrumb([
             { label: 'Genre Library', action: 'show-all' },
@@ -4684,6 +4451,36 @@ function updateStatsForFavorites() {
     `;
 }
 
+function updateStatsForRecentlyPlayed() {
+    const statsBar = document.getElementById('statsBar');
+    const totalTracks = recentTracks.length;
+    const uniqueArtists = new Set(recentTracks.map(track => track.artist).filter(Boolean)).size;
+    const uniquePlaylists = new Set(recentTracks.map(track => track.playlistName).filter(Boolean)).size;
+
+    statsBar.innerHTML = `
+        <div class="stat-item">
+            <i class="fas fa-clock"></i>
+            <div>
+                <div class="stat-value">${totalTracks}</div>
+                <div class="stat-label">Recent Tracks</div>
+            </div>
+        </div>
+        <div class="stat-item">
+            <i class="fas fa-user-music"></i>
+            <div>
+                <div class="stat-value">${uniqueArtists}</div>
+                <div class="stat-label">Artists</div>
+            </div>
+        </div>
+        <div class="stat-item">
+            <i class="fas fa-list-music"></i>
+            <div>
+                <div class="stat-value">${uniquePlaylists}</div>
+                <div class="stat-label">Playlists</div>
+            </div>
+        </div>
+    `;
+}
 
 // Update stats bar
 function updateStats() {
@@ -4765,116 +4562,510 @@ function showError() {
     `;
 }
 
-// Playback Speed Functions
-function openSpeedModal() {
-    const modal = document.getElementById('speedModal');
-    if (!modal) return;
-    
-    // Set current speed in slider and display
-    const speedSlider = document.getElementById('speedSlider');
-    const speedValueDisplay = document.getElementById('speedValueDisplay');
-    
-    if (speedSlider) {
-        speedSlider.value = currentPlaybackSpeed;
+// Smart Playlists Functions
+function loadSmartPlaylists() {
+    try {
+        const raw = localStorage.getItem(SMART_PLAYLISTS_STORAGE_KEY);
+        if (!raw) {
+            smartPlaylists = getDefaultSmartPlaylists();
+            saveSmartPlaylists();
+            return;
+        }
+        
+        const parsed = JSON.parse(raw);
+        smartPlaylists = Array.isArray(parsed) ? parsed : getDefaultSmartPlaylists();
+    } catch (error) {
+        console.warn('Failed to load smart playlists:', error);
+        smartPlaylists = getDefaultSmartPlaylists();
     }
-    
-    if (speedValueDisplay) {
-        speedValueDisplay.textContent = `${currentPlaybackSpeed.toFixed(1)}x`;
-    }
-    
-    // Update preset buttons
-    updateSpeedPresetButtons();
-    
-    modal.classList.add('show');
 }
 
-function closeSpeedModal() {
-    const modal = document.getElementById('speedModal');
-    if (!modal) return;
-    modal.classList.remove('show');
+function saveSmartPlaylists() {
+    try {
+        localStorage.setItem(SMART_PLAYLISTS_STORAGE_KEY, JSON.stringify(smartPlaylists));
+    } catch (error) {
+        console.warn('Failed to save smart playlists:', error);
+    }
 }
 
-function updateSpeedPresetButtons() {
-    const presetButtons = document.querySelectorAll('.speed-preset-btn');
-    presetButtons.forEach(btn => {
-        const btnSpeed = Number(btn.dataset.speed);
-        const isActive = Math.abs(btnSpeed - currentPlaybackSpeed) < 0.01;
-        btn.classList.toggle('active', isActive);
+function getDefaultSmartPlaylists() {
+    return [
+        {
+            id: 'smart-high-energy',
+            name: 'High Energy Workout',
+            icon: 'fa-dumbbell',
+            color: '#f97316',
+            matchType: 'all',
+            rules: [
+                { field: 'bpm', operator: 'greater', value: '120' }
+            ]
+        },
+        {
+            id: 'smart-classics',
+            name: 'Classic Oldies',
+            icon: 'fa-compact-disc',
+            color: '#3b82f6',
+            matchType: 'all',
+            rules: [
+                { field: 'year', operator: 'less', value: '1990' }
+            ]
+        },
+        {
+            id: 'smart-recent',
+            name: 'Recently Added',
+            icon: 'fa-clock',
+            color: '#10b981',
+            matchType: 'all',
+            rules: [
+                { field: 'addedDays', operator: 'less', value: '30' }
+            ]
+        }
+    ];
+}
+
+function evaluateSmartPlaylistRule(track, rule) {
+    const field = rule.field;
+    const operator = rule.operator;
+    const value = rule.value;
+    
+    switch (field) {
+        case 'bpm':
+            const trackBpm = Number(track.bpm) || 0;
+            const targetBpm = Number(value) || 0;
+            if (operator === 'greater') return trackBpm > targetBpm;
+            if (operator === 'less') return trackBpm < targetBpm;
+            if (operator === 'equals') return trackBpm === targetBpm;
+            break;
+            
+        case 'year':
+            const trackYear = Number(track.year) || 0;
+            const targetYear = Number(value) || 0;
+            if (operator === 'greater') return trackYear > targetYear;
+            if (operator === 'less') return trackYear < targetYear;
+            if (operator === 'equals') return trackYear === targetYear;
+            break;
+            
+        case 'mood':
+            if (operator === 'equals') return String(track.mood || '').toLowerCase() === String(value || '').toLowerCase();
+            if (operator === 'contains') return String(track.mood || '').toLowerCase().includes(String(value || '').toLowerCase());
+            break;
+            
+        case 'genre':
+            const trackGenre = String(track.genre || '').toLowerCase();
+            const targetGenre = String(value || '').toLowerCase();
+            if (operator === 'equals') return trackGenre === targetGenre;
+            if (operator === 'contains') return trackGenre.includes(targetGenre);
+            break;
+            
+        case 'title':
+            const trackTitle = String(track.title || '').toLowerCase();
+            const targetTitle = String(value || '').toLowerCase();
+            if (operator === 'contains') return trackTitle.includes(targetTitle);
+            break;
+            
+        case 'artist':
+            const trackArtist = String(track.artist || '').toLowerCase();
+            const targetArtist = String(value || '').toLowerCase();
+            if (operator === 'contains') return trackArtist.includes(targetArtist);
+            break;
+            
+        case 'tags':
+            const trackTags = Array.isArray(track.tags) ? track.tags.join(' ').toLowerCase() : '';
+            const targetTag = String(value || '').toLowerCase();
+            if (operator === 'contains') return trackTags.includes(targetTag);
+            break;
+    }
+    
+    return false;
+}
+
+function evaluateSmartPlaylist(smartPlaylist) {
+    const allTracks = getAllTracksWithContext();
+    const matchType = smartPlaylist.matchType || 'all';
+    const rules = smartPlaylist.rules || [];
+    
+    if (rules.length === 0) return [];
+    
+    return allTracks.filter(track => {
+        if (matchType === 'all') {
+            return rules.every(rule => evaluateSmartPlaylistRule(track, rule));
+        } else {
+            return rules.some(rule => evaluateSmartPlaylistRule(track, rule));
+        }
     });
 }
 
-function handleSpeedSliderChange(value) {
-    const speed = Number(value);
-    if (!Number.isFinite(speed)) return;
-    
-    const speedValueDisplay = document.getElementById('speedValueDisplay');
-    if (speedValueDisplay) {
-        speedValueDisplay.textContent = `${speed.toFixed(1)}x`;
-    }
-    
-    setPlaybackSpeed(speed);
-    updateSpeedPresetButtons();
-}
-
-function handleSpeedPresetClick(speed) {
-    const speedSlider = document.getElementById('speedSlider');
-    if (speedSlider) {
-        speedSlider.value = speed;
-    }
-    
-    handleSpeedSliderChange(speed);
-}
-
-// Session Management Functions
-function loadListeningSession() {
-    // Stub - feature to be fully implemented
-    console.log('Session management loading...');
-}
-
-// Pinned Playlists Functions
-function loadPinnedPlaylists() {
-    // Stub - feature to be fully implemented
-    console.log('Pinned playlists loading...');
-}
-
-
-function showHistoryCalendar() {
-    currentView = 'history';
+function showSmartPlaylists() {
+    currentView = 'smart';
     selectedGenre = null;
-    setHistoryLayoutMode(true);
-
-    if (searchQuery.trim()) {
-        searchQuery = '';
-        const searchInput = document.getElementById('searchInput');
-        const clearSearch = document.getElementById('clearSearch');
-        if (searchInput) searchInput.value = '';
-        if (clearSearch) clearSearch.classList.remove('visible');
-    }
     
-    setActiveMainNav('historyCalendarNav');
+    setActiveMainNav('smartPlaylistsNav');
     setActiveGenreItem(null);
+    
+    if (searchQuery.trim()) {
+        performSearch();
+        updateWorkspaceStatus();
+        return;
+    }
     
     clearGlobalSearchState();
     
     renderBreadcrumb([
         { label: 'Genre Library', action: 'show-all' },
-        { label: 'Listening History', current: true }
+        { label: 'Smart Playlists', current: true }
     ]);
-
-    document.getElementById('pageTitle').textContent = 'Listening History';
-    document.getElementById('pageSubtitle').textContent = 'Review daily plays, trends, and top tracks';
+    document.getElementById('pageTitle').textContent = 'Smart Playlists';
+    document.getElementById('pageSubtitle').textContent = 'AI-generated playlists based on your music rules';
     
-    // Call the render function from listening-history.js
-    if (typeof renderHistoryCalendar === 'function') {
-        renderHistoryCalendar();
-    } else {
-        showNotification('Feature Loading', 'Listening History Calendar is loading...', 'info');
-    }
-    
+    renderSmartPlaylists();
+    updateStatsForSmartPlaylists();
     updateWorkspaceStatus();
 }
 
+function renderSmartPlaylists() {
+    const grid = document.getElementById('folderGrid');
+    grid.innerHTML = '';
+    
+    smartPlaylists.forEach((smartPlaylist, index) => {
+        const matchingTracks = evaluateSmartPlaylist(smartPlaylist);
+        const totalSeconds = matchingTracks.reduce((sum, track) => sum + parseTrackDurationToSeconds(track.duration), 0);
+        const duration = formatQueueDuration(totalSeconds);
+        
+        const card = document.createElement('div');
+        card.className = 'playlist-card fade-in';
+        card.style.animationDelay = `${index * 0.1}s`;
+        card.style.setProperty('--card-color', smartPlaylist.color || '#6366f1');
+        
+        const playlistImages = matchingTracks.slice(0, 4).map(t => t.cover).filter(Boolean);
+        const safeImages = (playlistImages.length ? playlistImages : [DEFAULT_COVER, DEFAULT_COVER, DEFAULT_COVER, DEFAULT_COVER]).slice(0, 4);
+        const imagesHTML = safeImages.map(img => `<img src="${sanitizeImageUrl(img)}" alt="Album cover">`).join('');
+        
+        card.innerHTML = `
+            <div class="playlist-card-actions">
+                <button class="playlist-action-btn delete-smart-playlist-btn" title="Delete Smart Playlist" data-smart-id="${smartPlaylist.id}">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+            <div class="play-overlay">
+                <div class="play-btn">
+                    <i class="fas fa-play"></i>
+                </div>
+            </div>
+            <div class="card-icon" style="background: linear-gradient(135deg, ${smartPlaylist.color || '#6366f1'}22, ${smartPlaylist.color || '#6366f1'}11);">
+                <i class="fas ${smartPlaylist.icon || 'fa-brain'}" style="color: ${smartPlaylist.color || '#6366f1'}"></i>
+            </div>
+            <h3 class="card-title">${escapeHtml(smartPlaylist.name)}</h3>
+            <p class="card-description">${smartPlaylist.rules.length} rule${smartPlaylist.rules.length === 1 ? '' : 's'} · ${smartPlaylist.matchType === 'all' ? 'Match ALL' : 'Match ANY'}</p>
+            <div class="image-grid">
+                ${imagesHTML}
+            </div>
+            <div class="card-stats">
+                <div class="card-stat">
+                    <i class="fas fa-music"></i>
+                    <span>${matchingTracks.length} tracks</span>
+                </div>
+                <div class="card-stat">
+                    <i class="far fa-clock"></i>
+                    <span>${duration}</span>
+                </div>
+            </div>
+        `;
+        
+        const playOverlay = card.querySelector('.play-overlay');
+        playOverlay.addEventListener('click', (e) => {
+            e.stopPropagation();
+            playSmartPlaylist(smartPlaylist);
+        });
+        
+        const deleteBtn = card.querySelector('.delete-smart-playlist-btn');
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                deleteSmartPlaylist(smartPlaylist.id);
+            });
+        }
+        
+        card.addEventListener('click', (e) => {
+            if (!e.target.closest('.play-overlay') && !e.target.closest('.playlist-card-actions')) {
+                showSmartPlaylistTracks(smartPlaylist);
+            }
+        });
+        
+        grid.appendChild(card);
+    });
+    
+    // Add "Create New" card
+    const createCard = document.createElement('div');
+    createCard.className = 'playlist-card fade-in create-new-card';
+    createCard.style.animationDelay = `${smartPlaylists.length * 0.1}s`;
+    createCard.innerHTML = `
+        <div class="card-icon" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(99, 102, 241, 0.1));">
+            <i class="fas fa-plus" style="color: #6366f1;"></i>
+        </div>
+        <h3 class="card-title">Create Smart Playlist</h3>
+        <p class="card-description">Auto-updating playlists based on rules</p>
+    `;
+    createCard.addEventListener('click', openSmartPlaylistModal);
+    grid.appendChild(createCard);
+}
 
+function updateStatsForSmartPlaylists() {
+    const statsBar = document.getElementById('statsBar');
+    const totalPlaylists = smartPlaylists.length;
+    const totalTracks = smartPlaylists.reduce((sum, sp) => sum + evaluateSmartPlaylist(sp).length, 0);
+    
+    statsBar.innerHTML = `
+        <div class="stat-item">
+            <i class="fas fa-brain"></i>
+            <div>
+                <div class="stat-value">${totalPlaylists}</div>
+                <div class="stat-label">Smart Playlists</div>
+            </div>
+        </div>
+        <div class="stat-item">
+            <i class="fas fa-music"></i>
+            <div>
+                <div class="stat-value">${totalTracks}</div>
+                <div class="stat-label">Matching Tracks</div>
+            </div>
+        </div>
+        <div class="stat-item">
+            <i class="fas fa-magic"></i>
+            <div>
+                <div class="stat-value">Auto</div>
+                <div class="stat-label">Updates</div>
+            </div>
+        </div>
+    `;
+}
+
+function playSmartPlaylist(smartPlaylist) {
+    const tracks = evaluateSmartPlaylist(smartPlaylist);
+    
+    if (tracks.length === 0) {
+        showNotification(
+            'No Matching Tracks',
+            'This smart playlist has no tracks matching the current rules.',
+            'info'
+        );
+        return;
+    }
+    
+    currentPlaylist = tracks;
+    currentTrackIndex = 0;
+    currentPlaylistContext = {
+        playlistName: smartPlaylist.name,
+        genreName: 'Smart Playlist'
+    };
+    rebuildPlaybackOrder(currentTrackIndex);
+    loadTrack(currentPlaylist[currentTrackIndex]);
+    playTrack();
+}
+
+function showSmartPlaylistTracks(smartPlaylist) {
+    const tracks = evaluateSmartPlaylist(smartPlaylist);
+    currentSmartPlaylistTracks = tracks;
+    
+    renderBreadcrumb([
+        { label: 'Genre Library', action: 'show-all' },
+        { label: 'Smart Playlists', action: 'show-smart' },
+        { label: smartPlaylist.name, current: true }
+    ]);
+    document.getElementById('pageTitle').textContent = smartPlaylist.name;
+    document.getElementById('pageSubtitle').textContent = `Auto-generated · ${tracks.length} matching tracks`;
+    
+    const grid = document.getElementById('folderGrid');
+    grid.innerHTML = '';
+    
+    if (tracks.length === 0) {
+        grid.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-brain"></i>
+                <h3>No Matching Tracks</h3>
+                <p>No tracks in your library match the current rules. Try adjusting the smart playlist criteria.</p>
+            </div>
+        `;
+        return;
+    }
+    
+    const trackList = document.createElement('div');
+    trackList.className = 'track-list-view';
+    
+    tracks.forEach((track, index) => {
+        const trackItem = document.createElement('div');
+        trackItem.className = 'track-row fade-in';
+        trackItem.style.animationDelay = `${index * 0.02}s`;
+        
+        const tags = [track.__playlistName, track.__genreName].filter(Boolean);
+        const tagsHTML = tags.length
+            ? tags.map(tag => `<span class="track-tag">${escapeHtml(tag)}</span>`).join('')
+            : '<span class="track-tag">Smart</span>';
+        
+        trackItem.innerHTML = `
+            <div class="track-number">${index + 1}</div>
+            <img src="${sanitizeImageUrl(track.cover || DEFAULT_COVER)}" alt="${escapeHtml(track.title || 'Track cover')}" class="track-thumb">
+            <div class="track-info">
+                <div class="track-title">${escapeHtml(track.title || 'Unknown Title')}</div>
+                <div class="track-artist">${escapeHtml(track.artist || 'Unknown Artist')}</div>
+            </div>
+            <div class="track-album">${escapeHtml(track.album || track.__playlistName || '—')}</div>
+            <div class="track-meta">
+                ${track.year ? `<span><i class="fas fa-calendar"></i> ${escapeHtml(track.year)}</span>` : ''}
+                ${track.bpm ? `<span><i class="fas fa-drum"></i> ${escapeHtml(track.bpm)} BPM</span>` : ''}
+                ${track.mood ? `<span><i class="far fa-smile"></i> ${escapeHtml(track.mood)}</span>` : ''}
+            </div>
+            <div class="track-tags">${tagsHTML}</div>
+            <div class="track-duration">${escapeHtml(track.duration || '--:--')}</div>
+            <button type="button" class="track-play-btn" data-action="play-smart" data-track-index="${index}">
+                <i class="fas fa-play"></i>
+            </button>
+        `;
+        
+        trackList.appendChild(trackItem);
+    });
+    
+    grid.appendChild(trackList);
+    
+    // Store for playback
+    currentPlaylist = tracks;
+    currentPlaylistContext = {
+        playlistName: smartPlaylist.name,
+        genreName: 'Smart Playlist'
+    };
+    if (currentTrackIndex >= currentPlaylist.length) {
+        currentTrackIndex = 0;
+    }
+    rebuildPlaybackOrder(currentTrackIndex);
+    if (isQueuePanelOpen) {
+        renderQueuePanel();
+    }
+}
+
+function playTrackFromSmart(index) {
+    if (index < 0 || index >= currentSmartPlaylistTracks.length) return;
+    
+    currentPlaylist = currentSmartPlaylistTracks;
+    rebuildPlaybackOrder(index);
+    loadTrack(currentPlaylist[currentTrackIndex]);
+    playTrack();
+}
+
+function deleteSmartPlaylist(id) {
+    smartPlaylists = smartPlaylists.filter(sp => sp.id !== id);
+    saveSmartPlaylists();
+    showSmartPlaylists();
+    showNotification('Smart Playlist Deleted', 'The smart playlist has been removed.', 'success');
+}
+
+function openSmartPlaylistModal() {
+    const modal = document.getElementById('smartPlaylistModal');
+    if (!modal) return;
+    
+    // Reset form
+    document.getElementById('smartPlaylistForm').reset();
+    document.getElementById('smartPlaylistRules').innerHTML = '';
+    
+    // Add one default rule
+    addSmartPlaylistRule();
+    
+    modal.classList.add('show');
+}
+
+function closeSmartPlaylistModal() {
+    const modal = document.getElementById('smartPlaylistModal');
+    if (!modal) return;
+    modal.classList.remove('show');
+}
+
+let smartRuleCounter = 0;
+
+function addSmartPlaylistRule() {
+    const rulesContainer = document.getElementById('smartPlaylistRules');
+    const ruleId = ++smartRuleCounter;
+    
+    const ruleDiv = document.createElement('div');
+    ruleDiv.className = 'smart-rule';
+    ruleDiv.dataset.ruleId = ruleId;
+    
+    ruleDiv.innerHTML = `
+        <select class="smart-rule-field">
+            <option value="bpm">BPM</option>
+            <option value="year">Year</option>
+            <option value="mood">Mood</option>
+            <option value="genre">Genre</option>
+            <option value="title">Title</option>
+            <option value="artist">Artist</option>
+            <option value="tags">Tags</option>
+        </select>
+        <select class="smart-rule-operator">
+            <option value="greater">Greater than</option>
+            <option value="less">Less than</option>
+            <option value="equals">Equals</option>
+            <option value="contains">Contains</option>
+        </select>
+        <input type="text" class="smart-rule-value" placeholder="Value">
+        <button type="button" class="smart-rule-remove" title="Remove Rule">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    
+    const removeBtn = ruleDiv.querySelector('.smart-rule-remove');
+    removeBtn.addEventListener('click', () => {
+        ruleDiv.remove();
+    });
+    
+    rulesContainer.appendChild(ruleDiv);
+}
+
+function createSmartPlaylist(event) {
+    event.preventDefault();
+    
+    const name = document.getElementById('smartPlaylistNameInput').value.trim();
+    const icon = document.getElementById('smartPlaylistIconInput').value;
+    const matchType = document.getElementById('smartPlaylistMatchType').value;
+    
+    if (!name) {
+        showNotification('Missing Name', 'Please enter a name for the smart playlist.', 'warning');
+        return;
+    }
+    
+    const ruleElements = document.querySelectorAll('.smart-rule');
+    if (ruleElements.length === 0) {
+        showNotification('No Rules', 'Please add at least one rule for the smart playlist.', 'warning');
+        return;
+    }
+    
+    const rules = Array.from(ruleElements).map(ruleEl => ({
+        field: ruleEl.querySelector('.smart-rule-field').value,
+        operator: ruleEl.querySelector('.smart-rule-operator').value,
+        value: ruleEl.querySelector('.smart-rule-value').value.trim()
+    })).filter(rule => rule.value);
+    
+    if (rules.length === 0) {
+        showNotification('Empty Rules', 'Please fill in at least one rule with a value.', 'warning');
+        return;
+    }
+    
+    const newSmartPlaylist = {
+        id: `smart-${Date.now()}`,
+        name,
+        icon,
+        color: '#6366f1',
+        matchType,
+        rules
+    };
+    
+    smartPlaylists.push(newSmartPlaylist);
+    saveSmartPlaylists();
+    closeSmartPlaylistModal();
+    showSmartPlaylists();
+    
+    showNotification(
+        'Smart Playlist Created',
+        `"${name}" will automatically update with ${evaluateSmartPlaylist(newSmartPlaylist).length} matching tracks.`,
+        'success'
+    );
+}
 
 // Initialize waveform on load
 document.addEventListener('DOMContentLoaded', () => {

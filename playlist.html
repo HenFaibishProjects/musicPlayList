@@ -858,6 +858,8 @@
 
     <script src="https://cdn.jsdelivr.net/npm/nouislider@15.8.1/dist/nouislider.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- app.js MUST load first: it declares all global state variables used by every other file -->
+    <script src="app.js"></script>
     <script src="m3u-parser.js"></script>
     <script src="visualizer.js"></script>
     <script src="visualizer-3d.js"></script>
@@ -866,6 +868,12 @@
     <script src="player.js"></script>
     <script src="playlists.js"></script>
     <script src="ui.js"></script>
-    <script src="script.js"></script>
+    <!-- Split functionality files -->
+    <script src="quick-play.js"></script>
+    <script src="library-management.js"></script>
+    <script src="import-export.js"></script>
+    <script src="playback-control.js"></script>
+    <script src="volume-control.js"></script>
+    <script src="ui-utilities.js"></script>
 </body>
 </html>

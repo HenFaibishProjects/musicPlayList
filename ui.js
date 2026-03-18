@@ -1,9 +1,7 @@
 // UI Management - Modals, Notifications, Breadcrumbs
-const modalFormBaseline = { addGenre: '', addPlaylist: '', editGenre: '', editPlaylist: '' };
+// modalFormBaseline, isQueuePanelOpen, pendingDeletePlaylist, editingGenreContext
+// are declared in app.js (loaded first)
 let notificationAutoCloseTimer = null;
-let isQueuePanelOpen = false;
-let pendingDeletePlaylist = null;
-let editingGenreContext = null;
 
 function showNotification(title, message, type = 'info', actions = null) {
     const overlay = document.getElementById('notificationOverlay');

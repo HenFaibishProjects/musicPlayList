@@ -517,6 +517,90 @@ function closeDayDetails() {
     }
 }
 
+// Show the history calendar view (navigation function)
+function showHistoryCalendar() {
+    currentView = 'history';
+    selectedGenre = null;
+
+    setActiveMainNav('historyCalendarNav');
+    setActiveGenreItem(null);
+
+    clearGlobalSearchState();
+
+    renderBreadcrumb([
+        { label: 'Genre Library', action: 'show-all' },
+        { label: 'Listening History', current: true }
+    ]);
+    document.getElementById('pageTitle').textContent = 'Listening History';
+    document.getElementById('pageSubtitle').textContent = 'Your musical journey over time';
+
+    renderHistoryCalendar();
+    updateStatsForHistory();
+    updateWorkspaceStatus();
+}
+
+// Update stats bar for history view
+function updateStatsForHistory() {
+    const statsBar = document.getElementById('statsBar');
+    if (!statsBar) return;
+
+    const stats = getListeningStats();
+
+    statsBar.innerHTML = `
+        <div class="stat-item">
+            <i class="fas fa-headphones"></i>
+            <div>
+                <div class="stat-value">${stats.totalPlays.toLocaleString()}</div>
+                <div class="stat-label">Total Plays</div>
+            </div>
+        </div>
+        <div class="stat-item">
+            <i class="fas fa-music"></i>
+            <div>
+                <div class="stat-value">${stats.uniqueTracks.toLocaleString()}</div>
+                <div class="stat-label">Unique Tracks</div>
+            </div>
+        </div>
+        <div class="stat-item">
+            <i class="fas fa-calendar-check"></i>
+            <div>
+                <div class="stat-value">${stats.daysActive}</div>
+                <div class="stat-label">Days Active</div>
+            </div>
+        </div>
+    `;
+}
+
+// Play track from calendar day view
+function playTrackFromCalendar(dateKey, trackIndex) {
+    const plays = listeningHistory.get(dateKey) || [];
+    if (trackIndex < 0 || trackIndex >= plays.length) return;
+
+    // Create a playlist from all plays on that day
+    currentPlaylist = plays.map(play => ({
+        id: play.trackId,
+        title: play.title,
+        artist: play.artist,
+        album: play.album,
+        duration: play.duration,
+        cover: play.cover,
+        file: play.trackId, // Use trackId as file reference
+        playlistName: play.playlistName,
+        genreName: play.genreName
+    }));
+
+    rebuildPlaybackOrder(trackIndex);
+
+    const selectedTrack = currentPlaylist[currentTrackIndex];
+    currentPlaylistContext = {
+        playlistName: `History: ${dateKey}`,
+        genreName: selectedTrack?.genreName || ''
+    };
+
+    loadTrack(selectedTrack);
+    playTrack();
+}
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
     loadListeningHistory();
