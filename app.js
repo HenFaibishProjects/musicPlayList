@@ -65,20 +65,22 @@ async function init() {
         startSystemVolumePolling();
         setupSystemVolumeSyncTriggers();
 
-        try {
-            libraryData = await fetchLibraryData({ forceRescan: false });
-            apiAvailable = true;
-            console.log('✅ Loaded from API with folder-based scanning');
-        } catch (apiError) {
-            console.log('⚠️ API not available, starting with empty library structure');
-            libraryData = await mergeImportedPlaylistsIntoLibrary(getEmptyLibraryData());
-            apiAvailable = false;
-            showNotification(
-                'Server Not Connected',
-                'Start the Node server (`npm start`) to edit your genre and playlist libraries and scan local music folders.',
-                'warning'
-            );
-        }
+    try {
+        libraryData = await fetchLibraryData({ forceRescan: false });
+        apiAvailable = true;
+        console.log('✅ Loaded from API with folder-based scanning');
+        // Merge imported playlists (from M3U imports) into the library
+        libraryData = await mergeImportedPlaylistsIntoLibrary(libraryData);
+    } catch (apiError) {
+        console.log('⚠️ API not available, starting with empty library structure');
+        libraryData = await mergeImportedPlaylistsIntoLibrary(getEmptyLibraryData());
+        apiAvailable = false;
+        showNotification(
+            'Server Not Connected',
+            'Start the Node server (`npm start`) to edit your genre and playlist libraries and scan local music folders.',
+            'warning'
+        );
+    }
 
         setRescanButtonState();
         refreshLibraryUI();
@@ -132,6 +134,7 @@ function initializePlayer() {
     document.getElementById('shuffleBtn').addEventListener('click', toggleShuffle);
     document.getElementById('repeatBtn').addEventListener('click', toggleRepeat);
     document.getElementById('crossfadeBtn').addEventListener('click', toggleCrossfade);
+    document.getElementById('speedBtn').addEventListener('click', openSpeedModal);
     document.getElementById('playlistBtn').addEventListener('click', toggleQueuePanel);
     document.getElementById('queueCloseBtn').addEventListener('click', closeQueuePanel);
     document.getElementById('queuePlayAllBtn').addEventListener('click', playQueueFromTop);
@@ -222,3 +225,118 @@ window.addEventListener('beforeunload', () => {
 
 // Initialize on page load
 window.onload = init;
+
+// Playback Speed Functions
+function openSpeedModal() {
+    const modal = document.getElementById('speedModal');
+    if (!modal) return;
+    
+    modal.classList.add('show');
+    document.body.classList.add('modal-locked');
+    
+    // Initialize speed slider with current value
+    const speedSlider = document.getElementById('speedSlider');
+    const speedValueDisplay = document.getElementById('speedValueDisplay');
+    
+    if (speedSlider) {
+        speedSlider.value = currentPlaybackSpeed;
+        updateSpeedDisplay(speedSlider.value);
+        
+        // Add event listeners
+        speedSlider.addEventListener('input', (e) => {
+            updateSpeedDisplay(e.target.value);
+        });
+        
+        speedSlider.addEventListener('change', (e) => {
+            // Use the setPlaybackSpeed function from player.js
+            if (typeof setPlaybackSpeed === 'function') {
+                setPlaybackSpeed(parseFloat(e.target.value));
+            }
+        });
+    }
+    
+    // Add event listeners for preset buttons
+    document.querySelectorAll('.speed-preset-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const speed = parseFloat(btn.dataset.speed);
+            // Use the setPlaybackSpeed function from player.js
+            if (typeof setPlaybackSpeed === 'function') {
+                setPlaybackSpeed(speed);
+            }
+            updateSpeedDisplay(speed);
+            if (speedSlider) speedSlider.value = speed;
+            
+            // Update active state
+            document.querySelectorAll('.speed-preset-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+        });
+    });
+    
+    // Add event listener for close button
+    const closeBtn = document.getElementById('speedModalCloseBtn');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', closeSpeedModal);
+    }
+    
+    // Close modal when clicking outside
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            closeSpeedModal();
+        }
+    });
+}
+
+function closeSpeedModal() {
+    const modal = document.getElementById('speedModal');
+    if (!modal) return;
+    
+    modal.classList.remove('show');
+    document.body.classList.remove('modal-locked');
+    
+    // Clean up event listeners
+    const speedSlider = document.getElementById('speedSlider');
+    if (speedSlider) {
+        const newSlider = speedSlider.cloneNode(true);
+        speedSlider.parentNode.replaceChild(newSlider, speedSlider);
+    }
+    
+    const closeBtn = document.getElementById('speedModalCloseBtn');
+    if (closeBtn) {
+        const newCloseBtn = closeBtn.cloneNode(true);
+        closeBtn.parentNode.replaceChild(newCloseBtn, closeBtn);
+    }
+}
+
+function updateSpeedDisplay(speed) {
+    const speedValueDisplay = document.getElementById('speedValueDisplay');
+    if (speedValueDisplay) {
+        // Convert to number and ensure it's valid
+        const speedNum = parseFloat(speed);
+        if (!isNaN(speedNum)) {
+            speedValueDisplay.textContent = `${speedNum.toFixed(2)}x`;
+        } else {
+            speedValueDisplay.textContent = '1.00x';
+        }
+    }
+}
+
+// Load playback speed from storage
+function loadPlaybackSpeedFromStorage() {
+    // Fallback: load from localStorage directly
+    try {
+        const savedSpeed = localStorage.getItem('lidaplay_playback_speed');
+        if (savedSpeed) {
+            const speed = parseFloat(savedSpeed);
+            if (!isNaN(speed) && speed >= 0.25 && speed <= 2.0) {
+                currentPlaybackSpeed = speed;
+                // Update UI if possible
+                const speedIndicator = document.querySelector('#speedBtn .speed-indicator');
+                if (speedIndicator) {
+                    speedIndicator.textContent = `${speed.toFixed(1)}x`;
+                }
+            }
+        }
+    } catch (e) {
+        console.warn('Failed to load playback speed from storage:', e);
+    }
+}

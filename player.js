@@ -112,15 +112,48 @@ function setPlaybackSpeed(speed) {
     const validSpeed = Math.max(0.25, Math.min(2.0, Number(speed) || 1.0));
     currentPlaybackSpeed = validSpeed;
     
+    console.log(`[player.js] Setting playback speed to ${validSpeed}x`);
+    console.log(`[player.js] audioPlayer exists: ${!!audioPlayer}, audioPlayerB exists: ${!!audioPlayerB}`);
+    
     // Apply to both players
-    if (audioPlayer) audioPlayer.playbackRate = validSpeed;
-    if (audioPlayerB) audioPlayerB.playbackRate = validSpeed;
+    if (audioPlayer) {
+        console.log(`[player.js] Setting audioPlayer.playbackRate to ${validSpeed}`);
+        audioPlayer.playbackRate = validSpeed;
+        console.log(`[player.js] audioPlayer.playbackRate is now ${audioPlayer.playbackRate}`);
+    }
+    if (audioPlayerB) {
+        console.log(`[player.js] Setting audioPlayerB.playbackRate to ${validSpeed}`);
+        audioPlayerB.playbackRate = validSpeed;
+        console.log(`[player.js] audioPlayerB.playbackRate is now ${audioPlayerB.playbackRate}`);
+    }
     
     // Update UI
     updateSpeedButton();
     
+    // Also update modal UI if open
+    updateSpeedModalUI(validSpeed);
+    
     // Save to localStorage
     savePlaybackSpeedToStorage();
+}
+
+function updateSpeedModalUI(speed) {
+    // Update modal slider and display if modal is open
+    const speedSlider = document.getElementById('speedSlider');
+    const speedValueDisplay = document.getElementById('speedValueDisplay');
+    
+    if (speedSlider) {
+        speedSlider.value = speed;
+    }
+    if (speedValueDisplay) {
+        speedValueDisplay.textContent = `${speed.toFixed(2)}x`;
+    }
+    
+    // Update active preset buttons in modal
+    document.querySelectorAll('.speed-preset-btn').forEach(btn => {
+        const btnSpeed = parseFloat(btn.dataset.speed);
+        btn.classList.toggle('active', Math.abs(btnSpeed - speed) < 0.01);
+    });
 }
 
 function updateSpeedButton() {
@@ -139,7 +172,7 @@ function updateSpeedButton() {
 
 function savePlaybackSpeedToStorage() {
     try {
-        localStorage.setItem(PLAYBACK_SPEED_STORAGE_KEY, String(currentPlaybackSpeed));
+        localStorage.setItem('lidaplay_playback_speed', String(currentPlaybackSpeed));
     } catch (error) {
         console.warn('Failed to save playback speed:', error);
     }
@@ -147,7 +180,7 @@ function savePlaybackSpeedToStorage() {
 
 function loadPlaybackSpeedFromStorage() {
     try {
-        const raw = localStorage.getItem(PLAYBACK_SPEED_STORAGE_KEY);
+        const raw = localStorage.getItem('lidaplay_playback_speed');
         if (raw) {
             const speed = Number(raw);
             if (Number.isFinite(speed) && speed >= 0.25 && speed <= 2.0) {

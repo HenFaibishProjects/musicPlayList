@@ -199,7 +199,29 @@ async function mergeImportedPlaylistsIntoLibrary(payload) {
 
         const exists = genre.subfolders.some(playlist => playlist?.id === record.playlist.id);
         if (!exists) {
-            genre.subfolders.push(JSON.parse(JSON.stringify(record.playlist)));
+            // Ensure playlist has all UI-required properties
+            const playlist = JSON.parse(JSON.stringify(record.playlist));
+            const tracks = Array.isArray(playlist.tracks) ? playlist.tracks : [];
+            
+            // Add missing UI properties
+            if (!playlist.trackCount) {
+                playlist.trackCount = tracks.length;
+            }
+            if (!playlist.duration) {
+                playlist.duration = calculateTotalDuration(tracks);
+            }
+            if (!playlist.artists) {
+                playlist.artists = 'Imported from M3U';
+            }
+            if (!playlist.images || !Array.isArray(playlist.images) || playlist.images.length === 0) {
+                playlist.images = extractCovers(tracks);
+            }
+            if (!playlist.link) {
+                playlist.link = `imported://m3u/${playlist.name || 'playlist'}`;
+            }
+            playlist.isImported = true;
+            
+            genre.subfolders.push(playlist);
         }
     });
 

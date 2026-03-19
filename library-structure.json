@@ -39,6 +39,16 @@
             "isFavorite": false,
             "coverImage": null,
             "images": []
+          },
+          {
+            "id": "playlist-phill-collins-mmwc5fy8",
+            "name": "phill collins",
+            "artists": "phill collins",
+            "path": "F:\\music\\Collections\\codding",
+            "link": "F:\\music\\Collections\\codding",
+            "isFavorite": false,
+            "coverImage": null,
+            "images": []
           }
         ]
       },
