@@ -124,13 +124,15 @@ async function saveImportedPlaylistRecords(records = []) {
             const playlist = record.playlist;
             if (!playlist) continue;
             
-            // Send ONE playlist per request with name and tracks
+            // Send ONE playlist per request with name, tracks, and genre info
             await apiRequest('http://localhost:3000/api/imported-playlists', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     name: playlist.name || 'Imported Playlist',
-                    tracks: playlist.tracks || []
+                    tracks: playlist.tracks || [],
+                    genreId: record.genreId || '',
+                    genreName: record.genreName || 'Imported'
                 })
             });
         }
@@ -327,6 +329,19 @@ function openImportM3UModal() {
     // Load genres into dropdown
     populateImportGenreSelect();
     
+    // Add event listener for genre select change
+    const importGenreSelect = document.getElementById('importGenreSelect');
+    const newGenreNameRow = document.getElementById('newGenreNameRow');
+    if (importGenreSelect && newGenreNameRow) {
+        importGenreSelect.addEventListener('change', (e) => {
+            if (e.target.value === '__new__') {
+                newGenreNameRow.classList.remove('hidden');
+            } else {
+                newGenreNameRow.classList.add('hidden');
+            }
+        });
+    }
+    
     modal.classList.add('show');
 }
 
@@ -343,11 +358,19 @@ function populateImportGenreSelect() {
     const genres = getGenresFromLibraryState();
 
     // Clear existing options except the first placeholder
-    while (select.options.length > 1) {
-        select.remove(1);
+    while (select.options.length > 2) {
+        select.remove(2);
     }
 
-    // Add genre options from existing genres only
+    // Add "Create new genre" option
+    const newGenreOption = document.createElement('option');
+    newGenreOption.value = '__new__';
+    newGenreOption.textContent = '➕ Create new genre...';
+    if (select.options.length === 1) {
+        select.appendChild(newGenreOption);
+    }
+
+    // Add genre options from existing genres
     genres.forEach(genre => {
         const option = document.createElement('option');
         option.value = genre.id;
@@ -541,7 +564,18 @@ async function importM3UPlaylist(event) {
             throw new Error('Please enter a playlist name');
         }
         
+        // Handle new genre creation
         let targetGenreId = genreValue;
+        if (genreValue === '__new__') {
+            const newGenreName = document.getElementById('newGenreNameInput').value.trim();
+            if (!newGenreName) {
+                throw new Error('Please enter a name for the new genre');
+            }
+            
+            // Create new genre
+            progressText.textContent = 'Creating new genre...';
+            targetGenreId = await createGenreForImport(newGenreName);
+        }
         
         progressFill.style.width = '60%';
         progressText.textContent = 'Processing tracks...';
@@ -631,6 +665,14 @@ async function createGenreForImport(genreName) {
         })
     });
     
+    // Refresh library data to include the new genre
+    try {
+        const freshLibraryData = await fetchLibraryData({ forceRescan: false });
+        libraryData = await mergeImportedPlaylistsIntoLibrary(freshLibraryData);
+    } catch (error) {
+        console.warn('Failed to refresh library data after creating genre:', error);
+    }
+    
     return payload.genre.id;
 }
 
@@ -667,6 +709,25 @@ async function addImportedPlaylistToLibrary(genreId, playlistName, tracks) {
         genreName: genre.name || 'Imported',
         playlist: newPlaylist
     });
+
+    // Refresh library data from server to ensure UI is in sync
+    try {
+        const freshLibraryData = await fetchLibraryData({ forceRescan: false });
+        apiAvailable = true;
+        setRescanButtonState();
+        
+        // Merge imported playlists into the fresh library data
+        libraryData = await mergeImportedPlaylistsIntoLibrary(freshLibraryData);
+    } catch (error) {
+        console.warn('Failed to refresh library data after import:', error);
+        // Continue with local data if refresh fails
+        // Still try to merge imported playlists with current library data
+        try {
+            libraryData = await mergeImportedPlaylistsIntoLibrary(libraryData);
+        } catch (mergeError) {
+            console.warn('Failed to merge imported playlists:', mergeError);
+        }
+    }
 }
 
 function calculateTotalDuration(tracks) {

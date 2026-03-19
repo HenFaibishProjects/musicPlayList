@@ -976,10 +976,15 @@ async function rescanLibrary() {
         showNotification(
             'Playlist Libraries Rescanned',
             (typeof tracks === 'number' && typeof playlists === 'number')
-                ? `Scan complete: ${tracks} songs found across ${playlists} playlists.`
-                : 'Scan complete. Playlist folders were refreshed from disk.',
+                ? `Scan complete: ${tracks} songs found across ${playlists} playlists. Refreshing page...`
+                : 'Scan complete. Playlist folders were refreshed from disk. Refreshing page...',
             'success'
         );
+        
+        // Refresh the page after a short delay to show all updated playlists
+        setTimeout(() => {
+            window.location.reload();
+        }, 1500);
     } catch (error) {
         console.error('Rescan failed:', error);
         apiAvailable = false;
