@@ -388,18 +388,7 @@ function openImportM3UModal() {
     // Load genres into dropdown
     populateImportGenreSelect();
     
-    // Add event listener for genre select change
-    const importGenreSelect = document.getElementById('importGenreSelect');
-    const newGenreNameRow = document.getElementById('newGenreNameRow');
-    if (importGenreSelect && newGenreNameRow) {
-        importGenreSelect.addEventListener('change', (e) => {
-            if (e.target.value === '__new__') {
-                newGenreNameRow.classList.remove('hidden');
-            } else {
-                newGenreNameRow.classList.add('hidden');
-            }
-        });
-    }
+    // New genre name row is handled by central setupEventListeners in ui-utilities.js
     
     modal.classList.add('show');
 }
