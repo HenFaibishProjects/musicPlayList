@@ -50,13 +50,60 @@ function createQuickPlayTrack(file, fileUrl) {
     };
 }
 
-function openQuickPlayFilePicker() {
-    const fileInput = document.getElementById('quickPlayFileInput');
-    if (!fileInput) return;
+/**
+ * Play a quick-play audio file chosen via the folder-browser modal.
+ * Streams the local file through the server's /api/media endpoint so no
+ * blob URL is needed.
+ */
+function playQuickPlayFromPath(filePath) {
+    if (!filePath) return;
 
-    // Reset so selecting the same file twice still triggers change event
-    fileInput.value = '';
-    fileInput.click();
+    const fileName = filePath.split(/[\\/]/).pop() || 'Quick Play';
+    const isLikelyAudio = /\.(mp3|wav|flac|m4a|ogg|aac|wma|opus)$/i.test(fileName);
+    if (!isLikelyAudio) {
+        showNotification('Unsupported File', 'Please choose an audio file (mp3, wav, flac, m4a, ogg, aac, wma, opus).', 'warning');
+        return;
+    }
+
+    // Build the server streaming URL (same endpoint used by imported playlist tracks)
+    const fileUrl = `/api/media?imported=1&path=${encodeURIComponent(filePath)}`;
+
+    const quickTrack = {
+        id: `quick-play-${Date.now()}`,
+        title: getFileNameWithoutExtension(fileName),
+        artist: 'Duration: --:--',
+        album: '',
+        duration: '--:--',
+        cover: DEFAULT_COVER,
+        file: fileUrl,
+        __quickPlay: true,
+        __quickPlayFileName: fileName
+    };
+
+    currentPlaylistContext = { playlistName: 'Quick Play', genreName: '' };
+    currentPlaylist = [quickTrack];
+    currentTrackIndex = 0;
+    rebuildPlaybackOrder(0);
+    loadTrack(quickTrack);
+    playTrack();
+}
+
+function openQuickPlayFilePicker() {
+    if (!apiAvailable) {
+        // API offline — fall back to native file input
+        const fileInput = document.getElementById('quickPlayFileInput');
+        if (!fileInput) return;
+        fileInput.value = '';
+        fileInput.click();
+        return;
+    }
+
+    // Open the amazing folder-browser modal in file-selection mode
+    openModernFolderBrowser(null, null, {
+        mode: 'file',
+        fileExtensions: ['.mp3', '.wav', '.flac', '.m4a', '.ogg', '.aac', '.wma', '.opus'],
+        onFileSelect: playQuickPlayFromPath
+    });
 }
 
 function playQuickPlayFile(file) {
