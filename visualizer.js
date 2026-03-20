@@ -106,8 +106,8 @@ class AudioVisualizer {
 
         for (let i = 0; i < this.bufferLength; i++) {
             const value = this.dataArray[i] / 255;
-            this.smoothedBins[i] = this.smoothedBins[i] * 0.76 + value * 0.24;
-            this.peakBins[i] = Math.max(this.peakBins[i] * 0.94, this.smoothedBins[i]);
+            this.smoothedBins[i] = this.smoothedBins[i] * 0.68 + value * 0.32;
+            this.peakBins[i] = Math.max(this.peakBins[i] * 0.945, this.smoothedBins[i]);
 
             if (i < energyBins) {
                 energyAccumulator += this.smoothedBins[i];
@@ -115,8 +115,8 @@ class AudioVisualizer {
         }
 
         const nextEnergy = energyAccumulator / energyBins;
-        this.energy = this.energy * 0.82 + nextEnergy * 0.18;
-        this.hueOffset = (this.hueOffset + 0.55 + this.energy * 2.8) % 360;
+        this.energy = this.energy * 0.74 + nextEnergy * 0.26;
+        this.hueOffset = (this.hueOffset + 0.45 + this.energy * 3.5) % 360;
     }
 
     startVisualization() {
@@ -147,13 +147,7 @@ class AudioVisualizer {
             this.drawBackground(timestamp);
 
             switch (this.visualizationType) {
-                case '3d':
-                    // 3D mode handled by visualizer-3d.js
-                    if (typeof start3DVisualizer === 'function') {
-                        this.stopVisualization();
-                        start3DVisualizer();
-                    }
-                    return;
+
                 case 'wave':
                     this.drawWave(timestamp);
                     break;
@@ -184,36 +178,38 @@ class AudioVisualizer {
         if (this.canvasCtx && this.canvas) {
             this.canvasCtx.clearRect(0, 0, this.width || this.canvas.width, this.height || this.canvas.height);
         }
-    }
-
-    drawBackground(timestamp) {
+    }    drawBackground(timestamp) {
         const ctx = this.canvasCtx;
 
         ctx.globalCompositeOperation = 'source-over';
-        ctx.fillStyle = 'rgba(4, 8, 20, 0.24)';
+        // Motion blur effect - deeper dark blue with less alpha for better trails
+        ctx.fillStyle = 'rgba(8, 12, 24, 0.22)';
         ctx.fillRect(0, 0, this.width, this.height);
 
-        const baseGradient = ctx.createLinearGradient(0, 0, this.width, this.height);
-        baseGradient.addColorStop(0, 'rgba(0, 245, 255, 0.08)');
-        baseGradient.addColorStop(0.45, 'rgba(124, 58, 237, 0.10)');
-        baseGradient.addColorStop(1, 'rgba(255, 45, 149, 0.07)');
+        // Animated ambient glow
+        const gradientX = this.width * (0.5 + Math.sin(timestamp * 0.0004) * 0.2);
+        const gradientY = this.height * (0.5 + Math.cos(timestamp * 0.0003) * 0.2);
+        const baseGradient = ctx.createRadialGradient(gradientX, gradientY, 0, gradientX, gradientY, this.width * 0.8);
+        baseGradient.addColorStop(0, 'rgba(34, 211, 238, 0.06)');
+        baseGradient.addColorStop(0.5, 'rgba(124, 58, 237, 0.04)');
+        baseGradient.addColorStop(1, 'rgba(10, 14, 26, 0.1)');
         ctx.fillStyle = baseGradient;
         ctx.fillRect(0, 0, this.width, this.height);
 
-        const pulseRadius = Math.max(this.width, this.height) * (0.18 + this.energy * 0.5);
-        const pulseX = this.width * (0.25 + Math.sin(timestamp * 0.00035) * 0.08);
-        const pulseY = this.height * (0.4 + Math.cos(timestamp * 0.00027) * 0.09);
-        const pulseGradient = ctx.createRadialGradient(pulseX, pulseY, 0, pulseX, pulseY, pulseRadius);
-        pulseGradient.addColorStop(0, 'rgba(56, 189, 248, 0.22)');
+        // Pulse core - reacts to bass/energy
+        const pulseRadius = Math.max(this.width, this.height) * (0.15 + this.energy * 0.6);
+        const pulseGradient = ctx.createRadialGradient(this.width / 2, this.height / 2, 0, this.width / 2, this.height / 2, pulseRadius);
+        pulseGradient.addColorStop(0, `rgba(56, 189, 248, ${0.12 + this.energy * 0.15})`);
         pulseGradient.addColorStop(1, 'rgba(56, 189, 248, 0)');
-
         ctx.fillStyle = pulseGradient;
         ctx.fillRect(0, 0, this.width, this.height);
 
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+        // Grid lines with perspective-like fade
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
         ctx.lineWidth = 1;
-        const step = 36;
-        for (let x = 0; x <= this.width; x += step) {
+        const step = 48;
+        const offset = (timestamp * 0.02) % step;
+        for (let x = offset; x <= this.width; x += step) {
             ctx.beginPath();
             ctx.moveTo(x, 0);
             ctx.lineTo(x, this.height);
@@ -223,6 +219,7 @@ class AudioVisualizer {
 
     roundedBar(ctx, x, y, w, h, r) {
         const radius = Math.min(r, w / 2, h / 2);
+        if (h <= 0) return;
         ctx.beginPath();
         ctx.moveTo(x + radius, y);
         ctx.lineTo(x + w - radius, y);
@@ -238,146 +235,197 @@ class AudioVisualizer {
 
     drawBars() {
         const ctx = this.canvasCtx;
-        const bars = Math.min(96, Math.max(36, Math.floor(this.width / 10)));
+        // Increase bars for more detail, mirrored from center
+        const totalBars = Math.min(110, Math.max(40, Math.floor(this.width / 8)));
+        const halfBars = Math.floor(totalBars / 2);
         const gap = 3;
-        const barWidth = (this.width - gap * (bars - 1)) / bars;
-        const baseY = this.height * 0.84;
+        const barWidth = (this.width / 2 - gap * halfBars) / halfBars;
+        const baseY = this.height * 0.85;
+        const centerX = this.width / 2;
 
-        for (let i = 0; i < bars; i++) {
-            const index = Math.floor(Math.pow(i / bars, 1.65) * (this.bufferLength * 0.95));
+        ctx.globalCompositeOperation = 'lighter';
+
+        for (let i = 0; i < halfBars; i++) {
+            // Logarithmic index for natural spectrum distribution
+            const index = Math.floor(Math.pow(i / halfBars, 1.4) * (this.bufferLength * 0.85));
             const value = this.smoothedBins[index] || 0;
             const peak = this.peakBins[index] || value;
 
-            const barHeight = Math.max(2, Math.pow(value, 1.18) * this.height * 0.76);
-            const peakHeight = Math.max(2, Math.pow(peak, 1.12) * this.height * 0.76);
-            const x = i * (barWidth + gap);
-            const y = baseY - barHeight;
+            // Height with dynamic ooomph
+            const barHeight = Math.max(3, Math.pow(value, 1.1) * (this.height * 0.72));
+            const peakHeight = Math.max(3, Math.pow(peak, 1.05) * (this.height * 0.72));
+            
+            const hue = (this.hueOffset + i * 2.5) % 360;
+            const mainColor = `hsla(${hue}, 95%, 68%, 0.9)`;
+            const glowColor = `hsla(${hue}, 95%, 68%, 0.3)`;
 
-            const hue = (this.hueOffset + i * 1.75) % 360;
-            const gradient = ctx.createLinearGradient(0, y, 0, baseY);
-            gradient.addColorStop(0, `hsla(${hue}, 100%, 72%, 0.95)`);
-            gradient.addColorStop(0.55, `hsla(${(hue + 45) % 360}, 96%, 63%, 0.9)`);
-            gradient.addColorStop(1, `hsla(${(hue + 95) % 360}, 92%, 58%, 0.82)`);
+            // Draw right side
+            const rx = centerX + i * (barWidth + gap);
+            this.drawSymmetricalBar(ctx, rx, baseY, barWidth, barHeight, peakHeight, hue, mainColor, glowColor);
 
-            ctx.fillStyle = gradient;
-            this.roundedBar(ctx, x, y, barWidth, barHeight, 4);
-            ctx.fill();
-
-            // Reflection
-            ctx.globalAlpha = 0.24;
-            this.roundedBar(ctx, x, baseY + 5, barWidth, barHeight * 0.34, 3);
-            ctx.fill();
-            ctx.globalAlpha = 1;
-
-            // Peak marker
-            const peakY = baseY - peakHeight;
-            ctx.fillStyle = `hsla(${hue}, 100%, 82%, 0.95)`;
-            ctx.fillRect(x, peakY - 2, barWidth, 2);
+            // Draw left side (mirrored)
+            const lx = centerX - (i + 1) * (barWidth + gap);
+            this.drawSymmetricalBar(ctx, lx, baseY, barWidth, barHeight, peakHeight, hue, mainColor, glowColor);
         }
+        
+        ctx.globalCompositeOperation = 'source-over';
+    }
+
+    drawSymmetricalBar(ctx, x, baseY, w, h, peakH, hue, mainColor, glowColor) {
+        const y = baseY - h;
+        
+        // Glow layer
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = glowColor;
+        
+        const grad = ctx.createLinearGradient(x, y, x, baseY);
+        grad.addColorStop(0, mainColor);
+        grad.addColorStop(1, `hsla(${(hue + 40) % 360}, 90%, 50%, 0.4)`);
+        
+        ctx.fillStyle = grad;
+        this.roundedBar(ctx, x, y, w, h, 6);
+        ctx.fill();
+        
+        ctx.shadowBlur = 0;
+
+        // Peak marker
+        const py = baseY - peakH;
+        ctx.fillStyle = `hsla(${hue}, 100%, 85%, 0.9)`;
+        ctx.fillRect(x, py - 3, w, 2);
+
+        // Subtle Reflection
+        ctx.globalAlpha = 0.15;
+        this.roundedBar(ctx, x, baseY + 6, w, h * 0.25, 4);
+        ctx.fill();
+        ctx.globalAlpha = 1;
     }
 
     drawWave(timestamp) {
         const ctx = this.canvasCtx;
-        const midY = this.height * 0.52;
-        const amplitude = this.height * (0.2 + this.energy * 0.45);
+        const midY = this.height * 0.5;
+        const points = 180;
+        const sliceWidth = this.width / points;
+        
+        ctx.globalCompositeOperation = 'lighter';
 
-        const lineGradient = ctx.createLinearGradient(0, 0, this.width, 0);
-        lineGradient.addColorStop(0, '#22d3ee');
-        lineGradient.addColorStop(0.5, '#8b5cf6');
-        lineGradient.addColorStop(1, '#f472b6');
+        // Background Wave (Shadow/Glow)
+        ctx.shadowBlur = 25;
+        ctx.shadowColor = 'rgba(124, 58, 237, 0.5)';
+        this.renderWavePath(ctx, points, sliceWidth, midY, 1.2, timestamp, 0.002, 12, 'rgba(139, 92, 246, 0.2)');
+        ctx.shadowBlur = 0;
 
+        // Primary Wave
+        const gradient = ctx.createLinearGradient(0, 0, this.width, 0);
+        gradient.addColorStop(0, `hsla(${this.hueOffset}, 100%, 70%, 1)`);
+        gradient.addColorStop(0.5, `hsla(${(this.hueOffset + 60) % 360}, 100%, 75%, 1)`);
+        gradient.addColorStop(1, `hsla(${(this.hueOffset + 120) % 360}, 100%, 70%, 1)`);
+        
+        ctx.strokeStyle = gradient;
+        ctx.lineWidth = 4;
+        this.renderWavePath(ctx, points, sliceWidth, midY, 1.0, timestamp, 0, 0, null, true);
+
+        // Accent Wave (Faster oscillation)
+        ctx.strokeStyle = `hsla(${(this.hueOffset + 180) % 360}, 100%, 80%, 0.5)`;
+        ctx.lineWidth = 1.5;
+        this.renderWavePath(ctx, points, sliceWidth, midY, 0.6, timestamp, 0.005, 8, null, true);
+        
+        ctx.globalCompositeOperation = 'source-over';
+    }
+
+    renderWavePath(ctx, points, sliceWidth, midY, ampMod, timestamp, speed, drift, fillColor, isStroke = false) {
         ctx.beginPath();
-        const points = 220;
+        const amplitude = this.height * (0.22 + this.energy * 0.5) * ampMod;
+
         for (let i = 0; i <= points; i++) {
             const t = i / points;
-            const idx = Math.floor(t * (this.timeDataArray.length - 1));
-            const sample = (this.timeDataArray[idx] - 128) / 128;
+            const idx = Math.floor(t * (this.timeDataArray.length / 2));
+            const val = (this.timeDataArray[idx] - 128) / 128;
+            
             const x = t * this.width;
-            const y = midY + sample * amplitude;
+            const d = speed ? Math.sin(timestamp * speed + i * 0.1) * drift : 0;
+            const y = midY + val * amplitude + d;
 
-            if (i === 0) {
-                ctx.moveTo(x, y);
-            } else {
+            if (i === 0) ctx.moveTo(x, y);
+            else {
+                // Bezier smoothing
                 const prevT = (i - 1) / points;
                 const prevX = prevT * this.width;
-                const ctrlX = (prevX + x) * 0.5;
-                ctx.quadraticCurveTo(ctrlX, y, x, y);
+                const cp1x = (prevX + x) / 2;
+                ctx.quadraticCurveTo(cp1x, y, x, y);
             }
         }
 
-        ctx.strokeStyle = lineGradient;
-        ctx.lineWidth = 3;
-        ctx.shadowColor = 'rgba(34, 211, 238, 0.45)';
-        ctx.shadowBlur = 16;
-        ctx.stroke();
-        ctx.shadowBlur = 0;
-
-        // Secondary line for depth
-        ctx.globalAlpha = 0.45;
-        ctx.beginPath();
-        for (let i = 0; i <= points; i++) {
-            const t = i / points;
-            const idx = Math.floor(t * (this.timeDataArray.length - 1));
-            const sample = (this.timeDataArray[idx] - 128) / 128;
-            const drift = Math.sin(timestamp * 0.0015 + t * 10) * 6;
-            const x = t * this.width;
-            const y = midY + sample * (amplitude * 0.62) + drift;
-            if (i === 0) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
+        if (fillColor) {
+            ctx.fillStyle = fillColor;
+            ctx.lineTo(this.width, this.height);
+            ctx.lineTo(0, this.height);
+            ctx.fill();
         }
-        ctx.strokeStyle = 'rgba(244, 114, 182, 0.6)';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-        ctx.globalAlpha = 1;
+        if (isStroke) ctx.stroke();
     }
 
     drawCircular(timestamp) {
         const ctx = this.canvasCtx;
         const cx = this.width / 2;
         const cy = this.height / 2;
-        const baseRadius = Math.min(this.width, this.height) * 0.18;
+        const dim = Math.min(this.width, this.height);
+        const baseRadius = dim * 0.22;
+        
+        ctx.globalCompositeOperation = 'lighter';
+        
+        // Inner Core Glow
+        const innerGlow = ctx.createRadialGradient(cx, cy, 0, cx, cy, baseRadius * (1 + this.energy));
+        innerGlow.addColorStop(0, `hsla(${this.hueOffset}, 90%, 60%, ${0.15 + this.energy * 0.2})`);
+        innerGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = innerGlow;
+        ctx.beginPath();
+        ctx.arc(cx, cy, baseRadius * 1.5, 0, Math.PI * 2);
+        ctx.fill();
 
-        const bars = 160;
-        const rotation = timestamp * 0.00028;
+        // Reactive Kaleidoscope Bars
+        const bars = 180;
+        const rotation = timestamp * 0.0003;
 
         for (let i = 0; i < bars; i++) {
-            const idx = Math.floor(Math.pow(i / bars, 1.3) * (this.bufferLength * 0.9));
-            const value = this.smoothedBins[idx] || 0;
-            const boost = Math.pow(value, 1.25);
-            const length = boost * Math.min(this.width, this.height) * 0.26;
-
             const angle = (i / bars) * Math.PI * 2 + rotation;
-            const inner = baseRadius;
-            const outer = inner + length;
+            const index = Math.floor(Math.pow(i / bars, 1.4) * (this.bufferLength * 0.9));
+            const value = this.smoothedBins[index] || 0;
+            
+            const barLen = Math.max(4, Math.pow(value, 1.1) * dim * 0.32);
+            const hue = (this.hueOffset + i * (360 / bars)) % 360;
 
-            const x1 = cx + Math.cos(angle) * inner;
-            const y1 = cy + Math.sin(angle) * inner;
-            const x2 = cx + Math.cos(angle) * outer;
-            const y2 = cy + Math.sin(angle) * outer;
+            const x1 = cx + Math.cos(angle) * baseRadius;
+            const y1 = cy + Math.sin(angle) * baseRadius;
+            const x2 = cx + Math.cos(angle) * (baseRadius + barLen);
+            const y2 = cy + Math.sin(angle) * (baseRadius + barLen);
 
-            const hue = (this.hueOffset + i * 2.1) % 360;
-            ctx.strokeStyle = `hsla(${hue}, 95%, 66%, 0.95)`;
-            ctx.lineWidth = 2.2;
+            ctx.strokeStyle = `hsla(${hue}, 100%, 75%, ${0.6 + value * 0.4})`;
+            ctx.lineWidth = 1.5 + value * 4;
+            ctx.lineCap = 'round';
             ctx.beginPath();
             ctx.moveTo(x1, y1);
             ctx.lineTo(x2, y2);
             ctx.stroke();
+            
+            // Accent dots at the end of bars
+            if (value > 0.6) {
+                ctx.fillStyle = 'white';
+                ctx.beginPath();
+                ctx.arc(x2, y2, 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
         }
 
-        const pulse = baseRadius * (0.85 + this.energy * 0.75);
-        const ringGradient = ctx.createRadialGradient(cx, cy, pulse * 0.2, cx, cy, pulse);
-        ringGradient.addColorStop(0, 'rgba(34, 211, 238, 0.35)');
-        ringGradient.addColorStop(1, 'rgba(34, 211, 238, 0)');
-        ctx.fillStyle = ringGradient;
+        // Floating Outer Ring
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 10]);
         ctx.beginPath();
-        ctx.arc(cx, cy, pulse, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.24)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.arc(cx, cy, baseRadius, 0, Math.PI * 2);
+        ctx.arc(cx, cy, baseRadius + 10 + this.energy * 40, 0, Math.PI * 2);
         ctx.stroke();
+        ctx.setLineDash([]);
+        
+        ctx.globalCompositeOperation = 'source-over';
     }
 
     seedParticles() {
@@ -388,68 +436,54 @@ class AudioVisualizer {
     }
 
     createParticle(initial = false) {
-        const centerBand = this.height * (0.3 + Math.random() * 0.4);
         return {
-            x: Math.random() * Math.max(this.width, 1),
-            y: initial ? centerBand : this.height + Math.random() * 20,
-            size: 1.2 + Math.random() * 3.4,
-            speedX: (Math.random() - 0.5) * 0.6,
-            speedY: 0.35 + Math.random() * 1.2,
-            alpha: 0.14 + Math.random() * 0.5,
+            x: Math.random() * this.width,
+            y: initial ? Math.random() * this.height : this.height + 50,
+            size: 1.5 + Math.random() * 4,
+            speedX: (Math.random() - 0.5) * 1.5,
+            speedY: 0.8 + Math.random() * 2.5,
             hue: Math.random() * 360,
-            life: 0.4 + Math.random() * 1.1
+            life: 1.0,
+            decay: 0.002 + Math.random() * 0.008,
+            freqIdx: Math.floor(Math.random() * 128)
         };
     }
 
     drawParticles(timestamp) {
         const ctx = this.canvasCtx;
-        const bassEnergy = this.smoothedBins[4] || this.energy;
-        const lift = 0.35 + bassEnergy * 2.8;
+        ctx.globalCompositeOperation = 'lighter';
 
-        for (let i = 0; i < this.particles.length; i++) {
-            const p = this.particles[i];
-
-            p.x += p.speedX + Math.sin((timestamp * 0.001) + i) * 0.08;
+        this.particles.forEach((p, i) => {
+            const freqVal = this.smoothedBins[p.freqIdx] || 0;
+            const lift = 0.5 + freqVal * 3;
+            
+            p.x += p.speedX + Math.sin(timestamp * 0.001 + i) * 0.5;
             p.y -= p.speedY * lift;
-            p.hue = (p.hue + 0.45 + this.energy * 3.2) % 360;
-            p.alpha *= 0.992;
-            p.life -= 0.007;
+            p.life -= p.decay;
+            p.hue = (p.hue + 1) % 360;
 
-            if (p.y < -20 || p.x < -20 || p.x > this.width + 20 || p.life <= 0.05) {
+            if (p.life <= 0 || p.y < -50) {
                 this.particles[i] = this.createParticle(false);
-                continue;
+                return;
             }
 
-            const glow = 8 + bassEnergy * 26;
-            ctx.fillStyle = `hsla(${p.hue}, 95%, 67%, ${Math.max(0.04, p.alpha)})`;
-            ctx.shadowColor = `hsla(${(p.hue + 20) % 360}, 96%, 70%, 0.52)`;
-            ctx.shadowBlur = glow;
+            const alpha = p.life * (0.3 + freqVal * 0.7);
+            const size = p.size * (1 + freqVal);
+            
+            ctx.shadowBlur = 10 * freqVal;
+            ctx.shadowColor = `hsla(${p.hue}, 100%, 70%, 1)`;
+            ctx.fillStyle = `hsla(${p.hue}, 90%, 75%, ${alpha})`;
             ctx.beginPath();
-            ctx.arc(p.x, p.y, p.size + bassEnergy * 1.8, 0, Math.PI * 2);
+            ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
             ctx.fill();
-        }
+        });
 
         ctx.shadowBlur = 0;
-
-        // Low-end spectrum line for grounding
-        ctx.beginPath();
-        const pointCount = 80;
-        for (let i = 0; i <= pointCount; i++) {
-            const t = i / pointCount;
-            const idx = Math.floor(t * Math.min(120, this.bufferLength - 1));
-            const v = this.smoothedBins[idx] || 0;
-            const x = t * this.width;
-            const y = this.height * 0.88 - v * this.height * 0.26;
-            if (i === 0) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
-        }
-        ctx.strokeStyle = 'rgba(34, 211, 238, 0.55)';
-        ctx.lineWidth = 1.8;
-        ctx.stroke();
+        ctx.globalCompositeOperation = 'source-over';
     }
-
+    
     setVisualizationType(type) {
-        const allowed = new Set(['bars', 'wave', 'circular', 'particles', '3d']);
+        const allowed = new Set(['bars', 'wave', 'circular', 'particles']);
         if (!allowed.has(type)) return;
         this.visualizationType = type;
     }
