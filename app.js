@@ -60,6 +60,7 @@ async function init() {
         loadPinnedPlaylists();
         setupEventListeners();
         initializePlayer();
+        restoreLastPlayedTrack();
 
         await syncVolumeFromSystem({ silent: true });
         startSystemVolumePolling();

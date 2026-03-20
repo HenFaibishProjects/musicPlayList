@@ -26,6 +26,72 @@ function loadTrack(track) {
     if (track.file && track.file.startsWith('http')) {
         setupStreamMetadataMonitoring(track);
     }
+    
+    saveLastPlayedTrack();
+}
+
+function saveLastPlayedTrack() {
+    try {
+        const dataToSave = {
+            currentPlaylist,
+            currentTrackIndex,
+            currentPlaylistContext,
+            playbackOrder,
+            playbackOrderPosition,
+            isShuffle,
+            repeatMode
+        };
+        localStorage.setItem('lidaplay_last_played_state', JSON.stringify(dataToSave));
+    } catch (e) {
+        console.warn('Failed to save last played to local storage:', e);
+    }
+}
+
+function restoreLastPlayedTrack() {
+    try {
+        const stored = localStorage.getItem('lidaplay_last_played_state');
+        if (stored) {
+            const data = JSON.parse(stored);
+            if (data && data.currentPlaylist && data.currentPlaylist.length > 0) {
+                currentPlaylist = data.currentPlaylist;
+                currentTrackIndex = data.currentTrackIndex || 0;
+                currentPlaylistContext = data.currentPlaylistContext || {};
+                playbackOrder = data.playbackOrder || Array.from({length: currentPlaylist.length}, (_, i) => i);
+                playbackOrderPosition = data.playbackOrderPosition || 0;
+                isShuffle = Boolean(data.isShuffle);
+                repeatMode = Number(data.repeatMode) || 0;
+                
+                const shuffleBtn = document.getElementById('shuffleBtn');
+                if (shuffleBtn) shuffleBtn.classList.toggle('active', isShuffle);
+                
+                const repeatBtn = document.getElementById('repeatBtn');
+                const repeatIcon = repeatBtn?.querySelector('i');
+                if (repeatBtn && repeatIcon) {
+                    if (repeatMode === 0) {
+                        repeatBtn.classList.remove('active');
+                        repeatIcon.className = 'fas fa-repeat';
+                    } else if (repeatMode === 1) {
+                        repeatBtn.classList.add('active');
+                        repeatIcon.className = 'fas fa-repeat';
+                    } else {
+                        repeatBtn.classList.add('active');
+                        repeatIcon.className = 'fas fa-repeat-1';
+                    }
+                }
+                
+                const trackToLoad = currentPlaylist[currentTrackIndex];
+                if (trackToLoad) {
+                    loadTrack(trackToLoad);
+                    audioPlayer.pause();
+                    if (audioPlayerB) audioPlayerB.pause();
+                    isPlaying = false;
+                    updatePlayButton();
+                }
+            }
+        }
+    } catch (e) {
+        console.warn('Failed to restore last played from local storage:', e);
+    }
 }
 
 // Monitor stream metadata for live updates (radio stations)
