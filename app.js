@@ -51,9 +51,56 @@ let audioPlayerB = null;
 // Note: escapeHtml, sanitizeColor, sanitizeImageUrl, sanitizeClassList are defined in data.js
 // Note: formatTime is defined in player.js
 
+// ── Loading Screen Stage Messages ──────────────────────────────────────────
+const LOADING_STAGE_MESSAGES = [
+    'Tuning up the frequencies…',
+    'Scanning your music library…',
+    'Sorting beats and rhythms…',
+    'Warming up the equalizer…',
+    'Loading your playlists…',
+    'Syncing genre collections…',
+    'Almost ready to drop the beat…',
+    'Calibrating the soundscape…',
+    'Counting your tracks…',
+    'Preparing the mix…',
+];
+let _loadingMsgIndex = 0;
+let _loadingMsgTimer = null;
+
+function startLoadingMessages() {
+    const el = document.getElementById('loadingStageText');
+    if (!el) return;
+
+    const next = () => {
+        if (!el) return;
+        el.style.opacity = '0';
+        setTimeout(() => {
+            _loadingMsgIndex = (_loadingMsgIndex + 1) % LOADING_STAGE_MESSAGES.length;
+            el.textContent = LOADING_STAGE_MESSAGES[_loadingMsgIndex];
+            el.style.opacity = '0.85';
+        }, 450);
+    };
+
+    el.textContent = LOADING_STAGE_MESSAGES[0];
+    el.style.opacity = '0.85';
+    _loadingMsgTimer = setInterval(next, 1800);
+}
+
+function dismissLoadingScreen() {
+    if (_loadingMsgTimer) { clearInterval(_loadingMsgTimer); _loadingMsgTimer = null; }
+    const screen = document.getElementById('appLoadingScreen');
+    if (screen) {
+        screen.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+        screen.style.opacity = '0';
+        screen.style.transform = 'scale(0.96)';
+        setTimeout(() => { screen.remove(); }, 650);
+    }
+}
+
 // Initialize app
 async function init() {
     try {
+        startLoadingMessages();
         createBackgroundParticles();
         loadPlaybackSpeedFromStorage();
         loadListeningSession();
@@ -85,15 +132,11 @@ async function init() {
 
         setRescanButtonState();
         refreshLibraryUI();
-        
-        // Clear any loading spinners
-        const grid = document.getElementById('folderGrid');
-        const loadingDiv = grid?.querySelector('.loading');
-        if (loadingDiv) {
-            loadingDiv.remove();
-        }
+        dismissLoadingScreen();
+
     } catch (error) {
         console.error('Error loading data:', error);
+        dismissLoadingScreen();
         showError();
     }
 }

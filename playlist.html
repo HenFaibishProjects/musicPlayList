@@ -194,9 +194,57 @@
            
 
             <div class="folder-grid" id="folderGrid">
-                <div class="loading">
-                    <div class="spinner"></div>
-                    <p>Loading your genre and playlist libraries...</p>
+                <div class="loading" id="appLoadingScreen">
+                    <div class="loading-scene">
+
+                        <!-- Orbital rings -->
+                        <div class="loading-orbits">
+                            <div class="orbit orbit-1"></div>
+                            <div class="orbit orbit-2"></div>
+                            <div class="orbit orbit-3"></div>
+                        </div>
+
+                        <!-- Central pulse core -->
+                        <div class="loading-core">
+                            <div class="loading-core-ring"></div>
+                            <div class="loading-core-inner">
+                                <i class="fas fa-headphones"></i>
+                            </div>
+                        </div>
+
+                        <!-- Animated spectrum bars -->
+                        <div class="loading-spectrum">
+                            <div class="ls-bar"></div><div class="ls-bar"></div><div class="ls-bar"></div>
+                            <div class="ls-bar"></div><div class="ls-bar"></div><div class="ls-bar"></div>
+                            <div class="ls-bar"></div><div class="ls-bar"></div><div class="ls-bar"></div>
+                            <div class="ls-bar"></div><div class="ls-bar"></div><div class="ls-bar"></div>
+                            <div class="ls-bar"></div><div class="ls-bar"></div><div class="ls-bar"></div>
+                            <div class="ls-bar"></div><div class="ls-bar"></div><div class="ls-bar"></div>
+                            <div class="ls-bar"></div><div class="ls-bar"></div><div class="ls-bar"></div>
+                            <div class="ls-bar"></div><div class="ls-bar"></div><div class="ls-bar"></div>
+                            <div class="ls-bar"></div><div class="ls-bar"></div><div class="ls-bar"></div>
+                        </div>
+
+                        <!-- Floating music notes -->
+                        <div class="loading-notes">
+                            <span class="note note-1"><i class="fas fa-music"></i></span>
+                            <span class="note note-2"><i class="fas fa-compact-disc"></i></span>
+                            <span class="note note-3"><i class="fas fa-music"></i></span>
+                            <span class="note note-4"><i class="fas fa-headphones-alt"></i></span>
+                            <span class="note note-5"><i class="fas fa-music"></i></span>
+                            <span class="note note-6"><i class="fas fa-compact-disc"></i></span>
+                        </div>
+
+                        <!-- Text content -->
+                        <div class="loading-text-block">
+                            <h2 class="loading-title">LidaMixPlay</h2>
+                            <p class="loading-stage" id="loadingStageText">Tuning up the frequencies...</p>
+                            <div class="loading-dots">
+                                <span></span><span></span><span></span>
+                            </div>
+                        </div>
+
+                    </div>
                 </div>
             </div>
         </main>
