@@ -119,9 +119,31 @@ function openAddGenreModal() {
     const modal = document.getElementById('addGenreModal');
     if (!modal) return;
 
+    resetAddGenreColorUI();
+
     modal.classList.add('show');
     rememberModalFormState('addGenre', 'addGenreForm');
     syncLibraryModalBackgroundLock();
+}
+
+function resetAddGenreColorUI() {
+    const defaultColor = '#6366f1';
+    const valueInput = document.getElementById('addGenreColorValue');
+    const container = document.getElementById('addGenreColorSwatches');
+    if (!valueInput || !container) return;
+
+    valueInput.value = defaultColor;
+    container.querySelectorAll('.genre-swatch').forEach(btn => {
+        const isDefault = btn.dataset.color === defaultColor;
+        btn.classList.toggle('active', isDefault);
+    });
+
+    const customLabel = container.querySelector('.genre-swatch-custom');
+    if (customLabel) {
+        customLabel.classList.remove('active');
+        customLabel.style.backgroundColor = '';
+        customLabel.style.borderColor = '';
+    }
 }
 
 function closeAddGenreModal() {
@@ -185,17 +207,36 @@ function resolveFontAwesomeIconClass(iconValue, fallback = 'fa-music') {
 }
 
 function updateEditGenreColorInputUI(colorValue) {
-    const colorInput = document.getElementById('editGenreColorInput');
-    if (!colorInput) return;
+    const valueInput = document.getElementById('editGenreColorInput');
+    const container = document.getElementById('editGenreColorSwatches');
+    if (!valueInput || !container) return;
 
-    const resolved = String(colorValue || colorInput.value || '#6366f1').trim() || '#6366f1';
-    const isHexColor = /^#(?:[0-9a-fA-F]{3}){1,2}$/.test(resolved);
-    const accent = isHexColor ? resolved : '#6366f1';
-    const accentSoft = `${accent}33`;
+    const color = String(colorValue || valueInput.value || '#6366f1').trim() || '#6366f1';
+    valueInput.value = color;
 
-    colorInput.value = accent;
-    colorInput.style.borderColor = accent;
-    colorInput.style.boxShadow = `0 0 0 3px ${accentSoft}`;
+    // Reset swatches
+    container.querySelectorAll('.genre-swatch').forEach(btn => btn.classList.remove('active'));
+    
+    // Find matching swatch
+    const matchingSwatch = Array.from(container.querySelectorAll('.genre-swatch:not(.genre-swatch-custom)'))
+        .find(swatch => swatch.dataset.color.toLowerCase() === color.toLowerCase());
+
+    const customLabel = container.querySelector('.genre-swatch-custom');
+    const customInput = document.getElementById('editGenreColorCustom');
+
+    if (matchingSwatch) {
+        matchingSwatch.classList.add('active');
+        if (customLabel) {
+            customLabel.style.backgroundColor = '';
+            customLabel.style.borderColor = '';
+        }
+    } else if (customLabel && customInput) {
+        // Must be a custom color
+        customLabel.classList.add('active');
+        customLabel.style.backgroundColor = color;
+        customLabel.style.borderColor = '#fff';
+        customInput.value = color;
+    }
 }
 
 function setGenreIconSelection(iconClass = 'fa-music') {
@@ -379,12 +420,11 @@ function populatePlaylistGenreSelect(genres = [], preferredGenreId = '') {
         select.appendChild(option);
     });
 
-    if (!validGenres.length) {
-        select.disabled = true;
-        if (submitBtn) submitBtn.classList.add('disabled');
-        setFieldStatus('playlistGenreStatus', 'Add at least one genre before creating playlists.', 'warning');
-        return;
-    }
+    // Add "Create new genre" option
+    const newOption = document.createElement('option');
+    newOption.value = '__new__';
+    newOption.textContent = '➕ Create new genre...';
+    select.appendChild(newOption);
 
     select.disabled = false;
     if (submitBtn) submitBtn.classList.remove('disabled');
@@ -430,6 +470,7 @@ async function addGenreFromUI(event) {
     const name = document.getElementById('genreNameInput')?.value?.trim();
     const imageUrl = document.getElementById('genreImageInput')?.value?.trim();
     const description = document.getElementById('genreDescriptionInput')?.value?.trim();
+    const color = document.getElementById('addGenreColorValue')?.value?.trim() || '#6366f1';
 
     if (!name) {
         showNotification('Missing Genre Name', 'Please enter a genre name.', 'warning');
@@ -443,7 +484,8 @@ async function addGenreFromUI(event) {
             body: JSON.stringify({
                 name,
                 imageUrl,
-                description
+                description,
+                color
             })
         });
 
@@ -491,12 +533,43 @@ async function addPlaylistFromUI(event) {
         return;
     }
 
-    const genreId = document.getElementById('playlistGenreSelect')?.value?.trim();
+    let genreId = document.getElementById('playlistGenreSelect')?.value?.trim();
     const name = document.getElementById('playlistNameInput')?.value?.trim();
     const artists = document.getElementById('playlistArtistsInput')?.value?.trim();
     const folderPath = document.getElementById('playlistPathInput')?.value?.trim();
     const coverImage = document.getElementById('playlistCoverInput')?.value?.trim();
     const isFavorite = Boolean(document.getElementById('playlistFavoriteInput')?.checked);
+
+    if (genreId === '__new__') {
+        const newGenreName = document.getElementById('playlistNewGenreNameInput')?.value?.trim();
+        const newGenreColor = document.getElementById('playlistNewGenreColorValue')?.value?.trim() || '#6366f1';
+        
+        if (!newGenreName) {
+            showNotification('Missing Genre Name', 'Please enter a name for the new genre.', 'warning');
+            return;
+        }
+
+        try {
+            const payload = await apiRequest('http://localhost:3000/api/genres', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: newGenreName,
+                    color: newGenreColor
+                })
+            });
+            
+            if (payload?.genre?.id) {
+                genreId = payload.genre.id;
+            } else {
+                throw new Error('Failed to retrieve new genre ID');
+            }
+        } catch (error) {
+            console.error('Failed to create genre during playlist add:', error);
+            showNotification('Genre Creation Failed', error.message || 'Unable to create the new genre.', 'error');
+            return;
+        }
+    }
 
     if (!genreId) {
         setFieldStatus('playlistGenreStatus', 'Please choose an existing genre before adding a playlist.', 'warning');

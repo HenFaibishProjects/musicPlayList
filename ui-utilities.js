@@ -458,8 +458,21 @@ function setupEventListeners() {
 
     const playlistGenreSelect = document.getElementById('playlistGenreSelect');
     if (playlistGenreSelect) {
-        playlistGenreSelect.addEventListener('change', () => {
+        playlistGenreSelect.addEventListener('change', (e) => {
             setFieldStatus('playlistGenreStatus', '');
+            
+            // Handle Create New Genre fields visibility
+            const newGenreRow = document.getElementById('playlistNewGenreNameRow');
+            const newGenreColorRow = document.getElementById('playlistNewGenreColorRow');
+            if (newGenreRow && newGenreColorRow) {
+                if (e.target.value === '__new__') {
+                    newGenreRow.classList.remove('hidden');
+                    newGenreColorRow.classList.remove('hidden');
+                } else {
+                    newGenreRow.classList.add('hidden');
+                    newGenreColorRow.classList.add('hidden');
+                }
+            }
         });
     }
 
@@ -652,13 +665,65 @@ function setupEventListeners() {
     if (importGenreSelect) {
         importGenreSelect.addEventListener('change', (e) => {
             const newGenreRow = document.getElementById('newGenreNameRow');
+            const newGenreColorRow = document.getElementById('newGenreColorRow');
             if (e.target.value === '__new__') {
                 newGenreRow.classList.remove('hidden');
+                newGenreColorRow.classList.remove('hidden');
             } else {
                 newGenreRow.classList.add('hidden');
+                newGenreColorRow.classList.add('hidden');
             }
         });
     }
+
+
+
+    // ── Genre Color Swatch Picker Logic ────────────────────────────────────
+    function setupGenreColorSwatchLogic(swatchContainerId, valueInputId, customInputId) {
+        const container = document.getElementById(swatchContainerId);
+        const valueInput = document.getElementById(valueInputId);
+        const customInput = document.getElementById(customInputId);
+
+        if (!container || !valueInput || !customInput) return;
+
+        container.addEventListener('click', (e) => {
+            const swatch = e.target.closest('.genre-swatch');
+            if (swatch && !swatch.classList.contains('genre-swatch-custom')) {
+                const color = swatch.dataset.color;
+                valueInput.value = color;
+                
+                container.querySelectorAll('.genre-swatch').forEach(btn => btn.classList.remove('active'));
+                swatch.classList.add('active');
+                
+                // Reset custom label if needed
+                const customLabel = container.querySelector('.genre-swatch-custom');
+                if (customLabel) {
+                    customLabel.style.backgroundColor = '';
+                    customLabel.style.borderColor = '';
+                }
+            }
+        });
+
+        customInput.addEventListener('input', (e) => {
+            const color = e.target.value;
+            valueInput.value = color;
+            
+            const customLabel = customInput.closest('.genre-swatch-custom');
+            if (customLabel) {
+                customLabel.style.backgroundColor = color;
+                customLabel.style.borderColor = '#fff';
+                
+                container.querySelectorAll('.genre-swatch').forEach(btn => btn.classList.remove('active'));
+                customLabel.classList.add('active');
+            }
+        });
+    }
+
+    // Initialize logic for all modals
+    setupGenreColorSwatchLogic('genreColorSwatches', 'newGenreColorValue', 'newGenreColorCustom');
+    setupGenreColorSwatchLogic('addGenreColorSwatches', 'addGenreColorValue', 'addGenreColorCustom');
+    setupGenreColorSwatchLogic('editGenreColorSwatches', 'editGenreColorInput', 'editGenreColorCustom');
+    setupGenreColorSwatchLogic('playlistNewGenreColorSwatches', 'playlistNewGenreColorValue', 'playlistNewGenreColorCustom');
 
     const breadcrumb = document.getElementById('breadcrumb');
     if (breadcrumb) {

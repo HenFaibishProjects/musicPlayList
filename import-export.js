@@ -62,6 +62,25 @@ function openFileBrowserForM3U() {
     });
 }
 
+// Curated genre color palette — same vibrant hues used by hand-crafted genres
+const IMPORT_GENRE_COLORS = [
+    '#6366f1', // indigo
+    '#8b5cf6', // violet
+    '#ec4899', // pink
+    '#f43f5e', // rose
+    '#f97316', // orange
+    '#eab308', // amber
+    '#22c55e', // green
+    '#14b8a6', // teal
+    '#06b6d4', // cyan
+    '#3b82f6', // blue
+    '#a855f7', // purple
+    '#ef4444', // red
+];
+function pickImportGenreColor() {
+    return IMPORT_GENRE_COLORS[Math.floor(Math.random() * IMPORT_GENRE_COLORS.length)];
+}
+
 // Imported playlist management
 function getImportedPlaylistRecordsFromLegacyPayload(payload) {
     const records = [];
@@ -245,8 +264,8 @@ async function mergeImportedPlaylistsIntoLibrary(payload) {
             genre = {
                 id: record.genreId || `imported-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
                 name: record.genreName || 'Imported',
-                icon: 'fa-file-import',
-                color: '#10b981',
+                icon: 'fa-compact-disc',
+                color: pickImportGenreColor(),
                 description: 'Imported playlists',
                 subfolders: []
             };
@@ -410,14 +429,6 @@ function populateImportGenreSelect() {
         select.remove(2);
     }
 
-    // Add "Create new genre" option
-    const newGenreOption = document.createElement('option');
-    newGenreOption.value = '__new__';
-    newGenreOption.textContent = '➕ Create new genre...';
-    if (select.options.length === 1) {
-        select.appendChild(newGenreOption);
-    }
-
     // Add genre options from existing genres
     genres.forEach(genre => {
         const option = document.createElement('option');
@@ -425,6 +436,18 @@ function populateImportGenreSelect() {
         option.textContent = genre.name;
         select.appendChild(option);
     });
+
+
+    // Add "Create new genre" option
+    const newGenreOption1 = document.createElement('option');
+    newGenreOption1.value = '__new__';
+    newGenreOption1.textContent = '➕ Create new genre...';
+    if (select.options.length === 1) {
+        select.appendChild(newGenreOption1);
+    }
+
+    select.appendChild(newGenreOption1);
+    
 }
 
 function toggleImportMethod(method) {
@@ -627,7 +650,8 @@ async function importM3UPlaylist(event) {
             
             // Create new genre
             progressText.textContent = 'Creating new genre...';
-            targetGenreId = await createGenreForImport(newGenreName);
+            const newGenreColor = document.getElementById('newGenreColorValue').value;
+            targetGenreId = await createGenreForImport(newGenreName, newGenreColor);
         }
         
         progressFill.style.width = '60%';
@@ -686,14 +710,15 @@ async function importM3UPlaylist(event) {
     }
 }
 
-async function createGenreForImport(genreName) {
+async function createGenreForImport(genreName, color) {
+    const finalColor = color || pickImportGenreColor();
     if (!apiAvailable) {
         // Fallback: create locally
         const newGenre = {
             id: `imported-${Date.now()}`,
             name: genreName,
-            icon: 'fa-file-import',
-            color: '#10b981',
+            icon: 'fa-compact-disc',
+            color: finalColor,
             description: 'Imported from M3U',
             subfolders: []
         };
@@ -712,8 +737,8 @@ async function createGenreForImport(genreName) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             name: genreName,
-            icon: 'fa-file-import',
-            color: '#10b981',
+            icon: 'fa-compact-disc',
+            color: finalColor,
             description: 'Imported from M3U'
         })
     });

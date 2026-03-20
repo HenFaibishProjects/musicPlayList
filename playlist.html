@@ -355,6 +355,29 @@
                                 <label for="genreDescriptionInput">Description</label>
                                 <input type="text" id="genreDescriptionInput" placeholder="Calm, atmospheric textures">
                             </div>
+
+                            <div class="library-form-row">
+                                <label>Genre Color *</label>
+                                <div class="genre-color-swatches" id="addGenreColorSwatches">
+                                    <button type="button" class="genre-swatch active" data-color="#6366f1" style="background:#6366f1;" title="Indigo"></button>
+                                    <button type="button" class="genre-swatch" data-color="#8b5cf6" style="background:#8b5cf6;" title="Violet"></button>
+                                    <button type="button" class="genre-swatch" data-color="#ec4899" style="background:#ec4899;" title="Pink"></button>
+                                    <button type="button" class="genre-swatch" data-color="#f43f5e" style="background:#f43f5e;" title="Rose"></button>
+                                    <button type="button" class="genre-swatch" data-color="#f97316" style="background:#f97316;" title="Orange"></button>
+                                    <button type="button" class="genre-swatch" data-color="#eab308" style="background:#eab308;" title="Amber"></button>
+                                    <button type="button" class="genre-swatch" data-color="#22c55e" style="background:#22c55e;" title="Green"></button>
+                                    <button type="button" class="genre-swatch" data-color="#14b8a6" style="background:#14b8a6;" title="Teal"></button>
+                                    <button type="button" class="genre-swatch" data-color="#06b6d4" style="background:#06b6d4;" title="Cyan"></button>
+                                    <button type="button" class="genre-swatch" data-color="#3b82f6" style="background:#3b82f6;" title="Blue"></button>
+                                    <button type="button" class="genre-swatch" data-color="#a855f7" style="background:#a855f7;" title="Purple"></button>
+                                    <button type="button" class="genre-swatch" data-color="#ef4444" style="background:#ef4444;" title="Red"></button>
+                                    <label class="genre-swatch genre-swatch-custom" title="Custom color">
+                                        <i class="fas fa-palette"></i>
+                                        <input type="color" id="addGenreColorCustom" value="#6366f1" style="opacity:0;position:absolute;width:0;height:0;">
+                                    </label>
+                                </div>
+                                <input type="hidden" id="addGenreColorValue" value="#6366f1">
+                            </div>
                             <button type="submit" class="btn library-submit-btn">
                                 <i class="fas fa-plus-circle"></i>
                                 <span>Add Genre</span>
@@ -397,7 +420,34 @@
                                 </select>
                                 <div class="library-field-status" id="playlistGenreStatus" role="status" aria-live="polite"></div>
                             </div>
-                            <div class="library-form-row">
+
+                            <div class="library-form-row hidden" id="playlistNewGenreNameRow">
+                                <label for="playlistNewGenreNameInput">New Genre Name *</label>
+                                <input type="text" id="playlistNewGenreNameInput" placeholder="e.g. Brazilian Jazz, Retro Synth...">
+                            </div>
+
+                            <div class="library-form-row hidden" id="playlistNewGenreColorRow">
+                                <label>Genre Color *</label>
+                                <div class="genre-color-swatches" id="playlistNewGenreColorSwatches">
+                                    <button type="button" class="genre-swatch active" data-color="#6366f1" style="background:#6366f1;" title="Indigo"></button>
+                                    <button type="button" class="genre-swatch" data-color="#8b5cf6" style="background:#8b5cf6;" title="Violet"></button>
+                                    <button type="button" class="genre-swatch" data-color="#ec4899" style="background:#ec4899;" title="Pink"></button>
+                                    <button type="button" class="genre-swatch" data-color="#f43f5e" style="background:#f43f5e;" title="Rose"></button>
+                                    <button type="button" class="genre-swatch" data-color="#f97316" style="background:#f97316;" title="Orange"></button>
+                                    <button type="button" class="genre-swatch" data-color="#eab308" style="background:#eab308;" title="Amber"></button>
+                                    <button type="button" class="genre-swatch" data-color="#22c55e" style="background:#22c55e;" title="Green"></button>
+                                    <button type="button" class="genre-swatch" data-color="#14b8a6" style="background:#14b8a6;" title="Teal"></button>
+                                    <button type="button" class="genre-swatch" data-color="#06b6d4" style="background:#06b6d4;" title="Cyan"></button>
+                                    <button type="button" class="genre-swatch" data-color="#3b82f6" style="background:#3b82f6;" title="Blue"></button>
+                                    <button type="button" class="genre-swatch" data-color="#a855f7" style="background:#a855f7;" title="Purple"></button>
+                                    <button type="button" class="genre-swatch" data-color="#ef4444" style="background:#ef4444;" title="Red"></button>
+                                    <label class="genre-swatch genre-swatch-custom" title="Custom color">
+                                        <i class="fas fa-palette"></i>
+                                        <input type="color" id="playlistNewGenreColorCustom" value="#6366f1" style="opacity:0;position:absolute;width:0;height:0;">
+                                    </label>
+                                </div>
+                                <input type="hidden" id="playlistNewGenreColorValue" value="#6366f1">
+                            </div><div class="library-form-row">
                                 <label for="playlistNameInput">Playlist Name *</label>
                                 <input type="text" id="playlistNameInput" placeholder="Example: Chill House" required>
                             </div>
@@ -533,8 +583,26 @@
                                 </div>
                             </div>
                             <div class="library-form-row">
-                                <label for="editGenreColorInput">Accent Color</label>
-                                <input type="color" id="editGenreColorInput" value="#6366f1">
+                                <label>Accent Color *</label>
+                                <div class="genre-color-swatches" id="editGenreColorSwatches">
+                                    <button type="button" class="genre-swatch active" data-color="#6366f1" style="background:#6366f1;" title="Indigo"></button>
+                                    <button type="button" class="genre-swatch" data-color="#8b5cf6" style="background:#8b5cf6;" title="Violet"></button>
+                                    <button type="button" class="genre-swatch" data-color="#ec4899" style="background:#ec4899;" title="Pink"></button>
+                                    <button type="button" class="genre-swatch" data-color="#f43f5e" style="background:#f43f5e;" title="Rose"></button>
+                                    <button type="button" class="genre-swatch" data-color="#f97316" style="background:#f97316;" title="Orange"></button>
+                                    <button type="button" class="genre-swatch" data-color="#eab308" style="background:#eab308;" title="Amber"></button>
+                                    <button type="button" class="genre-swatch" data-color="#22c55e" style="background:#22c55e;" title="Green"></button>
+                                    <button type="button" class="genre-swatch" data-color="#14b8a6" style="background:#14b8a6;" title="Teal"></button>
+                                    <button type="button" class="genre-swatch" data-color="#06b6d4" style="background:#06b6d4;" title="Cyan"></button>
+                                    <button type="button" class="genre-swatch" data-color="#3b82f6" style="background:#3b82f6;" title="Blue"></button>
+                                    <button type="button" class="genre-swatch" data-color="#a855f7" style="background:#a855f7;" title="Purple"></button>
+                                    <button type="button" class="genre-swatch" data-color="#ef4444" style="background:#ef4444;" title="Red"></button>
+                                    <label class="genre-swatch genre-swatch-custom" title="Custom color">
+                                        <i class="fas fa-palette"></i>
+                                        <input type="color" id="editGenreColorCustom" value="#6366f1" style="opacity:0;position:absolute;width:0;height:0;">
+                                    </label>
+                                </div>
+                                <input type="hidden" id="editGenreColorInput" value="#6366f1">
                             </div>
                             <div class="library-form-row">
                                 <label for="editGenreDescriptionInput">Description</label>
@@ -712,7 +780,31 @@
                         <label for="newGenreNameInput">New Genre Name *</label>
                         <input type="text" id="newGenreNameInput" placeholder="e.g. Radio Streams, Jazz Hits...">
                     </div>
-                    
+
+                    <div class="library-form-row hidden" id="newGenreColorRow">
+                        <label>Genre Color *</label>
+                        <div class="genre-color-swatches" id="genreColorSwatches">
+                            <button type="button" class="genre-swatch active" data-color="#6366f1" style="background:#6366f1;" title="Indigo"></button>
+                            <button type="button" class="genre-swatch" data-color="#8b5cf6" style="background:#8b5cf6;" title="Violet"></button>
+                            <button type="button" class="genre-swatch" data-color="#ec4899" style="background:#ec4899;" title="Pink"></button>
+                            <button type="button" class="genre-swatch" data-color="#f43f5e" style="background:#f43f5e;" title="Rose"></button>
+                            <button type="button" class="genre-swatch" data-color="#f97316" style="background:#f97316;" title="Orange"></button>
+                            <button type="button" class="genre-swatch" data-color="#eab308" style="background:#eab308;" title="Amber"></button>
+                            <button type="button" class="genre-swatch" data-color="#22c55e" style="background:#22c55e;" title="Green"></button>
+                            <button type="button" class="genre-swatch" data-color="#14b8a6" style="background:#14b8a6;" title="Teal"></button>
+                            <button type="button" class="genre-swatch" data-color="#06b6d4" style="background:#06b6d4;" title="Cyan"></button>
+                            <button type="button" class="genre-swatch" data-color="#3b82f6" style="background:#3b82f6;" title="Blue"></button>
+                            <button type="button" class="genre-swatch" data-color="#a855f7" style="background:#a855f7;" title="Purple"></button>
+                            <button type="button" class="genre-swatch" data-color="#ef4444" style="background:#ef4444;" title="Red"></button>
+                            <label class="genre-swatch genre-swatch-custom" title="Custom color">
+                                <i class="fas fa-palette"></i>
+                                <input type="color" id="newGenreColorCustom" value="#6366f1" style="opacity:0;position:absolute;width:0;height:0;">
+                            </label>
+                        </div>
+                        <input type="hidden" id="newGenreColorValue" value="#6366f1">
+                    </div>
+
+
                     <div class="library-form-row">
                         <label for="importPlaylistName">Playlist Name *</label>
                         <input type="text" id="importPlaylistName" placeholder="e.g., My Radio Stations" required>

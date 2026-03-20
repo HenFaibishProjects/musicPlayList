@@ -207,6 +207,15 @@
         "imageUrl": null,
         "description": "",
         "subfolders": []
+      },
+      {
+        "id": "genre-newgenreeeeeeeeeee-mmyx98hf",
+        "name": "newgenreeeeeeeeeee",
+        "icon": "fa-file-import",
+        "color": "#10b981",
+        "imageUrl": null,
+        "description": "Imported from M3U",
+        "subfolders": []
       }
     ]
   }
