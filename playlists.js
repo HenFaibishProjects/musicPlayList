@@ -593,9 +593,13 @@ function createPlaylistCard(playlist, color, index, genreName = '') {
     card.style.animationDelay = `${index * 0.1}s`;
     card.style.setProperty('--card-color', color);
 
+    // Check if playlist has a custom cover image URL
+    const hasPlaylistImage = Boolean(String(playlist.imageUrl || playlist.coverImage || '').trim());
+    const playlistImageUrl = hasPlaylistImage ? sanitizeImageUrl(playlist.imageUrl || playlist.coverImage) : '';
+
     const playlistImages = Array.isArray(playlist.images) ? playlist.images : [];
     const safeImages = (playlistImages.length ? playlistImages : [DEFAULT_COVER, DEFAULT_COVER, DEFAULT_COVER, DEFAULT_COVER]).slice(0, 4);
-    const imagesHTML = safeImages.map(img => `<img src="${img}" alt="Album cover">`).join('');
+    const imagesHTML = safeImages.map(img => `<img src="${sanitizeImageUrl(img)}" alt="Album cover">`).join('');
     
     card.innerHTML = `
         <div class="playlist-card-actions">
@@ -614,11 +618,12 @@ function createPlaylistCard(playlist, color, index, genreName = '') {
                 <i class="fas fa-play"></i>
             </div>
         </div>
+        ${hasPlaylistImage ? `<div class="genre-cover"><img src="${playlistImageUrl}" alt="${escapeHtml(playlist.name || 'Playlist')} artwork"></div>` : ''}
         <div class="card-icon" style="background: linear-gradient(135deg, ${color}22, ${color}11);">
             <i class="fas fa-compact-disc" style="color: ${color}"></i>
         </div>
-        <h3 class="card-title">${playlist.name}</h3>
-        <p class="card-description">${playlist.artists}</p>
+        <h3 class="card-title">${escapeHtml(playlist.name)}</h3>
+        <p class="card-description">${escapeHtml(playlist.artists)}</p>
         <div class="image-grid">
             ${imagesHTML}
         </div>

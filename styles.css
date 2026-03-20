@@ -3448,6 +3448,23 @@ input[type="color"]#editGenreColorInput {
     box-shadow: 0 6px 24px rgba(96, 165, 250, 0.6);
 }
 
+/* File items (shown in file-selection mode) get a teal/green accent */
+.folder-item.file-item .folder-item-icon {
+    background: linear-gradient(135deg, #10b981, #059669);
+}
+
+.folder-item.file-item .folder-item-name {
+    color: #a7f3d0;
+}
+
+.folder-item.file-item:hover {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(5, 150, 105, 0.15));
+}
+
+.folder-item.file-item.selected {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.3), rgba(5, 150, 105, 0.2));
+}
+
 .folder-item.drive .folder-item-icon {
     background: var(--gradient-secondary);
 }

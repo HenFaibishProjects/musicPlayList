@@ -642,9 +642,10 @@ function setupEventListeners() {
 
     const fileInputDisplay = document.getElementById('fileInputDisplay');
     if (fileInputDisplay) {
-        fileInputDisplay.addEventListener('click', () => {
-            document.getElementById('m3uFileInput').click();
-        });
+        // Use the amazing folder-browser modal in file-selection mode instead of
+        // the native OS file picker.  openFileBrowserForM3U() falls back to the
+        // native input automatically when the API is offline.
+        fileInputDisplay.addEventListener('click', openFileBrowserForM3U);
     }
 
     const importGenreSelect = document.getElementById('importGenreSelect');

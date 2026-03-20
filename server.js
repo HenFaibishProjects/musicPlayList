@@ -232,8 +232,10 @@ function normalizeLibraryStructure(input) {
                     isFavorite: (typeof subfolder.isFavorite === 'boolean')
                         ? subfolder.isFavorite
                         : String(subfolder.isFavorite || '').toLowerCase() === 'true',
+                    // Support both imageUrl and coverImage for backward compatibility
+                    imageUrl: (typeof subfolder.imageUrl === 'string' && subfolder.imageUrl.trim()) ? subfolder.imageUrl.trim() : null,
                     coverImage: subfolder.coverImage || null,
-                    images: Array.isArray(subfolder.images) ? subfolder.images : (subfolder.coverImage ? [subfolder.coverImage] : [])
+                    images: Array.isArray(subfolder.images) ? subfolder.images : ((subfolder.imageUrl || subfolder.coverImage) ? [subfolder.imageUrl || subfolder.coverImage] : [])
                 }))
             }))
         }
@@ -712,9 +714,15 @@ app.get('/api/genres', async (req, res) => {
 });
 
 // API: Browse directories (for modern folder browser)
+// Supports ?includeFiles=true&extensions=.m3u,.m3u8,.pls to also list files
 app.get('/api/browse-directories', async (req, res) => {
     try {
         const requestedPath = req.query.path || '';
+        const includeFiles = ['1', 'true'].includes(String(req.query.includeFiles || '').toLowerCase());
+        const filterExtensions = req.query.extensions
+            ? String(req.query.extensions).split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
+            : [];
+
         const basePath = requestedPath ? path.resolve(requestedPath) : (process.platform === 'win32' ? '' : path.resolve('/'));
 
         // For Windows, if no path, return available drives
@@ -728,7 +736,8 @@ app.get('/api/browse-directories', async (req, res) => {
                         name: drive,
                         path: drive,
                         type: 'drive',
-                        isDirectory: true
+                        isDirectory: true,
+                        isFile: false
                     });
                 } catch {
                     // Drive not available
@@ -756,22 +765,37 @@ app.get('/api/browse-directories', async (req, res) => {
 
         // Read directory contents
         const entries = await fs.readdir(basePath, { withFileTypes: true });
-        const items = [];
+        const folders = [];
+        const files = [];
 
         for (const entry of entries) {
+            const fullPath = path.join(basePath, entry.name);
             if (entry.isDirectory()) {
-                const fullPath = path.join(basePath, entry.name);
-                items.push({
+                folders.push({
                     name: entry.name,
                     path: fullPath,
                     type: 'folder',
-                    isDirectory: true
+                    isDirectory: true,
+                    isFile: false
                 });
+            } else if (includeFiles && entry.isFile()) {
+                const ext = path.extname(entry.name).toLowerCase();
+                if (filterExtensions.length === 0 || filterExtensions.includes(ext)) {
+                    files.push({
+                        name: entry.name,
+                        path: fullPath,
+                        type: 'file',
+                        isDirectory: false,
+                        isFile: true
+                    });
+                }
             }
         }
 
-        // Sort folders alphabetically
-        items.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+        // Sort each group alphabetically, then merge folders first then files
+        folders.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+        files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+        const items = [...folders, ...files];
 
         // Determine parent path
         const parentPath = basePath !== path.parse(basePath).root ? path.dirname(basePath) : null;
@@ -784,6 +808,42 @@ app.get('/api/browse-directories', async (req, res) => {
     } catch (error) {
         console.error('Error browsing directories:', error);
         res.status(500).json({ error: error.message || 'Failed to browse directories' });
+    }
+});
+
+// API: Read M3U/M3U8/PLS file content by server-side path
+app.get('/api/read-m3u', async (req, res) => {
+    try {
+        const requestedPath = req.query.path;
+        if (!requestedPath || typeof requestedPath !== 'string') {
+            return res.status(400).json({ error: 'Missing file path' });
+        }
+
+        const resolvedPath = path.resolve(requestedPath);
+        const ext = path.extname(resolvedPath).toLowerCase();
+
+        if (!['.m3u', '.m3u8', '.pls'].includes(ext)) {
+            return res.status(400).json({ error: 'Only .m3u, .m3u8, and .pls files are supported' });
+        }
+
+        try {
+            const stat = await fs.stat(resolvedPath);
+            if (!stat.isFile()) {
+                return res.status(400).json({ error: 'Path is not a file' });
+            }
+        } catch (error) {
+            if (error.code === 'ENOENT') {
+                return res.status(404).json({ error: 'File not found' });
+            }
+            throw error;
+        }
+
+        const content = await fs.readFile(resolvedPath, 'utf-8');
+        res.set('Content-Type', 'text/plain; charset=utf-8');
+        res.send(content);
+    } catch (error) {
+        console.error('Error reading M3U file:', error);
+        res.status(500).json({ error: error.message || 'Failed to read file' });
     }
 });
 
@@ -972,7 +1032,7 @@ app.patch('/api/genres/:id', async (req, res) => {
 // API: Add playlist folder mapping
 app.post('/api/playlists', async (req, res) => {
     try {
-        const { genreId, genre, genreName, name, artists, folderPath, coverImage, isFavorite } = req.body || {};
+        const { genreId, genre, genreName, name, artists, folderPath, coverImage, imageUrl, isFavorite } = req.body || {};
         const requestedGenreName = (typeof genre === 'string' && genre.trim())
             ? genre.trim()
             : ((typeof genreName === 'string' && genreName.trim()) ? genreName.trim() : null);
@@ -1033,6 +1093,9 @@ app.post('/api/playlists', async (req, res) => {
             structure.library.folders.push(targetGenre);
         }
 
+        // Use imageUrl if provided, otherwise fall back to coverImage for backward compatibility
+        const playlistImageUrl = (imageUrl && String(imageUrl).trim()) || (coverImage && String(coverImage).trim()) || null;
+
         const newPlaylist = {
             id: createId('playlist', name),
             name: name.trim(),
@@ -1040,8 +1103,9 @@ app.post('/api/playlists', async (req, res) => {
             path: normalizedFolderPath,
             link: normalizedFolderPath,
             isFavorite: Boolean(isFavorite),
-            coverImage: (coverImage && String(coverImage).trim()) || null,
-            images: coverImage ? [coverImage] : []
+            imageUrl: playlistImageUrl,
+            coverImage: playlistImageUrl, // Keep for backward compatibility
+            images: playlistImageUrl ? [playlistImageUrl] : []
         };
 
         targetGenre.subfolders.push(newPlaylist);
@@ -1059,7 +1123,7 @@ app.post('/api/playlists', async (req, res) => {
 app.patch('/api/playlists/:id', async (req, res) => {
     try {
         const playlistId = req.params.id;
-        const { name, artists, folderPath, coverImage, isFavorite } = req.body || {};
+        const { name, artists, folderPath, coverImage, imageUrl, isFavorite } = req.body || {};
 
         const structure = await loadLibraryStructure();
         const found = findPlaylistInStructure(structure, playlistId);
@@ -1072,9 +1136,10 @@ app.patch('/api/playlists/:id', async (req, res) => {
         const hasArtists = typeof artists === 'string';
         const hasFolderPath = typeof folderPath === 'string';
         const hasCoverImage = typeof coverImage === 'string' || coverImage === null;
+        const hasImageUrl = typeof imageUrl === 'string' || imageUrl === null;
         const hasIsFavorite = typeof isFavorite === 'boolean';
 
-        if (!hasName && !hasArtists && !hasFolderPath && !hasCoverImage && !hasIsFavorite) {
+        if (!hasName && !hasArtists && !hasFolderPath && !hasCoverImage && !hasImageUrl && !hasIsFavorite) {
             return res.status(400).json({ error: 'No playlist fields provided to update' });
         }
 
@@ -1115,10 +1180,15 @@ app.patch('/api/playlists/:id', async (req, res) => {
             found.playlist.link = normalizedFolderPath;
         }
 
-        if (hasCoverImage) {
-            const nextCover = typeof coverImage === 'string' ? coverImage.trim() : '';
-            found.playlist.coverImage = nextCover || null;
-            found.playlist.images = nextCover ? [nextCover] : [];
+        if (hasCoverImage || hasImageUrl) {
+            // Use imageUrl if provided, otherwise fall back to coverImage for backward compatibility
+            const nextImage = hasImageUrl 
+                ? (typeof imageUrl === 'string' ? imageUrl.trim() : '')
+                : (typeof coverImage === 'string' ? coverImage.trim() : '');
+            
+            found.playlist.imageUrl = nextImage || null;
+            found.playlist.coverImage = nextImage || null; // Keep for backward compatibility
+            found.playlist.images = nextImage ? [nextImage] : [];
         }
 
         if (hasIsFavorite) {

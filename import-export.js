@@ -4,6 +4,64 @@
 let currentImportMethod = 'file';
 let importedTracks = [];
 
+// Tracks a server-side file path chosen via the folder-browser modal (file mode).
+// null means no file has been selected via the browser yet (native input will be used instead).
+let selectedM3UFilePath = null;
+
+/**
+ * Read an M3U/M3U8/PLS file from the server by absolute path.
+ * Uses the /api/read-m3u endpoint and the existing parseM3U() parser.
+ */
+async function readM3UFileByPath(filePath) {
+    const response = await fetch(
+        `http://localhost:3000/api/read-m3u?path=${encodeURIComponent(filePath)}`
+    );
+    if (!response.ok) {
+        let errMsg = 'Failed to read M3U file';
+        try {
+            const err = await response.json();
+            errMsg = err.error || errMsg;
+        } catch { /* ignore */ }
+        throw new Error(errMsg);
+    }
+    const content = await response.text();
+    return parseM3U(content);
+}
+
+/**
+ * Open the amazing folder-browser modal in file-selection mode so the user can
+ * pick an M3U/M3U8/PLS file from the filesystem instead of using the native
+ * OS file picker.  Falls back to the native input if the API is offline.
+ */
+function openFileBrowserForM3U() {
+    if (!apiAvailable) {
+        // API offline – fall back to the native file input
+        document.getElementById('m3uFileInput').click();
+        return;
+    }
+
+    openModernFolderBrowser(null, null, {
+        mode: 'file',
+        fileExtensions: ['.m3u', '.m3u8', '.pls'],
+        onFileSelect: (filePath) => {
+            // Store the chosen path so importM3UPlaylist() can use it
+            selectedM3UFilePath = filePath;
+
+            // Update the visual "Choose a file…" display
+            const display = document.getElementById('fileInputDisplay');
+            if (display) {
+                const fileName = filePath.split(/[\\/]/).pop();
+                display.innerHTML = `<i class="fas fa-file-audio"></i><span>${fileName}</span>`;
+                display.classList.add('has-file');
+            }
+
+            // Clear the native file input so it doesn't interfere
+            const fileInput = document.getElementById('m3uFileInput');
+            if (fileInput) fileInput.value = '';
+        }
+    });
+}
+
 // Imported playlist management
 function getImportedPlaylistRecordsFromLegacyPayload(payload) {
     const records = [];
@@ -320,7 +378,8 @@ function openImportM3UModal() {
     const modal = document.getElementById('importM3UModal');
     if (!modal) return;
     
-    // Reset form
+    // Reset form state including the server-side path tracker
+    selectedM3UFilePath = null;
     document.getElementById('importM3UForm').reset();
     document.getElementById('fileInputDisplay').innerHTML = '<i class="fas fa-file-audio"></i><span>Choose a file...</span>';
     document.getElementById('fileInputDisplay').classList.remove('has-file');
@@ -403,7 +462,8 @@ function toggleImportMethod(method) {
         urlRow.classList.remove('hidden');
         if (fileInput) { fileInput.disabled = true; fileInput.value = ''; }
         if (urlInput) urlInput.disabled = false;
-        // Reset file display
+        // Clear the server-side file path and reset display
+        selectedM3UFilePath = null;
         const display = document.getElementById('fileInputDisplay');
         if (display) {
             display.innerHTML = '<i class="fas fa-file-audio"></i><span>Choose a file...</span>';
@@ -522,14 +582,18 @@ async function importM3UPlaylist(event) {
         // Parse M3U
         let tracks = [];
         if (currentImportMethod === 'file') {
-            const fileInput = document.getElementById('m3uFileInput');
-            const file = fileInput.files[0];
-            
-            if (!file) {
-                throw new Error('Please select a file');
+            if (selectedM3UFilePath) {
+                // Chosen via the folder-browser modal — read from server
+                tracks = await readM3UFileByPath(selectedM3UFilePath);
+            } else {
+                // Fall back to native <input type="file">
+                const fileInput = document.getElementById('m3uFileInput');
+                const file = fileInput.files[0];
+                if (!file) {
+                    throw new Error('Please select a file');
+                }
+                tracks = await readM3UFile(file);
             }
-            
-            tracks = await readM3UFile(file);
         } else {
             const urlInput = document.getElementById('m3uUrlInput');
             const url = urlInput.value.trim();

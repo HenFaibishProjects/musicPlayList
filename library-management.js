@@ -6,7 +6,10 @@ let folderBrowserState = {
     currentPath: '',
     selectedPath: null,
     targetInputId: null,
-    onSelect: null
+    statusFieldId: null,
+    mode: 'folder',        // 'folder' | 'file'
+    fileExtensions: [],    // e.g. ['.m3u', '.m3u8', '.pls']
+    onFileSelect: null     // callback(filePath) used in file mode
 };
 
 // IMPORTED_PLAYLISTS_STORAGE_KEY and STREAM_PROXY_PATH are declared in app.js (loaded first)
@@ -305,7 +308,8 @@ function openEditPlaylistModal(playlist, genreName = '') {
     if (nameInput) nameInput.value = playlist.name || '';
     if (artistsInput) artistsInput.value = playlist.artists || '';
     if (pathInput) pathInput.value = playlist.path || playlist.link || '';
-    if (coverInput) coverInput.value = playlist.coverImage || '';
+    // Support both imageUrl and coverImage for backward compatibility
+    if (coverInput) coverInput.value = playlist.imageUrl || playlist.coverImage || '';
     if (favoriteInput) favoriteInput.checked = Boolean(playlist.isFavorite);
 
     modal.classList.add('show');
@@ -469,6 +473,10 @@ async function addGenreFromUI(event) {
         await loadGenreOptionsForPlaylistSelect(createdGenre?.id || '');
 
         showNotification('Genre Added', `Genre "${name}" is now available in the playlist dropdown.`, 'success');
+        setTimeout(() => {
+        closeAddGenreModal();
+        location.reload();
+    }, 2000); 
     } catch (error) {
         console.error('Failed to add genre:', error);
         showNotification('Add Genre Failed', error.message || 'Unable to create this genre right now.', 'error');
@@ -700,17 +708,52 @@ async function browseEditFolderPath() {
 }
 
 // Modern Folder Browser Functions
-async function openModernFolderBrowser(targetInputId, statusFieldId = null) {
+
+/**
+ * Open the modern folder/file browser modal.
+ * @param {string|null} targetInputId - ID of the <input> to populate on selection (folder mode)
+ * @param {string|null} statusFieldId  - ID of status element to update (folder mode)
+ * @param {object}      options        - Optional config:
+ *   options.mode            {string}   'folder' (default) | 'file'
+ *   options.fileExtensions  {string[]} e.g. ['.m3u', '.m3u8', '.pls']
+ *   options.onFileSelect    {Function} callback(filePath) called when a file is confirmed (file mode)
+ */
+async function openModernFolderBrowser(targetInputId, statusFieldId = null, options = {}) {
+    const mode = options.mode || 'folder';
     folderBrowserState = {
         isOpen: true,
         currentPath: '',
         selectedPath: null,
         targetInputId,
-        statusFieldId
+        statusFieldId,
+        mode,
+        fileExtensions: options.fileExtensions || [],
+        onFileSelect: options.onFileSelect || null
     };
 
     const modal = document.getElementById('folderBrowserModal');
     if (!modal) return;
+
+    // Update modal header text to match the current mode
+    const heading     = modal.querySelector('.folder-browser-heading h3');
+    const description = modal.querySelector('.folder-browser-heading p');
+    const kicker      = modal.querySelector('.folder-browser-heading .library-modal-kicker');
+    const selectBtn   = document.getElementById('folderBrowserSelectBtn');
+    const selectedPathDisplay = document.getElementById('folderBrowserSelectedPath');
+
+    if (mode === 'file') {
+        if (heading)     heading.innerHTML   = '<i class="fas fa-file-audio"></i> Select Playlist File';
+        if (description) description.textContent = 'Navigate your filesystem and choose the M3U/M3U8/PLS file to import';
+        if (kicker)      kicker.textContent  = 'File Selection';
+        if (selectBtn)   selectBtn.innerHTML = '<i class="fas fa-check"></i><span>Select File</span>';
+        if (selectedPathDisplay) selectedPathDisplay.textContent = 'No file selected';
+    } else {
+        if (heading)     heading.innerHTML   = '<i class="fas fa-folder-tree"></i> Select Playlist Folder';
+        if (description) description.textContent = 'Navigate your filesystem and choose the folder containing your music files';
+        if (kicker)      kicker.textContent  = 'Folder Selection';
+        if (selectBtn)   selectBtn.innerHTML = '<i class="fas fa-check"></i><span>Select Folder</span>';
+        if (selectedPathDisplay) selectedPathDisplay.textContent = 'No folder selected';
+    }
 
     modal.classList.add('show');
     await loadFolderBrowserDirectory('');
@@ -726,11 +769,14 @@ function closeFolderBrowser() {
         currentPath: '',
         selectedPath: null,
         targetInputId: null,
-        statusFieldId: null
+        statusFieldId: null,
+        mode: 'folder',
+        fileExtensions: [],
+        onFileSelect: null
     };
 }
 
-async function loadFolderBrowserDirectory(path) {
+async function loadFolderBrowserDirectory(dirPath) {
     const container = document.getElementById('folderBrowserContainer');
     const pathInput = document.getElementById('folderBrowserPathInput');
     const selectBtn = document.getElementById('folderBrowserSelectBtn');
@@ -738,35 +784,48 @@ async function loadFolderBrowserDirectory(path) {
     
     if (!container) return;
 
+    const isFileMode = folderBrowserState.mode === 'file';
+    const loadingLabel = isFileMode ? 'Loading files...' : 'Loading folders...';
+
     // Show loading state
     container.innerHTML = `
         <div class="folder-browser-loading">
             <div class="spinner"></div>
-            <p>Loading folders...</p>
+            <p>${loadingLabel}</p>
         </div>
     `;
 
     try {
-        const data = await apiRequest(`http://localhost:3000/api/browse-directories?path=${encodeURIComponent(path)}`);
-        
-        folderBrowserState.currentPath = data.path || '';
-        pathInput.value = data.path || 'Select a drive or folder';
-        
-        // Update UI based on selection
-        if (folderBrowserState.selectedPath === data.path && data.path) {
-            selectBtn.disabled = false;
-            selectedPathDisplay.textContent = data.path;
+        // Build API URL — include files when in file-selection mode
+        let apiUrl = `http://localhost:3000/api/browse-directories?path=${encodeURIComponent(dirPath)}`;
+        if (isFileMode) {
+            apiUrl += '&includeFiles=true';
+            if (folderBrowserState.fileExtensions.length) {
+                apiUrl += `&extensions=${encodeURIComponent(folderBrowserState.fileExtensions.join(','))}`;
+            }
         }
 
-        // Render folder list
+        const data = await apiRequest(apiUrl);
+        
+        folderBrowserState.currentPath = data.path || '';
+        pathInput.value = data.path || (isFileMode ? 'Select a drive or folder' : 'Select a drive or folder');
+        
+        // Keep select button enabled if a path is still selected after navigation
+        if (folderBrowserState.selectedPath && folderBrowserState.selectedPath === data.path && data.path) {
+            selectBtn.disabled = false;
+        }
+
+        // Render item list
         const items = data.items || [];
         
         if (items.length === 0) {
+            const emptyMsg = isFileMode
+                ? `<h4>No Matching Files Found</h4><p>This folder doesn't contain any ${folderBrowserState.fileExtensions.join('/') || 'supported'} files. Try navigating to another folder.</p>`
+                : `<h4>No Subfolders Found</h4><p>This folder doesn't contain any subfolders. You can still select it if it contains music files.</p>`;
             container.innerHTML = `
                 <div class="folder-browser-empty">
                     <i class="fas fa-folder-open"></i>
-                    <h4>No Subfolders Found</h4>
-                    <p>This folder doesn't contain any subfolders. You can still select it if it contains music files.</p>
+                    ${emptyMsg}
                 </div>
             `;
             return;
@@ -776,16 +835,21 @@ async function loadFolderBrowserDirectory(path) {
         listDiv.className = 'folder-browser-list';
 
         items.forEach(item => {
+            const isFile = item.isFile === true || item.type === 'file';
             const folderItem = document.createElement('div');
             folderItem.className = 'folder-item';
-            if (item.type === 'drive') {
-                folderItem.classList.add('drive');
-            }
-            if (folderBrowserState.selectedPath === item.path) {
-                folderItem.classList.add('selected');
-            }
+            if (item.type === 'drive') folderItem.classList.add('drive');
+            if (isFile)               folderItem.classList.add('file-item');
+            if (folderBrowserState.selectedPath === item.path) folderItem.classList.add('selected');
 
-            const iconClass = item.type === 'drive' ? 'fa-hard-drive' : 'fa-folder';
+            let iconClass;
+            if (item.type === 'drive') {
+                iconClass = 'fa-hard-drive';
+            } else if (isFile) {
+                iconClass = 'fa-file-audio';
+            } else {
+                iconClass = 'fa-folder';
+            }
             
             folderItem.innerHTML = `
                 <div class="folder-item-icon">
@@ -800,21 +864,27 @@ async function loadFolderBrowserDirectory(path) {
                 </div>
             `;
 
-            // Single click to select
+            // Single click — always selects the item
             folderItem.addEventListener('click', () => {
-                // Deselect all
                 listDiv.querySelectorAll('.folder-item').forEach(f => f.classList.remove('selected'));
-                // Select this one
                 folderItem.classList.add('selected');
                 folderBrowserState.selectedPath = item.path;
                 selectBtn.disabled = false;
-                selectedPathDisplay.textContent = item.path;
+                selectedPathDisplay.textContent = item.name || item.path;
             });
 
-            // Double click to navigate into folder
-            folderItem.addEventListener('dblclick', () => {
-                loadFolderBrowserDirectory(item.path);
-            });
+            // Double click — navigate into folders only (files don't navigate)
+            if (!isFile) {
+                folderItem.addEventListener('dblclick', () => {
+                    loadFolderBrowserDirectory(item.path);
+                });
+            } else {
+                // Double-click on a file immediately confirms the selection
+                folderItem.addEventListener('dblclick', () => {
+                    folderBrowserState.selectedPath = item.path;
+                    folderBrowserSelectFolder();
+                });
+            }
 
             listDiv.appendChild(folderItem);
         });
@@ -857,6 +927,18 @@ async function folderBrowserGoUp() {
 }
 
 function folderBrowserSelectFolder() {
+    const selectedPath = folderBrowserState.selectedPath;
+
+    // --- File mode: invoke callback, skip input update ---
+    if (folderBrowserState.mode === 'file') {
+        if (selectedPath && typeof folderBrowserState.onFileSelect === 'function') {
+            folderBrowserState.onFileSelect(selectedPath);
+        }
+        closeFolderBrowser();
+        return;
+    }
+
+    // --- Folder mode: populate the target input field ---
     const targetInput = document.getElementById(folderBrowserState.targetInputId);
     const statusFieldId = folderBrowserState.statusFieldId;
     
@@ -865,11 +947,11 @@ function folderBrowserSelectFolder() {
         return;
     }
 
-    if (folderBrowserState.selectedPath) {
-        targetInput.value = folderBrowserState.selectedPath;
+    if (selectedPath) {
+        targetInput.value = selectedPath;
         
         if (statusFieldId) {
-            setFieldStatus(statusFieldId, `Selected: ${folderBrowserState.selectedPath}`, 'success');
+            setFieldStatus(statusFieldId, `Selected: ${selectedPath}`, 'success');
         }
     }
 
