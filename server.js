@@ -90,7 +90,80 @@ app.use(cors());
 app.use(express.json());
 
 // Serve static files
-app.use(express.static('.'));
+const isDev = process.env.NODE_ENV !== 'production';
+
+const staticPath = isDev
+  ? path.join(__dirname)
+  : path.join(process.resourcesPath);
+
+app.use(express.static(staticPath));
+
+app.get('/', (req, res) => {
+  res.sendFile(path.join(staticPath, 'playlist.html'));
+});
+
+app.get('/api/listening-history', async (req, res) => {
+  try {
+    const data = await fs.readFile('listening-history.json', 'utf-8');
+    res.json(JSON.parse(data));
+  } catch {
+    res.json({ history: [] });
+  }
+});
+
+app.post('/api/listening-history', async (req, res) => {
+  try {
+    const { track } = req.body;
+
+    let data = { history: [] };
+
+    try {
+      const raw = await fs.readFile('listening-history.json', 'utf-8');
+      data = JSON.parse(raw);
+    } catch {}
+
+    // Ensure track has a unique ID for deletion
+    if (!track.id) {
+      track.id = `hist-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    }
+
+    data.history.unshift(track);
+    
+    // Limit history to 150 items
+    if (data.history.length > 150) {
+      data.history = data.history.slice(0, 150);
+    }
+    
+    await fs.writeFile('listening-history.json', JSON.stringify(data, null, 2));
+    
+    res.json({ success: true, count: data.history.length, track });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.delete('/api/listening-history/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    let data = { history: [] };
+
+    try {
+      const raw = await fs.readFile('listening-history.json', 'utf-8');
+      data = JSON.parse(raw);
+    } catch {}
+
+    const initialLength = data.history.length;
+    data.history = data.history.filter(item => item.id !== id);
+
+    if (data.history.length !== initialLength) {
+      await fs.writeFile('listening-history.json', JSON.stringify(data, null, 2));
+    }
+
+    res.json({ success: true, count: data.history.length });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
 // Cache for metadata
 let metadataCache = {};
