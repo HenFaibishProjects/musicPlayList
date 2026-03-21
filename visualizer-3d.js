@@ -3,6 +3,24 @@ let scene3D, camera3D, renderer3D, spaceship, starField, audioSphere;
 let particleSystem, glowRings;
 let visualizer3DActive = false;
 let animationFrame3D = null;
+let current3DTheme = null;
+
+function apply3DTheme(force = false) {
+    if (!scene3D || !renderer3D) return;
+
+    const nextTheme = document.body.classList.contains('light-theme') ? 'light' : 'dark';
+    if (!force && nextTheme === current3DTheme) return;
+
+    current3DTheme = nextTheme;
+
+    if (nextTheme === 'light') {
+        scene3D.fog = new THREE.FogExp2(0xe2e8f0, 0.00055);
+        renderer3D.setClearColor(0xf8fafc, 0.88);
+    } else {
+        scene3D.fog = new THREE.FogExp2(0x000000, 0.0008);
+        renderer3D.setClearColor(0x0a0e1a, 0.8);
+    }
+}
 
 // Initialize 3D Visualizer
 function init3DVisualizer() {
@@ -29,7 +47,7 @@ function init3DVisualizer() {
         antialias: true
     });
     renderer3D.setSize(canvas.width, canvas.height);
-    renderer3D.setClearColor(0x0a0e1a, 0.8);
+    apply3DTheme(true);
     
     // Create spaceship
     createSpaceship();
@@ -244,6 +262,8 @@ function animate3DVisualizer() {
     if (!visualizer3DActive) return;
     
     animationFrame3D = requestAnimationFrame(animate3DVisualizer);
+
+    apply3DTheme();
     
     const time = Date.now() * 0.001;
     

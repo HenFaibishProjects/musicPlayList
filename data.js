@@ -5,10 +5,7 @@ const PINNED_PLAYLISTS_STORAGE_KEY = 'lidaplay_pinned_playlists_v1';
 const PLAYBACK_SPEED_STORAGE_KEY = 'lidaplay_playback_speed_v1';
 const MAX_PINNED_PLAYLISTS = 10;
 
-// Global state
-let libraryData = null;
-let apiAvailable = false;
-let isRescanningLibrary = false;
+// Global state (libraryData, apiAvailable, and isRescanningLibrary are declared in app.js)
 let listeningSession = null;
 let sessionSaveTimer = null;
 let pinnedPlaylists = [];
@@ -110,4 +107,162 @@ function formatRelativeTime(timestamp) {
     if (minutes < 60) return `${minutes}m ago`;
     if (hours < 24) return `${hours}h ago`;
     return `${days}d ago`;
+}
+
+// ─── Listening Session ───────────────────────────────────────────────────────
+
+function loadListeningSession() {
+    try {
+        const raw = localStorage.getItem(SESSION_STORAGE_KEY);
+        if (raw) {
+            listeningSession = JSON.parse(raw);
+        }
+    } catch (e) {
+        console.warn('Failed to load listening session:', e);
+        listeningSession = null;
+    }
+}
+
+function saveListeningSession() {
+    try {
+        if (listeningSession) {
+            localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(listeningSession));
+        } else {
+            localStorage.removeItem(SESSION_STORAGE_KEY);
+        }
+    } catch (e) {
+        console.warn('Failed to save listening session:', e);
+    }
+}
+
+// ─── Pinned Playlists ─────────────────────────────────────────────────────────
+
+function loadPinnedPlaylists() {
+    try {
+        const raw = localStorage.getItem(PINNED_PLAYLISTS_STORAGE_KEY);
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+                pinnedPlaylists = parsed.slice(0, MAX_PINNED_PLAYLISTS);
+            }
+        }
+    } catch (e) {
+        console.warn('Failed to load pinned playlists:', e);
+        pinnedPlaylists = [];
+    }
+}
+
+function savePinnedPlaylists() {
+    try {
+        localStorage.setItem(PINNED_PLAYLISTS_STORAGE_KEY, JSON.stringify(pinnedPlaylists));
+    } catch (e) {
+        console.warn('Failed to save pinned playlists:', e);
+    }
+}
+
+function isPinned(id) {
+    return Array.isArray(pinnedPlaylists) && pinnedPlaylists.some(p => p.id === id);
+}
+
+function togglePinned(id, name, type = 'playlist') {
+    if (!Array.isArray(pinnedPlaylists)) pinnedPlaylists = [];
+    const idx = pinnedPlaylists.findIndex(p => p.id === id);
+    if (idx >= 0) {
+        pinnedPlaylists.splice(idx, 1);
+    } else {
+        if (pinnedPlaylists.length >= MAX_PINNED_PLAYLISTS) {
+            pinnedPlaylists.shift(); // remove oldest
+        }
+        pinnedPlaylists.push({ id, name, type });
+    }
+    savePinnedPlaylists();
+}
+
+// === Recent tracks functions ===
+
+function normalizeRecentTrack(track = {}) {
+    const title = track.title || 'Unknown Title';
+    const artist = track.artist || 'Unknown Artist';
+    const file = track.file || '';
+    const id = track.id || file || `${title}::${artist}`;
+
+    return {
+        id,
+        title,
+        artist,
+        album: track.album || '',
+        duration: track.duration || '--:--',
+        cover: track.cover || DEFAULT_COVER,
+        file,
+        playlistName: track.playlistName || '',
+        genreName: track.genreName || '',
+        playedAt: Number(track.playedAt) || Date.now()
+    };
+}
+
+function loadRecentTracksFromStorage() {
+    try {
+        const raw = localStorage.getItem(RECENT_TRACKS_STORAGE_KEY);
+        if (!raw) {
+            recentTracks = [];
+            return;
+        }
+
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) {
+            recentTracks = [];
+            return;
+        }
+
+        recentTracks = parsed
+            .map(normalizeRecentTrack)
+            .filter(track => track.file || track.title)
+            .slice(0, MAX_RECENT_TRACKS);
+    } catch (error) {
+        console.warn('Failed to load recently played tracks from storage:', error);
+        recentTracks = [];
+    }
+}
+
+function saveRecentTracksToStorage() {
+    try {
+        localStorage.setItem(RECENT_TRACKS_STORAGE_KEY, JSON.stringify(recentTracks.slice(0, MAX_RECENT_TRACKS)));
+    } catch (error) {
+        console.warn('Failed to persist recently played tracks:', error);
+    }
+}
+
+function addTrackToRecentlyPlayed(track, context = {}) {
+    if (!track) return;
+
+    const normalizedTrack = normalizeRecentTrack({
+        ...track,
+        playlistName: context.playlistName || track.playlistName || '',
+        genreName: context.genreName || track.genreName || '',
+        playedAt: Date.now()
+    });
+
+    const latestTrack = recentTracks[0];
+    if (
+        latestTrack &&
+        latestTrack.id === normalizedTrack.id &&
+        Date.now() - Number(latestTrack.playedAt || 0) < 15000
+    ) {
+        return;
+    }
+
+    const dedupeIndex = recentTracks.findIndex(item => item.id === normalizedTrack.id);
+    if (dedupeIndex >= 0) {
+        recentTracks.splice(dedupeIndex, 1);
+    }
+
+    recentTracks.unshift(normalizedTrack);
+    recentTracks = recentTracks.slice(0, MAX_RECENT_TRACKS);
+    saveRecentTracksToStorage();
+
+    if (currentView === 'recent') {
+        renderRecentlyPlayed();
+        updateStatsForRecentlyPlayed();
+        updateWorkspaceStatus();
+    }
 }

@@ -17,7 +17,7 @@
 
 .btn-filter {
     position: absolute;
-    right: 50px;
+    right: clamp(44px, 4vw, 50px);
     top: 50%;
     transform: translateY(-50%);
     width: 36px;
@@ -608,5 +608,68 @@
     
     .extraction-options {
         grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 900px) {
+    .filter-panel {
+        padding: 16px;
+    }
+
+    .filter-actions,
+    .upload-actions,
+    .batch-filters {
+        flex-wrap: wrap;
+    }
+
+    .filter-actions .btn,
+    .upload-actions .btn,
+    .batch-filters .btn,
+    .batch-filters select {
+        flex: 1 1 200px;
+        min-width: 0;
+    }
+
+    .modal-content,
+    .modal-content.large {
+        width: 95%;
+        max-width: 100%;
+    }
+}
+
+@media (max-width: 600px) {
+    .modal-header,
+    .modal-body,
+    .filter-panel,
+    .metadata-extraction,
+    .batch-operations,
+    .search-history {
+        padding: 12px;
+    }
+
+    .drop-zone {
+        padding: 28px 12px;
+    }
+
+    .drop-zone i {
+        font-size: 36px;
+    }
+
+    .btn-filter {
+        right: 10px;
+        width: 32px;
+        height: 32px;
+    }
+
+    .range-inputs {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .file-item,
+    .track-item,
+    .history-item {
+        flex-wrap: wrap;
+        gap: 8px;
     }
 }

@@ -1,9 +1,7 @@
 // UI Management - Modals, Notifications, Breadcrumbs
-const modalFormBaseline = { addGenre: '', addPlaylist: '', editGenre: '', editPlaylist: '' };
+// modalFormBaseline, isQueuePanelOpen, pendingDeletePlaylist, editingGenreContext
+// are declared in app.js (loaded first)
 let notificationAutoCloseTimer = null;
-let isQueuePanelOpen = false;
-let pendingDeletePlaylist = null;
-let editingGenreContext = null;
 
 function showNotification(title, message, type = 'info', actions = null) {
     const overlay = document.getElementById('notificationOverlay');
@@ -116,3 +114,77 @@ function createBackgroundParticles() {
         bgAnimation.appendChild(particle);
     }
 }
+
+// ── About Modal ──────────────────────────────────────
+function showAboutModal() {
+    const overlay = document.getElementById('aboutModalOverlay');
+    if (!overlay) return;
+    overlay.classList.add('show');
+    document.body.classList.add('modal-locked');
+}
+
+function closeAboutModal() {
+    const overlay = document.getElementById('aboutModalOverlay');
+    if (!overlay) return;
+    overlay.classList.remove('show');
+    document.body.classList.remove('modal-locked');
+}
+
+// App Menu Dropdown Logic
+document.addEventListener('DOMContentLoaded', () => {
+    const trigger = document.getElementById('appMenuTrigger');
+    const dropdown = document.getElementById('appMenuDropdown');
+    const aboutBtn = document.getElementById('appMenuAbout');
+    const exitBtn = document.getElementById('appMenuExit');
+
+    if (trigger && dropdown) {
+        // Toggle dropdown
+        trigger.addEventListener('click', (e) => {
+            e.stopPropagation();
+            dropdown.classList.toggle('active');
+        });
+
+        // Close on outside click
+        document.addEventListener('click', (e) => {
+            if (!trigger.contains(e.target) && !dropdown.contains(e.target)) {
+                dropdown.classList.remove('active');
+            }
+        });
+
+        // About Button — show in-page modal
+        if (aboutBtn) {
+            aboutBtn.addEventListener('click', () => {
+                dropdown.classList.remove('active');
+                showAboutModal();
+            });
+        }
+
+        // About Modal close button & backdrop
+        const aboutOverlay = document.getElementById('aboutModalOverlay');
+        const aboutCloseBtn = document.getElementById('aboutModalClose');
+        if (aboutCloseBtn) aboutCloseBtn.addEventListener('click', closeAboutModal);
+        if (aboutOverlay) {
+            aboutOverlay.addEventListener('click', (e) => {
+                if (e.target === aboutOverlay) closeAboutModal();
+            });
+        }
+        // Escape key closes about modal
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeAboutModal();
+        });
+
+        // Exit Button
+        if (exitBtn) {
+            exitBtn.addEventListener('click', () => {
+                dropdown.classList.remove('active');
+                if (typeof require !== 'undefined') {
+                    const { ipcRenderer } = require('electron');
+                    ipcRenderer.send('exit-app');
+                } else {
+                    // Fallback
+                    window.close();
+                }
+            });
+        }
+    }
+});

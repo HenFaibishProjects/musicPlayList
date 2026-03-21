@@ -6,44 +6,42 @@ let listeningHistory = new Map(); // Date string -> array of plays
 let currentHistoryView = 'month'; // 'month' or 'year'
 let currentHistoryDate = new Date();
 
-// Initialize listening history from localStorage
-function loadListeningHistory() {
+// Initialize listening history from backend API
+async function loadListeningHistory() {
     try {
-        const raw = localStorage.getItem(LISTENING_HISTORY_STORAGE_KEY);
-        if (!raw) {
-            listeningHistory = new Map();
-            return;
-        }
+        const response = await fetch('/api/listening-history');
+        const data = await response.json();
         
-        const parsed = JSON.parse(raw);
-        listeningHistory = new Map(Object.entries(parsed));
+        // Backend returns { history: [track, track, ...] }
+        const plays = data.history || [];
         
-        // Clean up old entries (older than MAX_HISTORY_DAYS)
-        const cutoffDate = new Date();
-        cutoffDate.setDate(cutoffDate.getDate() - MAX_HISTORY_DAYS);
-        const cutoffString = formatDateKey(cutoffDate);
+        // Rebuild the Map: Date string -> array of plays
+        listeningHistory = new Map();
         
-        for (const [dateKey] of listeningHistory) {
-            if (dateKey < cutoffString) {
-                listeningHistory.delete(dateKey);
+        plays.forEach(play => {
+            const date = new Date(play.timestamp);
+            const dateKey = formatDateKey(date);
+            
+            if (!listeningHistory.has(dateKey)) {
+                listeningHistory.set(dateKey, []);
             }
+            listeningHistory.get(dateKey).push(play);
+        });
+
+        // If we are currently viewing history, re-render
+        if (typeof currentView !== 'undefined' && currentView === 'history') {
+            renderHistoryCalendar();
+            updateStatsForHistory();
         }
-        
-        saveListeningHistory();
     } catch (error) {
-        console.warn('Failed to load listening history:', error);
+        console.warn('Failed to load listening history from server:', error);
         listeningHistory = new Map();
     }
 }
 
-// Save listening history to localStorage
+// No longer used: History is saved via trackPlayInHistory individual POSTs
 function saveListeningHistory() {
-    try {
-        const obj = Object.fromEntries(listeningHistory);
-        localStorage.setItem(LISTENING_HISTORY_STORAGE_KEY, JSON.stringify(obj));
-    } catch (error) {
-        console.warn('Failed to save listening history:', error);
-    }
+    // Intentionally empty - we save per-track via API
 }
 
 // Format date to YYYY-MM-DD
@@ -55,10 +53,9 @@ function formatDateKey(date) {
 }
 
 // Add a play event to history
-function trackPlayInHistory(track, context = {}) {
+async function trackPlayInHistory(track, context = {}) {
     if (!track) return;
     
-    const dateKey = formatDateKey(new Date());
     const playData = {
         trackId: track.id || track.file || `${track.title}::${track.artist}`,
         title: track.title || 'Unknown Title',
@@ -71,14 +68,69 @@ function trackPlayInHistory(track, context = {}) {
         timestamp: Date.now()
     };
     
+    // Update local state immediately for UI responsiveness
+    const dateKey = formatDateKey(new Date());
     if (!listeningHistory.has(dateKey)) {
         listeningHistory.set(dateKey, []);
     }
-    
-    const dayHistory = listeningHistory.get(dateKey);
-    dayHistory.push(playData);
-    
-    saveListeningHistory();
+    listeningHistory.get(dateKey).push(playData);
+
+    // Save to backend
+    try {
+        const response = await fetch('/api/listening-history', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ track: playData })
+        });
+        const result = await response.json();
+        if (result.success && result.track && result.track.id) {
+            // Update the local object with the server-generated ID
+            playData.id = result.track.id;
+        }
+    } catch (error) {
+        console.warn('Failed to save play to backend:', error);
+    }
+}
+
+// Delete a specific play by ID
+async function deleteTrackFromHistory(id, dateKey) {
+    if (!id) return;
+
+    // 1. Update backend
+    try {
+        const response = await fetch(`/api/listening-history/${id}`, {
+            method: 'DELETE'
+        });
+        
+        if (!response.ok) throw new Error('Delete failed');
+
+        // 2. Update local state
+        if (listeningHistory.has(dateKey)) {
+            const plays = listeningHistory.get(dateKey);
+            const filtered = plays.filter(p => p.id !== id);
+            
+            if (filtered.length === 0) {
+                listeningHistory.delete(dateKey);
+            } else {
+                listeningHistory.set(dateKey, filtered);
+            }
+        }
+
+        // 3. Refresh UI
+        renderHistoryCalendar();
+        updateStatsForHistory();
+        
+        // If modal is open, we can close it or refresh it. 
+        // For simplicity and responsiveness, let's refresh the details if still applicable
+        if (document.getElementById('dayDetailsOverlay')) {
+            showDayDetails(dateKey); 
+        }
+
+        showNotification('Deleted', 'Track removed from history', 'success');
+    } catch (error) {
+        console.error('Failed to delete track:', error);
+        showNotification('Error', 'Could not delete history item', 'error');
+    }
 }
 
 // Get play count for a specific date
@@ -452,21 +504,6 @@ function showDayDetails(dateKey) {
         day: 'numeric' 
     });
     
-    // Group by track
-    const trackMap = new Map();
-    plays.forEach(play => {
-        const key = `${play.title}::${play.artist}`;
-        if (!trackMap.has(key)) {
-            trackMap.set(key, { ...play, playCount: 0, timestamps: [] });
-        }
-        const track = trackMap.get(key);
-        track.playCount++;
-        track.timestamps.push(play.timestamp);
-    });
-    
-    const tracks = Array.from(trackMap.values())
-        .sort((a, b) => b.playCount - a.playCount);
-    
     let html = `
         <div class="day-details-overlay" id="dayDetailsOverlay">
             <div class="day-details-modal">
@@ -480,17 +517,20 @@ function showDayDetails(dateKey) {
                     </button>
                 </div>
                 <div class="day-details-body">
-                    ${tracks.map(track => `
+                    ${plays.sort((a,b) => b.timestamp - a.timestamp).map(track => `
                         <div class="day-track-item">
                             <img src="${sanitizeImageUrl(track.cover)}" alt="Cover" class="day-track-cover">
                             <div class="day-track-info">
                                 <div class="day-track-title">${escapeHtml(track.title)}</div>
                                 <div class="day-track-artist">${escapeHtml(track.artist)}</div>
-                                ${track.genreName ? `<div class="day-track-genre"><i class="fas fa-tag"></i> ${escapeHtml(track.genreName)}</div>` : ''}
+                                <div class="day-track-meta">
+                                    ${new Date(track.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                    ${track.genreName ? ` • <i class="fas fa-tag"></i> ${escapeHtml(track.genreName)}` : ''}
+                                </div>
                             </div>
-                            <div class="day-track-count">
-                                <i class="fas fa-repeat"></i> ${track.playCount}×
-                            </div>
+                            <button class="history-delete-btn" onclick="deleteTrackFromHistory('${track.id}', '${dateKey}')" title="Delete from history">
+                                <i class="fas fa-trash-can"></i>
+                            </button>
                         </div>
                     `).join('')}
                 </div>
@@ -515,6 +555,90 @@ function closeDayDetails() {
     if (overlay) {
         overlay.remove();
     }
+}
+
+// Show the history calendar view (navigation function)
+function showHistoryCalendar() {
+    currentView = 'history';
+    selectedGenre = null;
+
+    setActiveMainNav('historyCalendarNav');
+    setActiveGenreItem(null);
+
+    clearGlobalSearchState();
+
+    renderBreadcrumb([
+        { label: 'Genre Library', action: 'show-all' },
+        { label: 'Listening History', current: true }
+    ]);
+    document.getElementById('pageTitle').textContent = 'Listening History';
+    document.getElementById('pageSubtitle').textContent = 'Your musical journey over time';
+
+    renderHistoryCalendar();
+    updateStatsForHistory();
+    updateWorkspaceStatus();
+}
+
+// Update stats bar for history view
+function updateStatsForHistory() {
+    const statsBar = document.getElementById('statsBar');
+    if (!statsBar) return;
+
+    const stats = getListeningStats();
+
+    statsBar.innerHTML = `
+        <div class="stat-item">
+            <i class="fas fa-headphones"></i>
+            <div>
+                <div class="stat-value">${stats.totalPlays.toLocaleString()}</div>
+                <div class="stat-label">Total Plays</div>
+            </div>
+        </div>
+        <div class="stat-item">
+            <i class="fas fa-music"></i>
+            <div>
+                <div class="stat-value">${stats.uniqueTracks.toLocaleString()}</div>
+                <div class="stat-label">Unique Tracks</div>
+            </div>
+        </div>
+        <div class="stat-item">
+            <i class="fas fa-calendar-check"></i>
+            <div>
+                <div class="stat-value">${stats.daysActive}</div>
+                <div class="stat-label">Days Active</div>
+            </div>
+        </div>
+    `;
+}
+
+// Play track from calendar day view
+function playTrackFromCalendar(dateKey, trackIndex) {
+    const plays = listeningHistory.get(dateKey) || [];
+    if (trackIndex < 0 || trackIndex >= plays.length) return;
+
+    // Create a playlist from all plays on that day
+    currentPlaylist = plays.map(play => ({
+        id: play.trackId,
+        title: play.title,
+        artist: play.artist,
+        album: play.album,
+        duration: play.duration,
+        cover: play.cover,
+        file: play.trackId, // Use trackId as file reference
+        playlistName: play.playlistName,
+        genreName: play.genreName
+    }));
+
+    rebuildPlaybackOrder(trackIndex);
+
+    const selectedTrack = currentPlaylist[currentTrackIndex];
+    currentPlaylistContext = {
+        playlistName: `History: ${dateKey}`,
+        genreName: selectedTrack?.genreName || ''
+    };
+
+    loadTrack(selectedTrack);
+    playTrack();
 }
 
 // Initialize on page load

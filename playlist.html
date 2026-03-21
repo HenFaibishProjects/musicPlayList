@@ -60,11 +60,11 @@
         <!-- Main Content -->
         <main class="main-content">
             <section class="workspace-strip" id="workspaceStrip">
-                <div class="workspace-title-wrap">
-                    <p class="workspace-overline">Your Music Space</p>
-                    <h3 class="workspace-title">LidaMixPlay</h3>
+                <div class="ws-brand">
+                    <img src="favicon.png" alt="logo" class="ws-logo">
+                    <span class="ws-name">LidaMixPlay</span>
                 </div>
-                <div class="workspace-chips" id="workspaceChips">
+                <div class="ws-status-bar" id="workspaceChips">
                     <span class="workspace-chip" id="apiStatusChip">
                         <i class="fas fa-plug-circle-xmark"></i>
                         <span>API Offline</span>
@@ -85,6 +85,28 @@
                         <i class="fas fa-database"></i>
                         <span>0 Playlists</span>
                     </span>
+                </div>
+                
+                <div class="app-menu-container">
+                
+                
+                 <button class="app-menu-trigger" id="appMenuTrigger">
+                    <i class="fas fa-gear"></i>
+                    <span>Menu</span>
+                </button>
+
+                    
+                    <div class="app-menu-dropdown" id="appMenuDropdown">
+                        <div class="app-menu-item" id="appMenuAbout">
+                            <i class="fas fa-circle-info"></i>
+                            <span>About</span>
+                        </div>
+                        <div class="app-menu-divider"></div>
+                        <div class="app-menu-item app-menu-item-danger" id="appMenuExit">
+                            <i class="fas fa-power-off"></i>
+                            <span>Exit</span>
+                        </div>
+                    </div>
                 </div>
             </section>
 
@@ -129,9 +151,6 @@
                         </button>
                         <button class="viz-type-btn" data-viz-type="particles" title="Pulse Particles">
                             <i class="fas fa-fire"></i>
-                        </button>
-                        <button class="viz-type-btn" data-viz-type="3d" title="3D Space Flight">
-                            <i class="fas fa-rocket"></i>
                         </button>
                     </div>
                     <button class="viz-close-btn" id="vizToggleBtn" title="Stop Visualizer">
@@ -197,9 +216,57 @@
            
 
             <div class="folder-grid" id="folderGrid">
-                <div class="loading">
-                    <div class="spinner"></div>
-                    <p>Loading your genre and playlist libraries...</p>
+                <div class="loading" id="appLoadingScreen">
+                    <div class="loading-scene">
+
+                        <!-- Orbital rings -->
+                        <div class="loading-orbits">
+                            <div class="orbit orbit-1"></div>
+                            <div class="orbit orbit-2"></div>
+                            <div class="orbit orbit-3"></div>
+                        </div>
+
+                        <!-- Central pulse core -->
+                        <div class="loading-core">
+                            <div class="loading-core-ring"></div>
+                            <div class="loading-core-inner">
+                                <i class="fas fa-headphones"></i>
+                            </div>
+                        </div>
+
+                        <!-- Animated spectrum bars -->
+                        <div class="loading-spectrum">
+                            <div class="ls-bar"></div><div class="ls-bar"></div><div class="ls-bar"></div>
+                            <div class="ls-bar"></div><div class="ls-bar"></div><div class="ls-bar"></div>
+                            <div class="ls-bar"></div><div class="ls-bar"></div><div class="ls-bar"></div>
+                            <div class="ls-bar"></div><div class="ls-bar"></div><div class="ls-bar"></div>
+                            <div class="ls-bar"></div><div class="ls-bar"></div><div class="ls-bar"></div>
+                            <div class="ls-bar"></div><div class="ls-bar"></div><div class="ls-bar"></div>
+                            <div class="ls-bar"></div><div class="ls-bar"></div><div class="ls-bar"></div>
+                            <div class="ls-bar"></div><div class="ls-bar"></div><div class="ls-bar"></div>
+                            <div class="ls-bar"></div><div class="ls-bar"></div><div class="ls-bar"></div>
+                        </div>
+
+                        <!-- Floating music notes -->
+                        <div class="loading-notes">
+                            <span class="note note-1"><i class="fas fa-music"></i></span>
+                            <span class="note note-2"><i class="fas fa-compact-disc"></i></span>
+                            <span class="note note-3"><i class="fas fa-music"></i></span>
+                            <span class="note note-4"><i class="fas fa-headphones-alt"></i></span>
+                            <span class="note note-5"><i class="fas fa-music"></i></span>
+                            <span class="note note-6"><i class="fas fa-compact-disc"></i></span>
+                        </div>
+
+                        <!-- Text content -->
+                        <div class="loading-text-block">
+                            <h2 class="loading-title">LidaMixPlay</h2>
+                            <p class="loading-stage" id="loadingStageText">Tuning up the frequencies...</p>
+                            <div class="loading-dots">
+                                <span></span><span></span><span></span>
+                            </div>
+                        </div>
+
+                    </div>
                 </div>
             </div>
         </main>
@@ -209,7 +276,7 @@
     <div class="music-player" id="musicPlayer">
         <div class="player-track-info">
             <div class="album-art-wrapper">
-                <img src="https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=400&fit=crop" alt="Album cover" class="player-cover" id="playerCover">
+                <img src="https://www.lidasoftware.online/logo.png" alt="Album cover" class="player-cover" id="playerCover">
             </div>
             <div class="player-details">
                 <div class="player-title" id="playerTitle">No track selected</div>
@@ -310,6 +377,29 @@
                                 <label for="genreDescriptionInput">Description</label>
                                 <input type="text" id="genreDescriptionInput" placeholder="Calm, atmospheric textures">
                             </div>
+
+                            <div class="library-form-row">
+                                <label>Genre Color *</label>
+                                <div class="genre-color-swatches" id="addGenreColorSwatches">
+                                    <button type="button" class="genre-swatch active" data-color="#6366f1" style="background:#6366f1;" title="Indigo"></button>
+                                    <button type="button" class="genre-swatch" data-color="#8b5cf6" style="background:#8b5cf6;" title="Violet"></button>
+                                    <button type="button" class="genre-swatch" data-color="#ec4899" style="background:#ec4899;" title="Pink"></button>
+                                    <button type="button" class="genre-swatch" data-color="#f43f5e" style="background:#f43f5e;" title="Rose"></button>
+                                    <button type="button" class="genre-swatch" data-color="#f97316" style="background:#f97316;" title="Orange"></button>
+                                    <button type="button" class="genre-swatch" data-color="#eab308" style="background:#eab308;" title="Amber"></button>
+                                    <button type="button" class="genre-swatch" data-color="#22c55e" style="background:#22c55e;" title="Green"></button>
+                                    <button type="button" class="genre-swatch" data-color="#14b8a6" style="background:#14b8a6;" title="Teal"></button>
+                                    <button type="button" class="genre-swatch" data-color="#06b6d4" style="background:#06b6d4;" title="Cyan"></button>
+                                    <button type="button" class="genre-swatch" data-color="#3b82f6" style="background:#3b82f6;" title="Blue"></button>
+                                    <button type="button" class="genre-swatch" data-color="#a855f7" style="background:#a855f7;" title="Purple"></button>
+                                    <button type="button" class="genre-swatch" data-color="#ef4444" style="background:#ef4444;" title="Red"></button>
+                                    <label class="genre-swatch genre-swatch-custom" title="Custom color">
+                                        <i class="fas fa-palette"></i>
+                                        <input type="color" id="addGenreColorCustom" value="#6366f1" style="opacity:0;position:absolute;width:0;height:0;">
+                                    </label>
+                                </div>
+                                <input type="hidden" id="addGenreColorValue" value="#6366f1">
+                            </div>
                             <button type="submit" class="btn library-submit-btn">
                                 <i class="fas fa-plus-circle"></i>
                                 <span>Add Genre</span>
@@ -352,7 +442,34 @@
                                 </select>
                                 <div class="library-field-status" id="playlistGenreStatus" role="status" aria-live="polite"></div>
                             </div>
-                            <div class="library-form-row">
+
+                            <div class="library-form-row hidden" id="playlistNewGenreNameRow">
+                                <label for="playlistNewGenreNameInput">New Genre Name *</label>
+                                <input type="text" id="playlistNewGenreNameInput" placeholder="e.g. Brazilian Jazz, Retro Synth...">
+                            </div>
+
+                            <div class="library-form-row hidden" id="playlistNewGenreColorRow">
+                                <label>Genre Color *</label>
+                                <div class="genre-color-swatches" id="playlistNewGenreColorSwatches">
+                                    <button type="button" class="genre-swatch active" data-color="#6366f1" style="background:#6366f1;" title="Indigo"></button>
+                                    <button type="button" class="genre-swatch" data-color="#8b5cf6" style="background:#8b5cf6;" title="Violet"></button>
+                                    <button type="button" class="genre-swatch" data-color="#ec4899" style="background:#ec4899;" title="Pink"></button>
+                                    <button type="button" class="genre-swatch" data-color="#f43f5e" style="background:#f43f5e;" title="Rose"></button>
+                                    <button type="button" class="genre-swatch" data-color="#f97316" style="background:#f97316;" title="Orange"></button>
+                                    <button type="button" class="genre-swatch" data-color="#eab308" style="background:#eab308;" title="Amber"></button>
+                                    <button type="button" class="genre-swatch" data-color="#22c55e" style="background:#22c55e;" title="Green"></button>
+                                    <button type="button" class="genre-swatch" data-color="#14b8a6" style="background:#14b8a6;" title="Teal"></button>
+                                    <button type="button" class="genre-swatch" data-color="#06b6d4" style="background:#06b6d4;" title="Cyan"></button>
+                                    <button type="button" class="genre-swatch" data-color="#3b82f6" style="background:#3b82f6;" title="Blue"></button>
+                                    <button type="button" class="genre-swatch" data-color="#a855f7" style="background:#a855f7;" title="Purple"></button>
+                                    <button type="button" class="genre-swatch" data-color="#ef4444" style="background:#ef4444;" title="Red"></button>
+                                    <label class="genre-swatch genre-swatch-custom" title="Custom color">
+                                        <i class="fas fa-palette"></i>
+                                        <input type="color" id="playlistNewGenreColorCustom" value="#6366f1" style="opacity:0;position:absolute;width:0;height:0;">
+                                    </label>
+                                </div>
+                                <input type="hidden" id="playlistNewGenreColorValue" value="#6366f1">
+                            </div><div class="library-form-row">
                                 <label for="playlistNameInput">Playlist Name *</label>
                                 <input type="text" id="playlistNameInput" placeholder="Example: Chill House" required>
                             </div>
@@ -488,8 +605,26 @@
                                 </div>
                             </div>
                             <div class="library-form-row">
-                                <label for="editGenreColorInput">Accent Color</label>
-                                <input type="color" id="editGenreColorInput" value="#6366f1">
+                                <label>Accent Color *</label>
+                                <div class="genre-color-swatches" id="editGenreColorSwatches">
+                                    <button type="button" class="genre-swatch active" data-color="#6366f1" style="background:#6366f1;" title="Indigo"></button>
+                                    <button type="button" class="genre-swatch" data-color="#8b5cf6" style="background:#8b5cf6;" title="Violet"></button>
+                                    <button type="button" class="genre-swatch" data-color="#ec4899" style="background:#ec4899;" title="Pink"></button>
+                                    <button type="button" class="genre-swatch" data-color="#f43f5e" style="background:#f43f5e;" title="Rose"></button>
+                                    <button type="button" class="genre-swatch" data-color="#f97316" style="background:#f97316;" title="Orange"></button>
+                                    <button type="button" class="genre-swatch" data-color="#eab308" style="background:#eab308;" title="Amber"></button>
+                                    <button type="button" class="genre-swatch" data-color="#22c55e" style="background:#22c55e;" title="Green"></button>
+                                    <button type="button" class="genre-swatch" data-color="#14b8a6" style="background:#14b8a6;" title="Teal"></button>
+                                    <button type="button" class="genre-swatch" data-color="#06b6d4" style="background:#06b6d4;" title="Cyan"></button>
+                                    <button type="button" class="genre-swatch" data-color="#3b82f6" style="background:#3b82f6;" title="Blue"></button>
+                                    <button type="button" class="genre-swatch" data-color="#a855f7" style="background:#a855f7;" title="Purple"></button>
+                                    <button type="button" class="genre-swatch" data-color="#ef4444" style="background:#ef4444;" title="Red"></button>
+                                    <label class="genre-swatch genre-swatch-custom" title="Custom color">
+                                        <i class="fas fa-palette"></i>
+                                        <input type="color" id="editGenreColorCustom" value="#6366f1" style="opacity:0;position:absolute;width:0;height:0;">
+                                    </label>
+                                </div>
+                                <input type="hidden" id="editGenreColorInput" value="#6366f1">
                             </div>
                             <div class="library-form-row">
                                 <label for="editGenreDescriptionInput">Description</label>
@@ -643,7 +778,7 @@
                     
                     <div class="library-form-row" id="fileInputRow">
                         <label for="m3uFileInput">Select M3U/M3U8 File *</label>
-                        <input type="file" id="m3uFileInput" accept=".m3u,.m3u8,.pls" class="file-input">
+                        <input type="file" id="m3uFileInput" accept=".m3u,.m3u8,.pls" class="file-input" style="display:none">
                         <div class="file-input-display" id="fileInputDisplay">
                             <i class="fas fa-file-audio"></i>
                             <span>Choose a file...</span>
@@ -663,6 +798,35 @@
                         </select>
                     </div>
                     
+                    <div class="library-form-row hidden" id="newGenreNameRow">
+                        <label for="newGenreNameInput">New Genre Name *</label>
+                        <input type="text" id="newGenreNameInput" placeholder="e.g. Radio Streams, Jazz Hits...">
+                    </div>
+
+                    <div class="library-form-row hidden" id="newGenreColorRow">
+                        <label>Genre Color *</label>
+                        <div class="genre-color-swatches" id="genreColorSwatches">
+                            <button type="button" class="genre-swatch active" data-color="#6366f1" style="background:#6366f1;" title="Indigo"></button>
+                            <button type="button" class="genre-swatch" data-color="#8b5cf6" style="background:#8b5cf6;" title="Violet"></button>
+                            <button type="button" class="genre-swatch" data-color="#ec4899" style="background:#ec4899;" title="Pink"></button>
+                            <button type="button" class="genre-swatch" data-color="#f43f5e" style="background:#f43f5e;" title="Rose"></button>
+                            <button type="button" class="genre-swatch" data-color="#f97316" style="background:#f97316;" title="Orange"></button>
+                            <button type="button" class="genre-swatch" data-color="#eab308" style="background:#eab308;" title="Amber"></button>
+                            <button type="button" class="genre-swatch" data-color="#22c55e" style="background:#22c55e;" title="Green"></button>
+                            <button type="button" class="genre-swatch" data-color="#14b8a6" style="background:#14b8a6;" title="Teal"></button>
+                            <button type="button" class="genre-swatch" data-color="#06b6d4" style="background:#06b6d4;" title="Cyan"></button>
+                            <button type="button" class="genre-swatch" data-color="#3b82f6" style="background:#3b82f6;" title="Blue"></button>
+                            <button type="button" class="genre-swatch" data-color="#a855f7" style="background:#a855f7;" title="Purple"></button>
+                            <button type="button" class="genre-swatch" data-color="#ef4444" style="background:#ef4444;" title="Red"></button>
+                            <label class="genre-swatch genre-swatch-custom" title="Custom color">
+                                <i class="fas fa-palette"></i>
+                                <input type="color" id="newGenreColorCustom" value="#6366f1" style="opacity:0;position:absolute;width:0;height:0;">
+                            </label>
+                        </div>
+                        <input type="hidden" id="newGenreColorValue" value="#6366f1">
+                    </div>
+
+
                     <div class="library-form-row">
                         <label for="importPlaylistName">Playlist Name *</label>
                         <input type="text" id="importPlaylistName" placeholder="e.g., My Radio Stations" required>
@@ -857,15 +1021,105 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/nouislider@15.8.1/dist/nouislider.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- app.js MUST load first: it declares all global state variables used by every other file -->
+    <script src="app.js"></script>
     <script src="m3u-parser.js"></script>
     <script src="visualizer.js"></script>
-    <script src="visualizer-3d.js"></script>
     <script src="data.js"></script>
     <script src="listening-history.js"></script>
     <script src="player.js"></script>
     <script src="playlists.js"></script>
     <script src="ui.js"></script>
-    <script src="script.js"></script>
+    <!-- Split functionality files -->
+    <script src="quick-play.js"></script>
+    <script src="library-management.js"></script>
+    <script src="import-export.js"></script>
+    <script src="playback-control.js"></script>
+    <script src="volume-control.js"></script>
+    <script src="ui-utilities.js"></script>
+
+  <!-- ══════════════ ABOUT MODAL ══════════════ -->
+  <div class="about-modal-overlay" id="aboutModalOverlay" role="dialog" aria-modal="true" aria-label="About LidaMixPlay">
+    <div class="about-modal-card" id="aboutModalCard">
+
+      <!-- close button -->
+      <button class="about-modal-close" id="aboutModalClose" aria-label="Close">✕</button>
+
+      <!-- top gold shimmer line -->
+      <div class="about-top-line"></div>
+
+      <!-- HERO -->
+      <div class="about-hero">
+        <div class="about-vinyl-wrap">
+          <div class="about-vinyl"></div>
+          <div class="about-wave-bars">
+            <div class="about-bar"></div><div class="about-bar"></div>
+            <div class="about-bar"></div><div class="about-bar"></div>
+            <div class="about-bar"></div><div class="about-bar"></div>
+            <div class="about-bar"></div>
+          </div>
+        </div>
+        <div class="about-app-name">LidaMixPlay</div>
+        <div class="about-tagline">Music Collection &amp; Playlist Manager</div>
+        <div class="about-version-badge">▶ Version 2.0.0</div>
+      </div>
+
+      <div class="about-divider"></div>
+
+      <div class="about-desc">
+        Organize your entire music library with <strong>rich metadata</strong>,
+        album artwork, and a beautiful interface, all from a single
+        <strong>desktop application</strong>. Your collection, the way it was meant to be seen.
+      </div>
+
+      <div class="about-freeware-row">
+        <div class="about-freeware-pill">✦ Free &amp; Open to Everyone — No License Required</div>
+      </div>
+
+      <div class="about-divider"></div>
+
+      <div class="about-links">
+        <a class="about-link-btn" href="https://www.lidasoftware.online/" target="_blank">
+          <div class="about-link-left">
+            <div class="about-link-icon about-link-icon--gold">🌐</div>
+            <div class="about-link-text">
+              <span class="about-link-title">Lida Software</span>
+              <span class="about-link-sub">More tools &amp; projects — lidasoftware.com</span>
+            </div>
+          </div>
+          <span class="about-link-arrow">→</span>
+        </a>
+
+        <a class="about-link-btn" href="https://www.lidasoftware.online/#contact" target="_blank">
+          <div class="about-link-left">
+            <div class="about-link-icon about-link-icon--teal">✉</div>
+            <div class="about-link-text">
+              <span class="about-link-title">Get in Touch</span>
+              <span class="about-link-sub">Questions, feedback, or just to say hi</span>
+            </div>
+          </div>
+          <span class="about-link-arrow">→</span>
+        </a>
+
+        <a class="about-link-btn" href="https://www.lidasoftware.online/lidamixplay" target="_blank">
+          <div class="about-link-left">
+            <div class="about-link-icon about-link-icon--lavend">📋</div>
+            <div class="about-link-text">
+              <span class="about-link-title">Changelog &amp; Updates</span>
+              <span class="about-link-sub">See what's new in v2.0.0</span>
+            </div>
+          </div>
+          <span class="about-link-arrow">→</span>
+        </a>
+      </div>
+
+      <div class="about-footer">
+        <div class="about-copyright">© 2025 <span>Lida Software</span>. All rights reserved.</div>
+        <div class="about-made-by">by <a href="https://www.lidasoftware.online" target="_blank">Lida Software</a></div>
+      </div>
+
+    </div>
+  </div><!-- /about modal -->
+
 </body>
 </html>
