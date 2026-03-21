@@ -8,6 +8,12 @@ const { Readable } = require('stream');
 
 const app = express();
 const PORT = 3000;
+const hasExistingServerInstance = Boolean(global.__LIDAMIXPLAY_SERVER_INSTANCE__);
+
+if (hasExistingServerInstance) {
+    console.log('[SERVER] Duplicate bootstrap prevented in same process');
+}
+
 const LIBRARY_STRUCTURE_FILE = 'library-structure.json';
 const IMPORTED_PLAYLISTS_FILE = 'imported-playlists.json';
 const execFileAsync = promisify(execFile);
@@ -1632,47 +1638,58 @@ app.post('/api/upload', async (req, res) => {
 });
 
 // Start server
-const server = app.listen(PORT, () => {
-    console.log(`\n🎵 LidaPlay Server`);
-    console.log(`Server running on http://localhost:${PORT}`);
-    console.log('SERVER_READY');
+let server = global.__LIDAMIXPLAY_SERVER_INSTANCE__ || null;
 
-    (async () => {
-        await ensureFileExists(LISTENING_HISTORY_FILE, { history: [] });
-        await ensureFileExists(IMPORTED_PLAYLISTS_FILE, { playlists: [] });
-        await ensureFileExists(LIBRARY_STRUCTURE_FILE, {
-          library: {
-            name: 'My Music Collection',
-            folders: []
-          }
-        });
+if (!server) {
+    server = app.listen(PORT, () => {
+        console.log(`\n🎵 LidaPlay Server`);
+        console.log(`Server running on http://localhost:${PORT}`);
+        console.log('SERVER_STARTED');
+        console.log('SERVER_READY');
 
-        console.log(`\nAPI Endpoints:`);
-        console.log(`  GET  /api/library-structure - Get editable library folder structure`);
-        console.log(`  GET  /api/genres           - List existing genres for dropdowns`);
-        console.log(`  POST /api/genres            - Create a genre from UI`);
-        console.log(`  POST /api/playlists         - Map a playlist to a folder path`);
-        console.log(`  GET  /api/library       - Get full library with scanned tracks (cached)`);
-        console.log(`  GET  /api/playlist/:id  - Get specific playlist tracks from cache`);
-        console.log(`  GET  /api/system-volume - Get Windows master volume (0..1)`);
-        console.log(`  POST /api/system-volume - Set Windows master volume (0..1)`);
-        console.log(`  POST /api/rescan        - Force immediate rescan and refresh cache`);
-        console.log(`  POST /api/upload        - Upload new MP3 files\n`);
-
-        // Ensure library structure exists and do initial scan on startup
-        loadLibraryStructure()
-            .then(() => getScannedLibrary(true))
-            .then((result) => {
-                console.log(`✅ Startup scan complete: ${result.summary.totalTracks} tracks across ${result.summary.totalPlaylists} playlists`);
-            })
-            .catch((error) => {
-                console.error('⚠️ Startup scan failed:', error.message);
+        (async () => {
+            await ensureFileExists(LISTENING_HISTORY_FILE, { history: [] });
+            await ensureFileExists(IMPORTED_PLAYLISTS_FILE, { playlists: [] });
+            await ensureFileExists(LIBRARY_STRUCTURE_FILE, {
+              library: {
+                name: 'My Music Collection',
+                folders: []
+              }
             });
-    })().catch((error) => {
-        console.error('[SERVER] Startup initialization failed:', error);
-    });
-});
 
-server.on('error', (error) => {
-    console.error('[SERVER] Listen error:', error);
-});
+            console.log(`\nAPI Endpoints:`);
+            console.log(`  GET  /api/library-structure - Get editable library folder structure`);
+            console.log(`  GET  /api/genres           - List existing genres for dropdowns`);
+            console.log(`  POST /api/genres            - Create a genre from UI`);
+            console.log(`  POST /api/playlists         - Map a playlist to a folder path`);
+            console.log(`  GET  /api/library       - Get full library with scanned tracks (cached)`);
+            console.log(`  GET  /api/playlist/:id  - Get specific playlist tracks from cache`);
+            console.log(`  GET  /api/system-volume - Get Windows master volume (0..1)`);
+            console.log(`  POST /api/system-volume - Set Windows master volume (0..1)`);
+            console.log(`  POST /api/rescan        - Force immediate rescan and refresh cache`);
+            console.log(`  POST /api/upload        - Upload new MP3 files\n`);
+
+            // Ensure library structure exists, but defer heavy scan to /api/library or explicit /api/rescan
+            loadLibraryStructure()
+                .then(() => {
+                    console.log('✅ Library structure ready (startup scan deferred)');
+                })
+                .catch((error) => {
+                    console.error('⚠️ Startup library-structure initialization failed:', error.message);
+                });
+        })().catch((error) => {
+            console.error('[SERVER] Startup initialization failed:', error);
+        });
+    });
+
+    global.__LIDAMIXPLAY_SERVER_INSTANCE__ = server;
+}
+
+if (server && !server.__lidamixplayErrorHandlerAttached) {
+    server.on('error', (error) => {
+        console.error('[SERVER] Listen error:', error);
+    });
+    server.__lidamixplayErrorHandlerAttached = true;
+}
+
+module.exports = server;

@@ -515,10 +515,7 @@ async function addGenreFromUI(event) {
         await loadGenreOptionsForPlaylistSelect(createdGenre?.id || '');
 
         showNotification('Genre Added', `Genre "${name}" is now available in the playlist dropdown.`, 'success');
-        setTimeout(() => {
         closeAddGenreModal();
-        location.reload();
-    }, 2000); 
     } catch (error) {
         console.error('Failed to add genre:', error);
         showNotification('Add Genre Failed', error.message || 'Unable to create this genre right now.', 'error');
@@ -603,10 +600,7 @@ async function addPlaylistFromUI(event) {
         event.target.reset();
         closeAddPlaylistModal();
 
-        showNotification('Playlist Added', `Playlist "${name}" was created and scanned successfully. Refreshing page...`, 'success');
-        setTimeout(() => {
-            window.location.reload();
-        }, 500);
+        showNotification('Playlist Added', `Playlist "${name}" was created and scanned successfully.`, 'success');
     } catch (error) {
         console.error('Failed to add playlist mapping:', error);
         showNotification('Add Playlist Failed', error.message || 'Unable to add playlist mapping right now.', 'error');

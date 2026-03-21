@@ -7,6 +7,13 @@ const SERVER_PORT = 3000;
 const FRONTEND_URL = `http://${SERVER_HOST}:${SERVER_PORT}/playlist.html`;
 
 let backendStarted = false;
+let mainWindow = null;
+let aboutWindow = null;
+
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+  app.quit();
+}
 
 function getServerPath() {
   return app.isPackaged
@@ -75,7 +82,17 @@ async function waitForBackendReady({ attempts = 40, intervalMs = 250 } = {}) {
 }
 
 function createWindow() {
-  const win = new BrowserWindow({
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMinimized()) {
+      mainWindow.restore();
+    }
+    mainWindow.focus();
+    return mainWindow;
+  }
+
+  console.log('CREATE_MAIN_WINDOW');
+
+  mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     webPreferences: {
@@ -84,7 +101,12 @@ function createWindow() {
     }
   });
 
-  win.loadURL(FRONTEND_URL);
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
+
+  mainWindow.loadURL(FRONTEND_URL);
+  return mainWindow;
 }
 
 function createStartupErrorWindow(message) {
@@ -122,7 +144,17 @@ ipcMain.on('open-about', () => {
 });
 
 function createAboutWindow() {
-    const aboutWin = new BrowserWindow({
+    if (aboutWindow && !aboutWindow.isDestroyed()) {
+      if (aboutWindow.isMinimized()) {
+        aboutWindow.restore();
+      }
+      aboutWindow.focus();
+      return aboutWindow;
+    }
+
+    console.log('ABOUT_WINDOW_OPENED');
+
+    aboutWindow = new BrowserWindow({
       width: 620,
       height: 800,
       title: 'About LidaMixPlay',
@@ -130,16 +162,41 @@ function createAboutWindow() {
       resizable: true,
       minWidth: 520,
       minHeight: 640,
+      parent: mainWindow || undefined,
       webPreferences: {
           nodeIntegration: false,
           contextIsolation: true
       }
     });
 
-    aboutWin.loadFile(path.join(__dirname, 'about.html'));
+    aboutWindow.on('closed', () => {
+      aboutWindow = null;
+    });
+
+    aboutWindow.loadFile(path.join(__dirname, 'about.html'));
+    return aboutWindow;
 }
 
 Menu.setApplicationMenu(null);
+
+app.on('second-instance', () => {
+  console.log('SECOND_INSTANCE_DETECTED');
+
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMinimized()) {
+      mainWindow.restore();
+    }
+    mainWindow.focus();
+  }
+});
+
+app.on('activate', () => {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    createWindow();
+  } else {
+    mainWindow.focus();
+  }
+});
 
 
 app.whenReady().then(async () => {
