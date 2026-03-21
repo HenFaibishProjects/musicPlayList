@@ -49,6 +49,15 @@ function saveLastPlayedTrack() {
 
 function restoreLastPlayedTrack() {
     try {
+        const firstLaunchKey = 'lidaplay_has_launched_once';
+        const isFirstLaunch = !localStorage.getItem(firstLaunchKey);
+
+        if (isFirstLaunch) {
+            localStorage.removeItem('lidaplay_last_played_state');
+            localStorage.setItem(firstLaunchKey, '1');
+            return;
+        }
+
         const stored = localStorage.getItem('lidaplay_last_played_state');
         if (stored) {
             const data = JSON.parse(stored);

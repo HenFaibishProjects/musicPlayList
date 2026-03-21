@@ -97,16 +97,21 @@ namespace Audio {
 }
 `;
 
+process.on('uncaughtException', (error) => {
+    console.error('[SERVER] Uncaught exception:', error);
+});
+
+process.on('unhandledRejection', (reason) => {
+    console.error('[SERVER] Unhandled rejection:', reason);
+});
+
 // Enable CORS
 app.use(cors());
 app.use(express.json());
 
-// Serve static files
-const isDev = process.env.NODE_ENV !== 'production';
-
-const staticPath = isDev
-  ? path.join(__dirname)
-  : path.join(process.resourcesPath);
+// Serve static files from the same location as server.js
+// (works in dev and packaged app.asar runtime)
+const staticPath = path.join(__dirname);
 
 app.use(express.static(staticPath));
 
@@ -1627,39 +1632,47 @@ app.post('/api/upload', async (req, res) => {
 });
 
 // Start server
-app.listen(PORT, async () => {
+const server = app.listen(PORT, () => {
     console.log(`\n🎵 LidaPlay Server`);
     console.log(`Server running on http://localhost:${PORT}`);
-    
-    // Step 2: Call it on server startup
-    await ensureFileExists(LISTENING_HISTORY_FILE, { history: [] });
-    await ensureFileExists(IMPORTED_PLAYLISTS_FILE, { playlists: [] });
-    await ensureFileExists(LIBRARY_STRUCTURE_FILE, {
-      library: {
-        name: 'My Music Collection',
-        folders: []
-      }
-    });
+    console.log('SERVER_READY');
 
-    console.log(`\nAPI Endpoints:`);
-    console.log(`  GET  /api/library-structure - Get editable library folder structure`);
-    console.log(`  GET  /api/genres           - List existing genres for dropdowns`);
-    console.log(`  POST /api/genres            - Create a genre from UI`);
-    console.log(`  POST /api/playlists         - Map a playlist to a folder path`);
-    console.log(`  GET  /api/library       - Get full library with scanned tracks (cached)`);
-    console.log(`  GET  /api/playlist/:id  - Get specific playlist tracks from cache`);
-    console.log(`  GET  /api/system-volume - Get Windows master volume (0..1)`);
-    console.log(`  POST /api/system-volume - Set Windows master volume (0..1)`);
-    console.log(`  POST /api/rescan        - Force immediate rescan and refresh cache`);
-    console.log(`  POST /api/upload        - Upload new MP3 files\n`);
-
-    // Ensure library structure exists and do initial scan on startup
-    loadLibraryStructure()
-        .then(() => getScannedLibrary(true))
-        .then((result) => {
-            console.log(`✅ Startup scan complete: ${result.summary.totalTracks} tracks across ${result.summary.totalPlaylists} playlists`);
-        })
-        .catch((error) => {
-            console.error('⚠️ Startup scan failed:', error.message);
+    (async () => {
+        await ensureFileExists(LISTENING_HISTORY_FILE, { history: [] });
+        await ensureFileExists(IMPORTED_PLAYLISTS_FILE, { playlists: [] });
+        await ensureFileExists(LIBRARY_STRUCTURE_FILE, {
+          library: {
+            name: 'My Music Collection',
+            folders: []
+          }
         });
+
+        console.log(`\nAPI Endpoints:`);
+        console.log(`  GET  /api/library-structure - Get editable library folder structure`);
+        console.log(`  GET  /api/genres           - List existing genres for dropdowns`);
+        console.log(`  POST /api/genres            - Create a genre from UI`);
+        console.log(`  POST /api/playlists         - Map a playlist to a folder path`);
+        console.log(`  GET  /api/library       - Get full library with scanned tracks (cached)`);
+        console.log(`  GET  /api/playlist/:id  - Get specific playlist tracks from cache`);
+        console.log(`  GET  /api/system-volume - Get Windows master volume (0..1)`);
+        console.log(`  POST /api/system-volume - Set Windows master volume (0..1)`);
+        console.log(`  POST /api/rescan        - Force immediate rescan and refresh cache`);
+        console.log(`  POST /api/upload        - Upload new MP3 files\n`);
+
+        // Ensure library structure exists and do initial scan on startup
+        loadLibraryStructure()
+            .then(() => getScannedLibrary(true))
+            .then((result) => {
+                console.log(`✅ Startup scan complete: ${result.summary.totalTracks} tracks across ${result.summary.totalPlaylists} playlists`);
+            })
+            .catch((error) => {
+                console.error('⚠️ Startup scan failed:', error.message);
+            });
+    })().catch((error) => {
+        console.error('[SERVER] Startup initialization failed:', error);
+    });
+});
+
+server.on('error', (error) => {
+    console.error('[SERVER] Listen error:', error);
 });

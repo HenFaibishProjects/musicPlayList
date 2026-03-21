@@ -108,11 +108,15 @@ body::before {
     min-height: 100vh;
     position: relative;
     z-index: 1;
+    width: 100%;
+    max-width: 100%;
 }
 
 /* Delightful Sidebar */
 .sidebar {
-    width: 300px;
+    width: min(300px, 100%);
+    flex: 0 0 clamp(240px, 22vw, 300px);
+    max-width: 100%;
     background: linear-gradient(180deg, rgba(17, 24, 39, 0.95), rgba(15, 23, 42, 0.98));
     backdrop-filter: blur(20px);
     border-right: 1px solid rgba(255, 255, 255, 0.1);
@@ -744,8 +748,10 @@ body.light-theme .nav-item.active {
 /* Main Content */
 .main-content {
     flex: 1;
-    padding: 40px 60px 140px;
-    max-width: 1800px;
+    width: 100%;
+    min-width: 0;
+    padding: clamp(20px, 3vw, 40px) clamp(16px, 4vw, 60px) 140px;
+    max-width: min(1800px, 100%);
     margin: 0 auto;
 }
 
@@ -1298,7 +1304,7 @@ body.is-playing .wave-bar {
 /* Folder Grid */
 .folder-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: 24px;
     margin-bottom: 80px;
 }
@@ -1538,7 +1544,7 @@ body.is-playing .wave-bar {
 
 .image-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
     gap: 8px;
     margin-bottom: 20px;
     border-radius: 12px;
@@ -6710,6 +6716,7 @@ body.light-theme .about-made-by a:hover {
     top: calc(100% + 8px);
     right: 0;
     min-width: 220px;
+    max-width: min(260px, calc(100vw - 24px));
     background: rgba(15, 23, 42, 0.98);
     backdrop-filter: blur(24px);
     border: 1px solid rgba(255, 255, 255, 0.12);
@@ -6768,4 +6775,305 @@ body.light-theme .about-made-by a:hover {
 
 .app-menu-item-danger i {
     color: #f472b6;
+}
+
+/* ======================================================
+   GLOBAL RESPONSIVE OVERRIDES
+   ====================================================== */
+@media (max-width: 900px) {
+    .app-container {
+        flex-direction: column;
+    }
+
+    .sidebar {
+        width: 100%;
+        max-width: 100%;
+        flex: 0 0 auto;
+        height: auto;
+        position: relative;
+        top: auto;
+        border-right: none;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 20px 16px;
+    }
+
+    .main-content {
+        width: 100%;
+        max-width: 100%;
+        padding: 20px 16px 170px;
+    }
+
+    .workspace-strip {
+        height: auto;
+        min-height: 38px;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 8px 10px;
+    }
+
+    .ws-brand {
+        height: auto;
+        border-right: none;
+        padding-right: 0;
+        margin-right: 0;
+    }
+
+    .ws-status-bar {
+        height: auto;
+        flex-wrap: wrap;
+        min-width: 0;
+    }
+
+    .workspace-chip {
+        height: auto;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .workspace-chip + .workspace-chip::before {
+        display: none;
+    }
+
+    .statusnvisu {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    .toolbar,
+    .toolbar-left,
+    .toolbar-right,
+    .folder-browser-footer,
+    .resume-banner-content,
+    .history-navigation {
+        flex-wrap: wrap;
+    }
+
+    .folder-browser-buttons {
+        width: 100%;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+    }
+
+    .folder-browser-buttons .btn {
+        flex: 1 1 150px;
+        min-width: 0;
+    }
+
+    #historyDateTitle {
+        min-width: 0;
+        width: 100%;
+    }
+
+    .folder-grid {
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 16px;
+    }
+
+    .track-list-view {
+        overflow-x: auto;
+    }
+
+    .track-row {
+        min-width: 700px;
+    }
+
+    .music-player {
+        flex-wrap: wrap;
+        height: auto;
+        padding: 12px 16px;
+        gap: 12px;
+    }
+
+    .player-track-info {
+        flex: 1 1 100%;
+        min-width: 0;
+    }
+
+    .player-progress {
+        flex: 1 1 100%;
+        max-width: 100%;
+        order: 3;
+    }
+
+    .player-volume {
+        order: 2;
+        margin-left: auto;
+    }
+
+    .queue-panel-overlay {
+        width: 100vw;
+        bottom: 0;
+    }
+
+    body.queue-panel-open .main-content,
+    body.queue-panel-open .music-player {
+        padding-right: 16px;
+    }
+
+    .app-menu-dropdown {
+        right: 0;
+        left: auto;
+    }
+}
+
+@media (max-width: 600px) {
+    .main-content {
+        padding: 16px 12px 190px;
+    }
+
+    .page-title {
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .page-title h2 {
+        font-size: clamp(28px, 8vw, 36px);
+    }
+
+    .page-subtitle {
+        font-size: 14px;
+    }
+
+    .workspace-strip {
+        padding: 6px;
+    }
+
+    .workspace-chip {
+        font-size: 11px;
+        padding: 5px 8px;
+    }
+
+    #playbackStatusChip span {
+        max-width: 110px;
+    }
+
+    .search-box {
+        padding: 14px 42px;
+        font-size: 14px;
+    }
+
+    .search-icon {
+        left: 14px;
+        font-size: 14px;
+    }
+
+    .clear-search {
+        right: 14px;
+        font-size: 14px;
+    }
+
+    .toolbar {
+        padding: 10px;
+        gap: 8px;
+    }
+
+    .toolbar-left,
+    .toolbar-right {
+        width: 100%;
+        gap: 8px;
+    }
+
+    .toolbar-left .btn,
+    .toolbar-right .btn,
+    .theme-toggle {
+        flex: 1 1 calc(50% - 8px);
+        justify-content: center;
+    }
+
+    .theme-toggle {
+        height: 42px;
+    }
+
+    .folder-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .playlist-card {
+        padding: 44px 16px 16px;
+    }
+
+    .image-grid {
+        grid-template-columns: repeat(auto-fit, minmax(56px, 1fr));
+    }
+
+    .music-player {
+        padding: 10px 12px 12px;
+        gap: 10px;
+    }
+
+    .player-controls {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .player-volume {
+        width: 100%;
+        justify-content: center;
+        margin-left: 0;
+    }
+
+    .control-btn {
+        width: 40px;
+        height: 40px;
+    }
+
+    .play-btn-main {
+        width: 48px;
+        height: 48px;
+    }
+
+    .time {
+        min-width: 36px;
+        font-size: 12px;
+    }
+
+    .notification-modal,
+    .modal-content,
+    .day-details-modal,
+    .folder-browser-content {
+        width: 100%;
+        max-width: 100%;
+        border-radius: 16px;
+    }
+
+    .modal-header,
+    .library-modal-header,
+    .day-details-header,
+    .modal-body,
+    .library-manager-body,
+    .day-details-body,
+    .folder-browser-toolbar,
+    .folder-browser-footer {
+        padding: 12px;
+    }
+
+    .folder-browser-path {
+        min-width: 0;
+        width: 100%;
+    }
+
+    .calendar-grid,
+    .calendar-days,
+    .calendar-weekdays {
+        gap: 6px;
+    }
+
+    .calendar-day {
+        padding: 6px;
+        border-radius: 10px;
+    }
+
+    .history-calendar-container {
+        padding: 12px;
+        gap: 20px;
+    }
+
+    .app-menu-dropdown {
+        left: 0;
+        right: auto;
+        width: min(100%, 280px);
+    }
 }
