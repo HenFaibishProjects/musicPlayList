@@ -29,11 +29,13 @@ ipcMain.on('open-about', () => {
 
 function createAboutWindow() {
     const aboutWin = new BrowserWindow({
-      width: 400,
-      height: 300,
+      width: 620,
+      height: 800,
       title: 'About LidaMixPlay',
       autoHideMenuBar: true,
-      resizable: false,
+      resizable: true,
+      minWidth: 520,
+      minHeight: 640,
       webPreferences: {
           nodeIntegration: false,
           contextIsolation: true

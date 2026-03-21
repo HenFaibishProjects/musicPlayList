@@ -60,11 +60,11 @@
         <!-- Main Content -->
         <main class="main-content">
             <section class="workspace-strip" id="workspaceStrip">
-                <div class="workspace-title-wrap">
-                    <p class="workspace-overline">Your Music Space</p>
-                    <h3 class="workspace-title">LidaMixPlay</h3>
+                <div class="ws-brand">
+                    <img src="favicon.png" alt="logo" class="ws-logo">
+                    <span class="ws-name">LidaMixPlay</span>
                 </div>
-                <div class="workspace-chips" id="workspaceChips">
+                <div class="ws-status-bar" id="workspaceChips">
                     <span class="workspace-chip" id="apiStatusChip">
                         <i class="fas fa-plug-circle-xmark"></i>
                         <span>API Offline</span>
@@ -276,7 +276,7 @@
     <div class="music-player" id="musicPlayer">
         <div class="player-track-info">
             <div class="album-art-wrapper">
-                <img src="https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=400&fit=crop" alt="Album cover" class="player-cover" id="playerCover">
+                <img src="https://www.lidasoftware.online/logo.png" alt="Album cover" class="player-cover" id="playerCover">
             </div>
             <div class="player-details">
                 <div class="player-title" id="playerTitle">No track selected</div>
@@ -1037,5 +1037,89 @@
     <script src="playback-control.js"></script>
     <script src="volume-control.js"></script>
     <script src="ui-utilities.js"></script>
+
+  <!-- ══════════════ ABOUT MODAL ══════════════ -->
+  <div class="about-modal-overlay" id="aboutModalOverlay" role="dialog" aria-modal="true" aria-label="About LidaMixPlay">
+    <div class="about-modal-card" id="aboutModalCard">
+
+      <!-- close button -->
+      <button class="about-modal-close" id="aboutModalClose" aria-label="Close">✕</button>
+
+      <!-- top gold shimmer line -->
+      <div class="about-top-line"></div>
+
+      <!-- HERO -->
+      <div class="about-hero">
+        <div class="about-vinyl-wrap">
+          <div class="about-vinyl"></div>
+          <div class="about-wave-bars">
+            <div class="about-bar"></div><div class="about-bar"></div>
+            <div class="about-bar"></div><div class="about-bar"></div>
+            <div class="about-bar"></div><div class="about-bar"></div>
+            <div class="about-bar"></div>
+          </div>
+        </div>
+        <div class="about-app-name">LidaMixPlay</div>
+        <div class="about-tagline">Music Collection &amp; Playlist Manager</div>
+        <div class="about-version-badge">▶ Version 2.0.0</div>
+      </div>
+
+      <div class="about-divider"></div>
+
+      <div class="about-desc">
+        Organize your entire music library with <strong>rich metadata</strong>,
+        album artwork, and a beautiful interface, all from a single
+        <strong>desktop application</strong>. Your collection, the way it was meant to be seen.
+      </div>
+
+      <div class="about-freeware-row">
+        <div class="about-freeware-pill">✦ Free &amp; Open to Everyone — No License Required</div>
+      </div>
+
+      <div class="about-divider"></div>
+
+      <div class="about-links">
+        <a class="about-link-btn" href="https://www.lidasoftware.online/" target="_blank">
+          <div class="about-link-left">
+            <div class="about-link-icon about-link-icon--gold">🌐</div>
+            <div class="about-link-text">
+              <span class="about-link-title">Lida Software</span>
+              <span class="about-link-sub">More tools &amp; projects — lidasoftware.com</span>
+            </div>
+          </div>
+          <span class="about-link-arrow">→</span>
+        </a>
+
+        <a class="about-link-btn" href="https://www.lidasoftware.online/#contact" target="_blank">
+          <div class="about-link-left">
+            <div class="about-link-icon about-link-icon--teal">✉</div>
+            <div class="about-link-text">
+              <span class="about-link-title">Get in Touch</span>
+              <span class="about-link-sub">Questions, feedback, or just to say hi</span>
+            </div>
+          </div>
+          <span class="about-link-arrow">→</span>
+        </a>
+
+        <a class="about-link-btn" href="https://www.lidasoftware.online/lidamixplay" target="_blank">
+          <div class="about-link-left">
+            <div class="about-link-icon about-link-icon--lavend">📋</div>
+            <div class="about-link-text">
+              <span class="about-link-title">Changelog &amp; Updates</span>
+              <span class="about-link-sub">See what's new in v2.0.0</span>
+            </div>
+          </div>
+          <span class="about-link-arrow">→</span>
+        </a>
+      </div>
+
+      <div class="about-footer">
+        <div class="about-copyright">© 2025 <span>Lida Software</span>. All rights reserved.</div>
+        <div class="about-made-by">by <a href="https://www.lidasoftware.online" target="_blank">Lida Software</a></div>
+      </div>
+
+    </div>
+  </div><!-- /about modal -->
+
 </body>
 </html>

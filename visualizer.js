@@ -32,6 +32,36 @@ class AudioVisualizer {
         this.maxParticles = 90;
     }
 
+    isLightTheme() {
+        return document.body?.classList.contains('light-theme');
+    }
+
+    getThemePalette() {
+        if (this.isLightTheme()) {
+            return {
+                motionBlur: 'rgba(248, 250, 252, 0.45)',
+                glowStart: 'rgba(59, 130, 246, 0.1)',
+                glowMid: 'rgba(168, 85, 247, 0.07)',
+                glowEnd: 'rgba(226, 232, 240, 0.22)',
+                pulseColor: '59, 130, 246',
+                gridLine: 'rgba(15, 23, 42, 0.08)',
+                ringStroke: 'rgba(15, 23, 42, 0.2)',
+                accentDot: 'rgba(15, 23, 42, 0.8)'
+            };
+        }
+
+        return {
+            motionBlur: 'rgba(8, 12, 24, 0.22)',
+            glowStart: 'rgba(34, 211, 238, 0.06)',
+            glowMid: 'rgba(124, 58, 237, 0.04)',
+            glowEnd: 'rgba(10, 14, 26, 0.1)',
+            pulseColor: '56, 189, 248',
+            gridLine: 'rgba(255, 255, 255, 0.03)',
+            ringStroke: 'rgba(255, 255, 255, 0.15)',
+            accentDot: 'white'
+        };
+    }
+
     initialize() {
         if (this.isInitialized) return true;
 
@@ -178,34 +208,36 @@ class AudioVisualizer {
         if (this.canvasCtx && this.canvas) {
             this.canvasCtx.clearRect(0, 0, this.width || this.canvas.width, this.height || this.canvas.height);
         }
-    }    drawBackground(timestamp) {
+    }
+    drawBackground(timestamp) {
         const ctx = this.canvasCtx;
+        const palette = this.getThemePalette();
 
         ctx.globalCompositeOperation = 'source-over';
-        // Motion blur effect - deeper dark blue with less alpha for better trails
-        ctx.fillStyle = 'rgba(8, 12, 24, 0.22)';
+        // Motion blur layer adapted to current theme
+        ctx.fillStyle = palette.motionBlur;
         ctx.fillRect(0, 0, this.width, this.height);
 
         // Animated ambient glow
         const gradientX = this.width * (0.5 + Math.sin(timestamp * 0.0004) * 0.2);
         const gradientY = this.height * (0.5 + Math.cos(timestamp * 0.0003) * 0.2);
         const baseGradient = ctx.createRadialGradient(gradientX, gradientY, 0, gradientX, gradientY, this.width * 0.8);
-        baseGradient.addColorStop(0, 'rgba(34, 211, 238, 0.06)');
-        baseGradient.addColorStop(0.5, 'rgba(124, 58, 237, 0.04)');
-        baseGradient.addColorStop(1, 'rgba(10, 14, 26, 0.1)');
+        baseGradient.addColorStop(0, palette.glowStart);
+        baseGradient.addColorStop(0.5, palette.glowMid);
+        baseGradient.addColorStop(1, palette.glowEnd);
         ctx.fillStyle = baseGradient;
         ctx.fillRect(0, 0, this.width, this.height);
 
         // Pulse core - reacts to bass/energy
         const pulseRadius = Math.max(this.width, this.height) * (0.15 + this.energy * 0.6);
         const pulseGradient = ctx.createRadialGradient(this.width / 2, this.height / 2, 0, this.width / 2, this.height / 2, pulseRadius);
-        pulseGradient.addColorStop(0, `rgba(56, 189, 248, ${0.12 + this.energy * 0.15})`);
-        pulseGradient.addColorStop(1, 'rgba(56, 189, 248, 0)');
+        pulseGradient.addColorStop(0, `rgba(${palette.pulseColor}, ${0.12 + this.energy * 0.15})`);
+        pulseGradient.addColorStop(1, `rgba(${palette.pulseColor}, 0)`);
         ctx.fillStyle = pulseGradient;
         ctx.fillRect(0, 0, this.width, this.height);
 
         // Grid lines with perspective-like fade
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
+        ctx.strokeStyle = palette.gridLine;
         ctx.lineWidth = 1;
         const step = 48;
         const offset = (timestamp * 0.02) % step;
@@ -366,6 +398,7 @@ class AudioVisualizer {
 
     drawCircular(timestamp) {
         const ctx = this.canvasCtx;
+        const palette = this.getThemePalette();
         const cx = this.width / 2;
         const cy = this.height / 2;
         const dim = Math.min(this.width, this.height);
@@ -409,7 +442,7 @@ class AudioVisualizer {
             
             // Accent dots at the end of bars
             if (value > 0.6) {
-                ctx.fillStyle = 'white';
+                ctx.fillStyle = palette.accentDot;
                 ctx.beginPath();
                 ctx.arc(x2, y2, 2, 0, Math.PI * 2);
                 ctx.fill();
@@ -417,7 +450,7 @@ class AudioVisualizer {
         }
 
         // Floating Outer Ring
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.strokeStyle = palette.ringStroke;
         ctx.lineWidth = 2;
         ctx.setLineDash([5, 10]);
         ctx.beginPath();

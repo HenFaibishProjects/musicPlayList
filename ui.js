@@ -115,6 +115,21 @@ function createBackgroundParticles() {
     }
 }
 
+// ── About Modal ──────────────────────────────────────
+function showAboutModal() {
+    const overlay = document.getElementById('aboutModalOverlay');
+    if (!overlay) return;
+    overlay.classList.add('show');
+    document.body.classList.add('modal-locked');
+}
+
+function closeAboutModal() {
+    const overlay = document.getElementById('aboutModalOverlay');
+    if (!overlay) return;
+    overlay.classList.remove('show');
+    document.body.classList.remove('modal-locked');
+}
+
 // App Menu Dropdown Logic
 document.addEventListener('DOMContentLoaded', () => {
     const trigger = document.getElementById('appMenuTrigger');
@@ -136,19 +151,27 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // About Button
+        // About Button — show in-page modal
         if (aboutBtn) {
             aboutBtn.addEventListener('click', () => {
                 dropdown.classList.remove('active');
-                if (typeof require !== 'undefined') {
-                    const { ipcRenderer } = require('electron');
-                    ipcRenderer.send('open-about');
-                } else {
-                    // Fallback
-                    window.open('about.html', 'About', 'width=400,height=300');
-                }
+                showAboutModal();
             });
         }
+
+        // About Modal close button & backdrop
+        const aboutOverlay = document.getElementById('aboutModalOverlay');
+        const aboutCloseBtn = document.getElementById('aboutModalClose');
+        if (aboutCloseBtn) aboutCloseBtn.addEventListener('click', closeAboutModal);
+        if (aboutOverlay) {
+            aboutOverlay.addEventListener('click', (e) => {
+                if (e.target === aboutOverlay) closeAboutModal();
+            });
+        }
+        // Escape key closes about modal
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeAboutModal();
+        });
 
         // Exit Button
         if (exitBtn) {
