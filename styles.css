@@ -1303,7 +1303,7 @@ body.is-playing .wave-bar {
 
 /* Folder Grid */
 .folder-grid {
-    display: grid;
+    display: flex;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: 24px;
     margin-bottom: 80px;

@@ -66,6 +66,7 @@ const LOADING_STAGE_MESSAGES = [
 ];
 let _loadingMsgIndex = 0;
 let _loadingMsgTimer = null;
+let _appInitStarted = false;
 
 function startLoadingMessages() {
     const el = document.getElementById('loadingStageText');
@@ -99,6 +100,11 @@ function dismissLoadingScreen() {
 
 // Initialize app
 async function init() {
+    if (_appInitStarted) {
+        return;
+    }
+    _appInitStarted = true;
+
     try {
         startLoadingMessages();
         createBackgroundParticles();
