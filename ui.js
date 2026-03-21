@@ -114,3 +114,54 @@ function createBackgroundParticles() {
         bgAnimation.appendChild(particle);
     }
 }
+
+// App Menu Dropdown Logic
+document.addEventListener('DOMContentLoaded', () => {
+    const trigger = document.getElementById('appMenuTrigger');
+    const dropdown = document.getElementById('appMenuDropdown');
+    const aboutBtn = document.getElementById('appMenuAbout');
+    const exitBtn = document.getElementById('appMenuExit');
+
+    if (trigger && dropdown) {
+        // Toggle dropdown
+        trigger.addEventListener('click', (e) => {
+            e.stopPropagation();
+            dropdown.classList.toggle('active');
+        });
+
+        // Close on outside click
+        document.addEventListener('click', (e) => {
+            if (!trigger.contains(e.target) && !dropdown.contains(e.target)) {
+                dropdown.classList.remove('active');
+            }
+        });
+
+        // About Button
+        if (aboutBtn) {
+            aboutBtn.addEventListener('click', () => {
+                dropdown.classList.remove('active');
+                if (typeof require !== 'undefined') {
+                    const { ipcRenderer } = require('electron');
+                    ipcRenderer.send('open-about');
+                } else {
+                    // Fallback
+                    window.open('about.html', 'About', 'width=400,height=300');
+                }
+            });
+        }
+
+        // Exit Button
+        if (exitBtn) {
+            exitBtn.addEventListener('click', () => {
+                dropdown.classList.remove('active');
+                if (typeof require !== 'undefined') {
+                    const { ipcRenderer } = require('electron');
+                    ipcRenderer.send('exit-app');
+                } else {
+                    // Fallback
+                    window.close();
+                }
+            });
+        }
+    }
+});

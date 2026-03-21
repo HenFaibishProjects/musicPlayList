@@ -12,6 +12,18 @@ const LIBRARY_STRUCTURE_FILE = 'library-structure.json';
 const IMPORTED_PLAYLISTS_FILE = 'imported-playlists.json';
 const execFileAsync = promisify(execFile);
 
+const LISTENING_HISTORY_FILE = 'listening-history.json';
+
+// Helper: Ensure a JSON file exists with default data if missing
+async function ensureFileExists(filePath, defaultData) {
+  try {
+    await fs.access(filePath);
+  } catch {
+    await fs.writeFile(filePath, JSON.stringify(defaultData, null, 2), 'utf-8');
+    console.log(`Created ${filePath}`);
+  }
+}
+
 const WINDOWS_AUDIO_CORE_SCRIPT = `
 if (-not ("Audio.AudioManager" -as [type])) {
 Add-Type -TypeDefinition @"
@@ -1615,9 +1627,20 @@ app.post('/api/upload', async (req, res) => {
 });
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
     console.log(`\n🎵 LidaPlay Server`);
     console.log(`Server running on http://localhost:${PORT}`);
+    
+    // Step 2: Call it on server startup
+    await ensureFileExists(LISTENING_HISTORY_FILE, { history: [] });
+    await ensureFileExists(IMPORTED_PLAYLISTS_FILE, { playlists: [] });
+    await ensureFileExists(LIBRARY_STRUCTURE_FILE, {
+      library: {
+        name: 'My Music Collection',
+        folders: []
+      }
+    });
+
     console.log(`\nAPI Endpoints:`);
     console.log(`  GET  /api/library-structure - Get editable library folder structure`);
     console.log(`  GET  /api/genres           - List existing genres for dropdowns`);
