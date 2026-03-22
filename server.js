@@ -1058,8 +1058,15 @@ app.patch('/api/genres/:id', async (req, res) => {
         const genreId = req.params.id;
         const { name, icon, color, description, imageUrl } = req.body || {};
 
-        const structure = await loadLibraryStructure();
-        const found = findGenreInStructure(structure, genreId);
+        let structure = await loadLibraryStructure();
+        let found = findGenreInStructure(structure, genreId);
+
+        // Cache may be stale – force a fresh read from file and retry once
+        if (!found) {
+            libraryStructureCache = null;
+            structure = await loadLibraryStructure();
+            found = findGenreInStructure(structure, genreId);
+        }
 
         if (!found) {
             return res.status(404).json({ error: 'Genre not found' });
@@ -1130,8 +1137,15 @@ app.delete('/api/genres/:id', async (req, res) => {
     try {
         const genreId = req.params.id;
 
-        const structure = await loadLibraryStructure();
-        const found = findGenreInStructure(structure, genreId);
+        let structure = await loadLibraryStructure();
+        let found = findGenreInStructure(structure, genreId);
+
+        // Cache may be stale – force a fresh read from file and retry once
+        if (!found) {
+            libraryStructureCache = null;
+            structure = await loadLibraryStructure();
+            found = findGenreInStructure(structure, genreId);
+        }
 
         if (!found) {
             return res.status(404).json({ error: 'Genre not found' });
@@ -1248,8 +1262,15 @@ app.patch('/api/playlists/:id', async (req, res) => {
         const playlistId = req.params.id;
         const { name, artists, folderPath, coverImage, imageUrl, isFavorite } = req.body || {};
 
-        const structure = await loadLibraryStructure();
-        const found = findPlaylistInStructure(structure, playlistId);
+        let structure = await loadLibraryStructure();
+        let found = findPlaylistInStructure(structure, playlistId);
+
+        // Cache may be stale – force a fresh read from file and retry once
+        if (!found) {
+            libraryStructureCache = null;
+            structure = await loadLibraryStructure();
+            found = findPlaylistInStructure(structure, playlistId);
+        }
 
         if (!found) {
             return res.status(404).json({ error: 'Playlist not found' });
@@ -1336,8 +1357,15 @@ app.delete('/api/playlists/:id', async (req, res) => {
     try {
         const playlistId = req.params.id;
 
-        const structure = await loadLibraryStructure();
-        const found = findPlaylistInStructure(structure, playlistId);
+        let structure = await loadLibraryStructure();
+        let found = findPlaylistInStructure(structure, playlistId);
+
+        // Cache may be stale – force a fresh read from file and retry once
+        if (!found) {
+            libraryStructureCache = null;
+            structure = await loadLibraryStructure();
+            found = findPlaylistInStructure(structure, playlistId);
+        }
 
         if (!found) {
             return res.status(404).json({ error: 'Playlist not found' });
