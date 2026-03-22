@@ -383,6 +383,28 @@ function closeDeletePlaylistModal() {
     pendingDeletePlaylist = null;
 }
 
+function openDeleteGenreModal(genre) {
+    const modal = document.getElementById('deleteGenreModal');
+    const message = document.getElementById('deleteGenreMessage');
+    if (!modal || !message) return;
+
+    const playlistCount = (genre.subfolders || []).length;
+    const playlistWarning = playlistCount > 0
+        ? ` This will also remove all ${playlistCount} playlist(s) inside it.`
+        : '';
+
+    pendingDeleteGenre = genre;
+    message.textContent = `Delete genre "${genre.name}"?${playlistWarning} This removes it from the library manager.`;
+    modal.classList.add('show');
+}
+
+function closeDeleteGenreModal() {
+    const modal = document.getElementById('deleteGenreModal');
+    if (!modal) return;
+    modal.classList.remove('show');
+    pendingDeleteGenre = null;
+}
+
 // Genre selection utilities
 function getGenresFromLibraryState() {
     return (libraryData?.library?.folders || []).map(folder => ({
@@ -762,6 +784,51 @@ async function submitEditGenreFromUI(event) {
     } catch (error) {
         console.error('Failed to update genre:', error);
         showNotification('Update Failed', error.message || 'Unable to update this genre right now.', 'error');
+    }
+}
+
+async function deleteGenreFromUI(genre) {
+    if (!apiAvailable) {
+        showNotification('API Offline', 'Start the server first (npm start) to delete genres.', 'warning');
+        return;
+    }
+
+    openDeleteGenreModal(genre);
+}
+
+async function confirmDeleteGenreFromUI() {
+    if (!apiAvailable) {
+        showNotification('API Offline', 'Start the server first (npm start) to delete genres.', 'warning');
+        return;
+    }
+
+    const genre = pendingDeleteGenre;
+    if (!genre?.id) {
+        closeDeleteGenreModal();
+        return;
+    }
+
+    try {
+        await apiRequest(`http://localhost:3000/api/genres/${encodeURIComponent(genre.id)}`, {
+            method: 'DELETE'
+        });
+
+        // If we were currently viewing the deleted genre, go back to all genres
+        if (selectedGenre && selectedGenre.id === genre.id) {
+            selectedGenre = null;
+            currentView = 'all';
+        }
+
+        libraryData = await fetchLibraryData({ forceRescan: true });
+        apiAvailable = true;
+        setRescanButtonState();
+        refreshLibraryUI();
+        closeDeleteGenreModal();
+
+        showNotification('Genre Deleted', `Genre "${genre.name}" and all its playlists were deleted.`, 'success');
+    } catch (error) {
+        console.error('Failed to delete genre:', error);
+        showNotification('Delete Failed', error.message || 'Unable to delete this genre right now.', 'error');
     }
 }
 

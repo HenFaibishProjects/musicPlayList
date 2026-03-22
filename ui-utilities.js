@@ -560,6 +560,21 @@ function setupEventListeners() {
         confirmDeletePlaylistBtn.addEventListener('click', confirmDeletePlaylistFromUI);
     }
 
+    const deleteGenreCloseBtn = document.getElementById('deleteGenreCloseBtn');
+    if (deleteGenreCloseBtn) {
+        deleteGenreCloseBtn.addEventListener('click', closeDeleteGenreModal);
+    }
+
+    const cancelDeleteGenreBtn = document.getElementById('cancelDeleteGenreBtn');
+    if (cancelDeleteGenreBtn) {
+        cancelDeleteGenreBtn.addEventListener('click', closeDeleteGenreModal);
+    }
+
+    const confirmDeleteGenreBtn = document.getElementById('confirmDeleteGenreBtn');
+    if (confirmDeleteGenreBtn) {
+        confirmDeleteGenreBtn.addEventListener('click', confirmDeleteGenreFromUI);
+    }
+
     // Intentionally do not close library management modals on backdrop click.
     // They should only close via explicit actions (X button / submit flow).
 
@@ -568,6 +583,15 @@ function setupEventListeners() {
         deletePlaylistModal.addEventListener('click', (e) => {
             if (e.target === deletePlaylistModal) {
                 closeDeletePlaylistModal();
+            }
+        });
+    }
+
+    const deleteGenreModal = document.getElementById('deleteGenreModal');
+    if (deleteGenreModal) {
+        deleteGenreModal.addEventListener('click', (e) => {
+            if (e.target === deleteGenreModal) {
+                closeDeleteGenreModal();
             }
         });
     }

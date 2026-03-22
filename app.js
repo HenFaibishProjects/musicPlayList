@@ -31,6 +31,7 @@ let currentPlaybackSpeed = 1.0;
 let isDraggingVolume = false;
 let isQueuePanelOpen = false;
 let pendingDeletePlaylist = null;
+let pendingDeleteGenre = null;
 let editingGenreContext = null;
 let modalFormBaseline = {};
 let systemVolumeSyncSupported = true;

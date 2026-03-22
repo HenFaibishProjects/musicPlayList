@@ -515,7 +515,7 @@ async function extractMetadata(filePath, fileName) {
         // Extract album art
         if (common.picture && common.picture.length > 0) {
             const picture = common.picture[0];
-            track.cover = `data:${picture.format};base64,${picture.data.toString('base64')}`;
+            track.cover = null;
         }
         
         // Detect mood from genre/tags (simple heuristic)
@@ -1121,6 +1121,33 @@ app.patch('/api/genres/:id', async (req, res) => {
         });
     } catch (error) {
         console.error('Error updating genre:', error);
+        return res.status(500).json({ error: error.message });
+    }
+});
+
+// API: Delete genre
+app.delete('/api/genres/:id', async (req, res) => {
+    try {
+        const genreId = req.params.id;
+
+        const structure = await loadLibraryStructure();
+        const found = findGenreInStructure(structure, genreId);
+
+        if (!found) {
+            return res.status(404).json({ error: 'Genre not found' });
+        }
+
+        const removed = found.folders.splice(found.index, 1)[0];
+
+        await saveLibraryStructure(structure);
+        invalidateScannedCache();
+
+        return res.json({
+            message: 'Genre deleted',
+            genre: removed
+        });
+    } catch (error) {
+        console.error('Error deleting genre:', error);
         return res.status(500).json({ error: error.message });
     }
 });

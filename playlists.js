@@ -538,15 +538,18 @@ function createGenreCard(folder, index) {
     
     const totalTracks = (folder.subfolders || []).reduce((sum, sub) => sum + (Number(sub.trackCount) || 0), 0);
     const hasGenreImage = Boolean(String(folder.imageUrl || '').trim());
-    const genreImageUrl = hasGenreImage ? sanitizeImageUrl(folder.imageUrl) : '';
+    const genreImageUrl = hasGenreImage ? sanitizeImageUrl(folder.imageUrl) : 'genre.png';
     
     card.innerHTML = `
         <div class="playlist-card-actions">
             <button class="playlist-action-btn edit-genre-btn" title="Edit Genre">
                 <i class="fas fa-pen"></i>
             </button>
+            <button class="playlist-action-btn delete-genre-btn" title="Delete Genre">
+                <i class="fas fa-trash"></i>
+            </button>
         </div>
-        ${hasGenreImage ? `<div class="genre-cover"><img src="${genreImageUrl}" alt="${escapeHtml(folder.name || 'Genre')} artwork"></div>` : ''}
+        <div class="genre-cover"><img src="${genreImageUrl}" alt="${escapeHtml(folder.name || 'Genre')} artwork"></div>
         <div class="card-icon" style="background: linear-gradient(135deg, ${folder.color}22, ${folder.color}11);">
             <i class="${resolveFontAwesomeIconClass(folder.icon)}" style="color: ${folder.color}"></i>
         </div>
@@ -569,6 +572,14 @@ function createGenreCard(folder, index) {
         editGenreBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             editGenreFromUI(folder);
+        });
+    }
+
+    const deleteGenreBtn = card.querySelector('.delete-genre-btn');
+    if (deleteGenreBtn) {
+        deleteGenreBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            deleteGenreFromUI(folder);
         });
     }
     
@@ -595,12 +606,8 @@ function createPlaylistCard(playlist, color, index, genreName = '') {
 
     // Check if playlist has a custom cover image URL
     const hasPlaylistImage = Boolean(String(playlist.imageUrl || playlist.coverImage || '').trim());
-    const playlistImageUrl = hasPlaylistImage ? sanitizeImageUrl(playlist.imageUrl || playlist.coverImage) : '';
+    const playlistImageUrl = hasPlaylistImage ? sanitizeImageUrl(playlist.imageUrl || playlist.coverImage) : 'Playlist-image.png';
 
-    const playlistImages = Array.isArray(playlist.images) ? playlist.images : [];
-    const safeImages = (playlistImages.length ? playlistImages : [DEFAULT_COVER, DEFAULT_COVER, DEFAULT_COVER, DEFAULT_COVER]).slice(0, 4);
-    const imagesHTML = safeImages.map(img => `<img src="${sanitizeImageUrl(img)}" alt="Album cover">`).join('');
-    
     card.innerHTML = `
         <div class="playlist-card-actions">
             <button class="playlist-action-btn favorite-playlist-btn ${playlist.isFavorite ? 'active' : ''}" title="Toggle Favorite">
@@ -618,15 +625,12 @@ function createPlaylistCard(playlist, color, index, genreName = '') {
                 <i class="fas fa-play"></i>
             </div>
         </div>
-        ${hasPlaylistImage ? `<div class="genre-cover"><img src="${playlistImageUrl}" alt="${escapeHtml(playlist.name || 'Playlist')} artwork"></div>` : ''}
+        <div class="genre-cover"><img src="${playlistImageUrl}" alt="${escapeHtml(playlist.name || 'Playlist')} artwork"></div>
         <div class="card-icon" style="background: linear-gradient(135deg, ${color}22, ${color}11);">
             <i class="fas fa-compact-disc" style="color: ${color}"></i>
         </div>
         <h3 class="card-title">${escapeHtml(playlist.name)}</h3>
         <p class="card-description">${escapeHtml(playlist.artists)}</p>
-        <div class="image-grid">
-            ${imagesHTML}
-        </div>
         <div class="card-stats">
             <div class="card-stat">
                 <i class="fas fa-music"></i>
