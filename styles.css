@@ -1365,6 +1365,8 @@ display: grid;
 .folder-grid.list-view .card-description {
     font-size: 12px;
     margin-bottom: 4px;
+    min-height: 0;
+    -webkit-line-clamp: 1;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1481,8 +1483,9 @@ display: grid;
 .genre-cover img {
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain;
     object-position: center center;
+    background: rgba(15, 23, 42, 0.75);
     display: block;
     position: relative;
     z-index: 1;
@@ -1490,7 +1493,7 @@ display: grid;
 }
 
 .playlist-card:hover .genre-cover img {
-    transform: scale(1.08);
+    transform: scale(1);
 }
 
 /* Broken / still-loading image fallback */
@@ -1648,6 +1651,11 @@ display: grid;
     color: var(--text-secondary);
     margin-bottom: 20px;
     line-height: 1.6;
+    min-height: calc(1.6em * 2);
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
 }
 
 .image-grid {
