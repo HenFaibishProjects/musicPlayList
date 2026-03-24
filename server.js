@@ -14,11 +14,13 @@ if (hasExistingServerInstance) {
     console.log('[SERVER] Duplicate bootstrap prevented in same process');
 }
 
-const LIBRARY_STRUCTURE_FILE = 'library-structure.json';
-const IMPORTED_PLAYLISTS_FILE = 'imported-playlists.json';
+const DATA_DIR = process.env.LIDAMIXPLAY_DATA_DIR || process.cwd();
+
+const LIBRARY_STRUCTURE_FILE = path.join(DATA_DIR, 'library-structure.json');
+const IMPORTED_PLAYLISTS_FILE = path.join(DATA_DIR, 'imported-playlists.json');
 const execFileAsync = promisify(execFile);
 
-const LISTENING_HISTORY_FILE = 'listening-history.json';
+const LISTENING_HISTORY_FILE = path.join(DATA_DIR, 'listening-history.json');
 
 // Helper: Ensure a JSON file exists with default data if missing
 async function ensureFileExists(filePath, defaultData) {
@@ -127,7 +129,7 @@ app.get('/', (req, res) => {
 
 app.get('/api/listening-history', async (req, res) => {
   try {
-    const data = await fs.readFile('listening-history.json', 'utf-8');
+    const data = await fs.readFile(LISTENING_HISTORY_FILE, 'utf-8');
     res.json(JSON.parse(data));
   } catch {
     res.json({ history: [] });
@@ -141,7 +143,7 @@ app.post('/api/listening-history', async (req, res) => {
     let data = { history: [] };
 
     try {
-      const raw = await fs.readFile('listening-history.json', 'utf-8');
+      const raw = await fs.readFile(LISTENING_HISTORY_FILE, 'utf-8');
       data = JSON.parse(raw);
     } catch {}
 
@@ -157,7 +159,7 @@ app.post('/api/listening-history', async (req, res) => {
       data.history = data.history.slice(0, 150);
     }
     
-    await fs.writeFile('listening-history.json', JSON.stringify(data, null, 2));
+    await fs.writeFile(LISTENING_HISTORY_FILE, JSON.stringify(data, null, 2));
     
     res.json({ success: true, count: data.history.length, track });
   } catch (e) {
@@ -171,7 +173,7 @@ app.delete('/api/listening-history/:id', async (req, res) => {
     let data = { history: [] };
 
     try {
-      const raw = await fs.readFile('listening-history.json', 'utf-8');
+      const raw = await fs.readFile(LISTENING_HISTORY_FILE, 'utf-8');
       data = JSON.parse(raw);
     } catch {}
 
@@ -179,7 +181,7 @@ app.delete('/api/listening-history/:id', async (req, res) => {
     data.history = data.history.filter(item => item.id !== id);
 
     if (data.history.length !== initialLength) {
-      await fs.writeFile('listening-history.json', JSON.stringify(data, null, 2));
+      await fs.writeFile(LISTENING_HISTORY_FILE, JSON.stringify(data, null, 2));
     }
 
     res.json({ success: true, count: data.history.length });

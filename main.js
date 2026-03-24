@@ -26,6 +26,11 @@ function startBackendServer() {
     return true;
   }
 
+  // Pass userData path to the server so it avoids EPERM writes in packaged mode
+  if (app.isPackaged) {
+    process.env.LIDAMIXPLAY_DATA_DIR = app.getPath('userData');
+  }
+
   const serverPath = getServerPath();
   console.log(`[MAIN] Starting backend from: ${serverPath}`);
 
@@ -54,7 +59,7 @@ function pingBackend({ timeoutMs = 1000 } = {}) {
       },
       (res) => {
         res.resume();
-        resolve(res.statusCode >= 200 && res.statusCode < 500);
+        resolve(res.statusCode >= 200 && res.statusCode < 300);
       }
     );
 
