@@ -281,6 +281,37 @@
         </main>
     </div>
 
+    <!-- Lyrics Panel -->
+    <div class="lyrics-panel" id="lyricsPanel">
+        <div class="lyrics-panel-header">
+            <div class="lyrics-track-info">
+                <img id="lyricsCover" src="" alt="cover" class="lyrics-cover">
+                <div class="lyrics-track-meta">
+                    <div class="lyrics-track-title" id="lyricsTrackTitle">—</div>
+                    <div class="lyrics-track-artist" id="lyricsTrackArtist">—</div>
+                </div>
+            </div>
+            <div class="lyrics-panel-actions">
+                <span class="lyrics-source-badge" id="lyricsSourceBadge"></span>
+                <button class="lyrics-close-btn" id="lyricsCloseBtn" title="Close Lyrics">
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+            </div>
+        </div>
+        <div class="lyrics-body" id="lyricsBody">
+            <div class="lyrics-loading" id="lyricsLoading">
+                <i class="fas fa-compact-disc fa-spin"></i>
+                <span>Searching for lyrics...</span>
+            </div>
+            <div class="lyrics-not-found" id="lyricsNotFound" style="display:none;">
+                <i class="fas fa-face-sad-tear"></i>
+                <p>No lyrics found for this track.</p>
+                <span>Try renaming the file to include the correct artist and title.</span>
+            </div>
+            <div class="lyrics-content" id="lyricsContent" style="display:none;"></div>
+        </div>
+    </div>
+
     <!-- Music Player -->
     <div class="music-player" id="musicPlayer">
         <div class="player-track-info">
@@ -336,6 +367,11 @@
             </button>
             <button class="control-btn" id="playlistBtn" title="Current Playlist">
                 <i class="fas fa-list-ul"></i>
+            </button>
+            <button class="lyrics-pill-btn" id="lyricsBtn" title="Show Lyrics">
+                <i class="fas fa-microphone-lines"></i>
+                <span class="lyrics-btn-label">Lyrics</span>
+                <span class="lyrics-btn-dot" id="lyricsBtnDot"></span>
             </button>
         </div>
     </div>
@@ -1080,6 +1116,7 @@
     <script src="playback-control.js"></script>
     <script src="volume-control.js"></script>
     <script src="ui-utilities.js"></script>
+    <script src="lyrics.js"></script>
 
   <!-- ══════════════ ABOUT MODAL ══════════════ -->
   <div class="about-modal-overlay" id="aboutModalOverlay" role="dialog" aria-modal="true" aria-label="About LidaMixPlay">

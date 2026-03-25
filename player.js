@@ -28,6 +28,11 @@ function loadTrack(track) {
     }
     
     saveLastPlayedTrack();
+
+    // Notify the lyrics panel that the track has changed
+    if (typeof window.onLyricsTrackChange === 'function') {
+        window.onLyricsTrackChange(track);
+    }
 }
 
 function saveLastPlayedTrack() {

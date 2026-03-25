@@ -988,7 +988,160 @@ app.get('/api/export-structure', async (req, res) => {
     }
 });
 
+// API: Fetch Lyrics for current track
+// Priority: 1. Embedded ID3 USLT tag  2. lrclib.net exact  3. lrclib.net search  4. lyrics.ovh (plain)
+app.get('/api/lyrics', async (req, res) => {
+    const { artist = '', title = '', filePath = '', duration = '' } = req.query;
+
+    console.log(`[LYRICS] Request — artist: "${artist}" | title: "${title}" | filePath: "${filePath ? 'yes' : 'no'}"`);
+
+    // --- Layer 1: Embedded ID3 USLT tag ---
+    if (filePath) {
+        try {
+            // filePath arrives as the raw track.file URL like /api/media?path=C%3A%5C...
+            const rawPath = filePath.startsWith('/api/media?path=')
+                ? filePath.slice('/api/media?path='.length)
+                : filePath;
+            const absolutePath = decodeURIComponent(rawPath);
+            console.log(`[LYRICS] Checking embedded tag for: ${absolutePath}`);
+            const mm = await getMusicMetadata();
+            const metadata = await mm.parseFile(absolutePath, { skipCovers: true });
+            const lyrics = metadata?.common?.lyrics;
+            if (lyrics && lyrics.length > 0) {
+                const text = typeof lyrics[0] === 'string' ? lyrics[0] : (lyrics[0]?.text || '');
+                if (text.trim().length > 10) {
+                    console.log(`[LYRICS] ✓ Found embedded lyrics (${text.length} chars)`);
+                    return res.json({ source: 'embedded', synced: false, plain: text.trim(), lines: [] });
+                }
+            }
+            console.log(`[LYRICS] No embedded lyrics found`);
+        } catch (err) {
+            console.log(`[LYRICS] Embedded tag error: ${err.message}`);
+        }
+    }
+
+    // Sanitize artist — strip garbage like "Duration: X" that comes from Quick Play
+    const cleanArtist = (artist || '')
+        .replace(/^Duration:\s*[\d:-]+$/i, '')
+        .replace(/^Unknown Artist$/i, '')
+        .trim();
+    const cleanTitle = (title || '').trim();
+
+    console.log(`[LYRICS] Cleaned — artist: "${cleanArtist}" | title: "${cleanTitle}"`);
+
+    if (!cleanTitle) {
+        console.log(`[LYRICS] No usable title, returning none`);
+        return res.json({ source: 'none', synced: false, plain: '', lines: [] });
+    }
+
+    // --- Layer 2: lrclib.net exact match ---
+    try {
+        const params = new URLSearchParams({ track_name: cleanTitle });
+        if (cleanArtist) params.set('artist_name', cleanArtist);
+        if (duration) params.set('duration', Math.round(Number(duration)));
+
+        const url = `https://lrclib.net/api/get?${params.toString()}`;
+        console.log(`[LYRICS] lrclib exact: ${url}`);
+
+        const lrcRes = await fetch(url, {
+            headers: { 'User-Agent': 'LidaMixPlay/1.0 (https://lidasoftware.online)' },
+            signal: AbortSignal.timeout(8000)
+        });
+
+        console.log(`[LYRICS] lrclib exact response: ${lrcRes.status}`);
+
+        if (lrcRes.ok) {
+            const lrcData = await lrcRes.json();
+            if (lrcData && lrcData.syncedLyrics) {
+                const lines = parseLrc(lrcData.syncedLyrics);
+                if (lines.length > 0) {
+                    console.log(`[LYRICS] ✓ lrclib synced lyrics (${lines.length} lines)`);
+                    return res.json({ source: 'lrclib', synced: true, plain: lines.map(l => l.text).join('\n'), lines });
+                }
+            }
+            if (lrcData && lrcData.plainLyrics && lrcData.plainLyrics.trim().length > 10) {
+                console.log(`[LYRICS] ✓ lrclib plain lyrics`);
+                return res.json({ source: 'lrclib', synced: false, plain: lrcData.plainLyrics.trim(), lines: [] });
+            }
+            console.log(`[LYRICS] lrclib returned no lyrics in response body`);
+        }
+    } catch (err) {
+        console.log(`[LYRICS] lrclib exact failed: ${err.message}`);
+    }
+
+    // --- Layer 3: lrclib.net search (fuzzier, no artist required) ---
+    try {
+        const searchUrl = `https://lrclib.net/api/search?q=${encodeURIComponent(cleanTitle + (cleanArtist ? ' ' + cleanArtist : ''))}`;
+        console.log(`[LYRICS] lrclib search: ${searchUrl}`);
+
+        const searchRes = await fetch(searchUrl, {
+            headers: { 'User-Agent': 'LidaMixPlay/1.0' },
+            signal: AbortSignal.timeout(8000)
+        });
+
+        console.log(`[LYRICS] lrclib search response: ${searchRes.status}`);
+
+        if (searchRes.ok) {
+            const results = await searchRes.json();
+            if (Array.isArray(results) && results.length > 0) {
+                const best = results[0];
+                if (best.syncedLyrics) {
+                    const lines = parseLrc(best.syncedLyrics);
+                    if (lines.length > 0) {
+                        console.log(`[LYRICS] ✓ lrclib search synced (match: "${best.trackName}")`);
+                        return res.json({ source: 'lrclib', synced: true, plain: lines.map(l => l.text).join('\n'), lines });
+                    }
+                }
+                if (best.plainLyrics && best.plainLyrics.trim().length > 10) {
+                    console.log(`[LYRICS] ✓ lrclib search plain (match: "${best.trackName}")`);
+                    return res.json({ source: 'lrclib', synced: false, plain: best.plainLyrics.trim(), lines: [] });
+                }
+            }
+            console.log(`[LYRICS] lrclib search returned ${Array.isArray(results) ? results.length : 0} results, no lyrics`);
+        }
+    } catch (err) {
+        console.log(`[LYRICS] lrclib search failed: ${err.message}`);
+    }
+
+    // --- Layer 4: lyrics.ovh (plain text fallback) ---
+    if (cleanArtist && cleanTitle) {
+        try {
+            const ovhUrl = `https://api.lyrics.ovh/v1/${encodeURIComponent(cleanArtist)}/${encodeURIComponent(cleanTitle)}`;
+            console.log(`[LYRICS] lyrics.ovh: ${ovhUrl}`);
+
+            const ovhRes = await fetch(ovhUrl, { signal: AbortSignal.timeout(8000) });
+            console.log(`[LYRICS] lyrics.ovh response: ${ovhRes.status}`);
+
+            if (ovhRes.ok) {
+                const ovhData = await ovhRes.json();
+                if (ovhData && ovhData.lyrics && ovhData.lyrics.trim().length > 10) {
+                    console.log(`[LYRICS] ✓ lyrics.ovh plain lyrics`);
+                    return res.json({ source: 'lyrics.ovh', synced: false, plain: ovhData.lyrics.trim(), lines: [] });
+                }
+            }
+        } catch (err) {
+            console.log(`[LYRICS] lyrics.ovh failed: ${err.message}`);
+        }
+    }
+
+    console.log(`[LYRICS] ✗ No lyrics found for "${cleanTitle}" by "${cleanArtist}"`);
+    return res.json({ source: 'none', synced: false, plain: '', lines: [] });
+});
+
+// Helper: parse LRC timestamp format [mm:ss.xx] text
+function parseLrc(lrcText) {
+    return lrcText.split('\n')
+        .map(line => {
+            const m = line.match(/^\[(\d+):(\d+(?:\.\d+)?)\]\s*(.*)/);
+            if (!m) return null;
+            const seconds = parseInt(m[1]) * 60 + parseFloat(m[2]);
+            return { time: seconds, text: m[3].trim() };
+        })
+        .filter(l => l !== null && l.text.length > 0);
+}
+
 // API: Import Library Structure
+
 app.post('/api/import-structure', async (req, res) => {
     try {
         const structure = req.body;
