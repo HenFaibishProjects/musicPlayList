@@ -462,6 +462,14 @@ function calculatePlaylistDuration(tracks) {
 async function scanDirectoryRecursive(dirPath) {
     const tracks = [];
     
+    // Skip known problematic or heavy system directories to prevent console flooding and hanging
+    const skipDirs = new Set(['node_modules', 'windows', '$windows.~bt', 'system volume information', '$recycle.bin', 'program files', 'program files (x86)', 'appdata']);
+    const dirNameLower = path.basename(dirPath).toLowerCase();
+    
+    if (skipDirs.has(dirNameLower) || dirNameLower.startsWith('.') || dirNameLower.startsWith('$')) {
+        return tracks;
+    }
+
     try {
         const entries = await fs.readdir(dirPath, { withFileTypes: true });
         
@@ -482,7 +490,10 @@ async function scanDirectoryRecursive(dirPath) {
             }
         }
     } catch (error) {
-        console.error(`Error scanning directory ${dirPath}:`, error.message);
+        // Only log non-permissions errors to prevent terminal flooding
+        if (error.code !== 'EPERM' && error.code !== 'EACCES' && error.code !== 'EBUSY') {
+            console.error(`Error scanning directory ${dirPath}:`, error.message);
+        }
     }
     
     return tracks;
@@ -964,6 +975,35 @@ app.get('/api/select-folder', async (req, res) => {
     }
 });
 
+// API: Export Library Structure
+app.get('/api/export-structure', async (req, res) => {
+    try {
+        const structure = await loadLibraryStructure();
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Content-Disposition', 'attachment; filename="library-structure.json"');
+        res.send(JSON.stringify(structure, null, 2));
+    } catch (error) {
+        console.error('Error exporting library structure:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// API: Import Library Structure
+app.post('/api/import-structure', async (req, res) => {
+    try {
+        const structure = req.body;
+        if (!structure || !structure.library || !Array.isArray(structure.library.folders)) {
+            return res.status(400).json({ error: 'Invalid library structure JSON' });
+        }
+        await saveLibraryStructure(structure);
+        invalidateScannedCache();
+        res.json({ success: true, message: 'Library structure imported successfully' });
+    } catch (error) {
+        console.error('Error importing library structure:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // API: Get current OS master volume (0..1)
 app.get('/api/system-volume', async (req, res) => {
     try {
@@ -1045,7 +1085,12 @@ app.post('/api/genres', async (req, res) => {
 
         structure.library.folders.push(newGenre);
         await saveLibraryStructure(structure);
-        invalidateScannedCache();
+        
+        if (libraryCache && libraryCache.folders) {
+            libraryCache.folders.push(deepClone({ ...newGenre, subfolders: [] }));
+        } else {
+            invalidateScannedCache();
+        }
 
         res.status(201).json({ message: 'Genre created', genre: newGenre });
     } catch (error) {
@@ -1122,7 +1167,19 @@ app.patch('/api/genres/:id', async (req, res) => {
         }
 
         await saveLibraryStructure(structure);
-        invalidateScannedCache();
+        
+        if (libraryCache && libraryCache.folders) {
+            const cachedGenre = libraryCache.folders.find(g => g.id === genreId);
+            if (cachedGenre) {
+                if (hasName) cachedGenre.name = found.genre.name;
+                if (hasIcon) cachedGenre.icon = found.genre.icon;
+                if (hasColor) cachedGenre.color = found.genre.color;
+                if (hasDescription) cachedGenre.description = found.genre.description;
+                if (hasImageUrl) cachedGenre.imageUrl = found.genre.imageUrl;
+            }
+        } else {
+            invalidateScannedCache();
+        }
 
         return res.json({
             message: 'Genre updated',
@@ -1156,7 +1213,15 @@ app.delete('/api/genres/:id', async (req, res) => {
         const removed = found.folders.splice(found.index, 1)[0];
 
         await saveLibraryStructure(structure);
-        invalidateScannedCache();
+        
+        if (libraryCache && libraryCache.folders) {
+            const cacheIdx = libraryCache.folders.findIndex(g => g.id === genreId);
+            if (cacheIdx !== -1) {
+                libraryCache.folders.splice(cacheIdx, 1);
+            }
+        } else {
+            invalidateScannedCache();
+        }
 
         return res.json({
             message: 'Genre deleted',
@@ -1249,7 +1314,37 @@ app.post('/api/playlists', async (req, res) => {
 
         targetGenre.subfolders.push(newPlaylist);
         await saveLibraryStructure(structure);
-        invalidateScannedCache();
+        
+        if (libraryCache && libraryCache.folders) {
+            let cachedGenre = libraryCache.folders.find(g => g.id === targetGenre.id);
+            if (!cachedGenre) {
+                cachedGenre = deepClone({ ...targetGenre, subfolders: [] });
+                libraryCache.folders.push(cachedGenre);
+            }
+            
+            const cachedPlaylist = deepClone(newPlaylist);
+            cachedPlaylist.tracks = [];
+            cachedPlaylist.trackCount = 0;
+            cachedPlaylist.duration = '0:00';
+            cachedGenre.subfolders.push(cachedPlaylist);
+            
+            // Wait for the tracks for this single playlist folder to scan
+            try {
+                const tracks = await scanDirectoryRecursive(normalizedFolderPath);
+                cachedPlaylist.tracks = tracks;
+                cachedPlaylist.trackCount = tracks.length;
+                cachedPlaylist.duration = calculatePlaylistDuration(tracks);
+                const explicitCover = (cachedPlaylist.images && cachedPlaylist.images[0]) || cachedPlaylist.coverImage;
+                const trackCovers = tracks.slice(0, 4).map(t => t.cover).filter(Boolean);
+                if (explicitCover) trackCovers.unshift(explicitCover);
+                cachedPlaylist.images = trackCovers.length > 0 ? trackCovers.slice(0, 4) : [];
+            } catch (e) {
+                console.error('Incremental playlist scan failed:', e);
+            }
+            
+        } else {
+            invalidateScannedCache();
+        }
 
         res.status(201).json({ message: 'Playlist mapping created', playlist: newPlaylist });
     } catch (error) {
@@ -1342,7 +1437,38 @@ app.patch('/api/playlists/:id', async (req, res) => {
         }
 
         await saveLibraryStructure(structure);
-        invalidateScannedCache();
+        
+        if (libraryCache && libraryCache.folders) {
+            const cachedFind = findPlaylistInStructure({ library: libraryCache }, playlistId);
+            if (cachedFind && cachedFind.playlist) {
+                const lp = cachedFind.playlist;
+                if (hasName) lp.name = found.playlist.name;
+                if (hasArtists) lp.artists = found.playlist.artists;
+                if (hasIsFavorite) lp.isFavorite = found.playlist.isFavorite;
+                if (hasImageUrl || hasCoverImage) {
+                    const nextImage = hasImageUrl ? (imageUrl || '') : (coverImage || '');
+                    lp.imageUrl = nextImage || null;
+                    lp.coverImage = nextImage || null;
+                    lp.images = nextImage ? [nextImage] : [];
+                }
+                if (hasFolderPath) {
+                    lp.path = found.playlist.path;
+                    lp.link = found.playlist.link;
+                    // Rescan newly provided path iteratively
+                    const pPath = lp.path;
+                    try {
+                        const tracks = await scanDirectoryRecursive(pPath);
+                        lp.tracks = tracks;
+                        lp.trackCount = tracks.length;
+                        lp.duration = calculatePlaylistDuration(tracks);
+                    } catch (e) {
+                        console.error('Incremental patch scan failed:', e);
+                    }
+                }
+            }
+        } else {
+            invalidateScannedCache();
+        }
 
         return res.json({
             message: 'Playlist updated',
@@ -1376,7 +1502,15 @@ app.delete('/api/playlists/:id', async (req, res) => {
         const removed = found.playlists.splice(found.index, 1)[0];
 
         await saveLibraryStructure(structure);
-        invalidateScannedCache();
+        
+        if (libraryCache && libraryCache.folders) {
+            const cachedFind = findPlaylistInStructure({ library: libraryCache }, playlistId);
+            if (cachedFind) {
+                cachedFind.playlists.splice(cachedFind.index, 1);
+            }
+        } else {
+            invalidateScannedCache();
+        }
 
         return res.json({
             message: 'Playlist deleted',
@@ -1412,7 +1546,8 @@ function detectMood(genre, tags) {
 // API: Get all library data with scanned tracks
 app.get('/api/library', async (req, res) => {
     try {
-        const response = await getScannedLibrary(false);
+        const forceRescan = ['1', 'true', 'yes'].includes(String(req.query.forceRescan || '').toLowerCase());
+        const response = await getScannedLibrary(forceRescan);
         res.json(response);
     } catch (error) {
         console.error('Error getting library:', error);

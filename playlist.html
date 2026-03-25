@@ -102,6 +102,15 @@
                             <span>About</span>
                         </div>
                         <div class="app-menu-divider"></div>
+                        <div class="app-menu-item" id="appMenuExportConfig">
+                            <i class="fas fa-file-export"></i>
+                            <span>Export Library Config</span>
+                        </div>
+                        <div class="app-menu-item" id="appMenuImportConfig">
+                            <i class="fas fa-file-import"></i>
+                            <span>Import Library Config</span>
+                        </div>
+                        <div class="app-menu-divider"></div>
                         <div class="app-menu-item app-menu-item-danger" id="appMenuExit">
                             <i class="fas fa-power-off"></i>
                             <span>Exit</span>
@@ -187,11 +196,11 @@
                     </div>
                 </div>
                 <div class="toolbar-right">
-                    <div class="btn" id="openAddGenreBtn" title="Create a new genre">
+                    <div class="btn-genre" id="openAddGenreBtn" title="Create a new genre">
                         <i class="fas fa-layer-group"></i>
                         <span>Add Genre</span>
                     </div>
-                    <div class="btn" id="openAddPlaylistBtn" title="Map a folder to an existing genre">
+                    <div class="btn-playlist" id="openAddPlaylistBtn" title="Map a folder to an existing genre">
                         <i class="fas fa-folder-plus"></i>
                         <span>Add Playlist</span>
                     </div>
@@ -338,6 +347,12 @@
         type="file"
         id="quickPlayFileInput"
         accept=".mp3,.wav,.flac,.m4a,.ogg,audio/*"
+        style="display: none;"
+    >
+    <input
+        type="file"
+        id="importConfigInput"
+        accept=".json"
         style="display: none;"
     >
 

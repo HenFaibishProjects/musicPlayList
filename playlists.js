@@ -971,33 +971,50 @@ async function rescanLibrary() {
     isRescanningLibrary = true;
     setRescanButtonState();
 
+    // Create a mandatory full-screen loading overlay for the deep scan
+    const scanOverlay = document.createElement('div');
+    scanOverlay.id = 'rescanOverlay';
+    scanOverlay.style.cssText = `
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(15, 23, 42, 0.9);
+        z-index: 99999;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        backdrop-filter: blur(10px);
+    `;
+
+    // Ensure it looks good in light mode too by overriding body classes if needed, 
+    // but a dark overlay looks premium everywhere.
+    scanOverlay.innerHTML = `
+        <div style="font-size: 48px; color: #eb65f5; margin-bottom: 24px;">
+            <i class="fas fa-compact-disc fa-spin"></i>
+        </div>
+        <h2 style="margin: 0 0 12px 0; font-weight: 600; font-size: 24px; color: white;">Scanning Library...</h2>
+        <p style="color: #94a3b8; margin: 0; font-size: 16px;">This may take a moment depending on your collection size.</p>
+    `;
+    document.body.appendChild(scanOverlay);
+
     try {
-        const payload = await fetchLibraryData({ forceRescan: true });
-        libraryData = payload;
-        apiAvailable = true;
-        setRescanButtonState();
-        refreshLibraryUI();
-
-        const summary = payload.summary;
-        const tracks = summary?.totalTracks;
-        const playlists = summary?.totalPlaylists;
-
-        showNotification(
-            'Playlist Libraries Rescanned',
-            (typeof tracks === 'number' && typeof playlists === 'number')
-                ? `Scan complete: ${tracks} songs found across ${playlists} playlists.`
-                : 'Scan complete. Playlist folders were refreshed from disk.',
-            'success'
-        );
+        await fetchLibraryData({ forceRescan: true });
+        
+        // Refresh the page immediately once the scan is successfully completed
+        window.location.reload();
+        
     } catch (error) {
         console.error('Rescan failed:', error);
         apiAvailable = false;
+        if (document.body.contains(scanOverlay)) {
+            document.body.removeChild(scanOverlay);
+        }
         showNotification(
             'Rescan Failed',
             'Unable to connect to the scan API. Please start the Node server (npm start) and try again.',
             'error'
         );
-    } finally {
         isRescanningLibrary = false;
         setRescanButtonState();
     }

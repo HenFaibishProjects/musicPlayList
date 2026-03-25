@@ -533,11 +533,12 @@ async function addGenreFromUI(event) {
         refreshLibraryUI();
         event.target.reset();
         rememberModalFormState('addGenre', 'addGenreForm');
+        
+        closeAddGenreModal();
 
         await loadGenreOptionsForPlaylistSelect(createdGenre?.id || '');
 
         showNotification('Genre Added', `Genre "${name}" is now available in the playlist dropdown.`, 'success');
-        closeAddGenreModal();
     } catch (error) {
         console.error('Failed to add genre:', error);
         showNotification('Add Genre Failed', error.message || 'Unable to create this genre right now.', 'error');
@@ -614,13 +615,13 @@ async function addPlaylistFromUI(event) {
             })
         });
 
-        libraryData = await fetchLibraryData({ forceRescan: true });
+        event.target.reset();
+        closeAddPlaylistModal();
+
+        libraryData = await fetchLibraryData({ forceRescan: false });
         apiAvailable = true;
         setRescanButtonState();
         refreshLibraryUI();
-
-        event.target.reset();
-        closeAddPlaylistModal();
 
         showNotification('Playlist Added', `Playlist "${name}" was created and scanned successfully.`, 'success');
     } catch (error) {
@@ -689,11 +690,11 @@ async function submitEditPlaylistFromUI(event) {
             })
         });
 
-        libraryData = await fetchLibraryData({ forceRescan: true });
+        closeEditPlaylistModal();
+        libraryData = await fetchLibraryData({ forceRescan: false });
         apiAvailable = true;
         setRescanButtonState();
         refreshLibraryUI();
-        closeEditPlaylistModal();
 
         showNotification('Playlist Updated', `Playlist "${nextName}" was updated successfully.`, 'success');
     } catch (error) {
@@ -719,11 +720,11 @@ async function confirmDeletePlaylistFromUI() {
             method: 'DELETE'
         });
 
-        libraryData = await fetchLibraryData({ forceRescan: true });
+        closeDeletePlaylistModal();
+        libraryData = await fetchLibraryData({ forceRescan: false });
         apiAvailable = true;
         setRescanButtonState();
         refreshLibraryUI();
-        closeDeletePlaylistModal();
 
         showNotification('Playlist Deleted', `Playlist "${playlist.name}" was deleted.`, 'success');
     } catch (error) {
@@ -767,11 +768,11 @@ async function submitEditGenreFromUI(event) {
 
         const wasViewingEditedGenre = selectedGenre && selectedGenre.id === genreId;
 
-        libraryData = await fetchLibraryData({ forceRescan: true });
+        closeEditGenreModal();
+        libraryData = await fetchLibraryData({ forceRescan: false });
         apiAvailable = true;
         setRescanButtonState();
         refreshLibraryUI();
-        closeEditGenreModal();
 
         if (wasViewingEditedGenre) {
             const updatedGenre = (libraryData.library.folders || []).find(folder => folder.id === genreId);
@@ -819,11 +820,11 @@ async function confirmDeleteGenreFromUI() {
             currentView = 'all';
         }
 
-        libraryData = await fetchLibraryData({ forceRescan: true });
+        closeDeleteGenreModal();
+        libraryData = await fetchLibraryData({ forceRescan: false });
         apiAvailable = true;
         setRescanButtonState();
         refreshLibraryUI();
-        closeDeleteGenreModal();
 
         showNotification('Genre Deleted', `Genre "${genre.name}" and all its playlists were deleted.`, 'success');
     } catch (error) {

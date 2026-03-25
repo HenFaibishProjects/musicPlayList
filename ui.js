@@ -136,6 +136,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const dropdown = document.getElementById('appMenuDropdown');
     const aboutBtn = document.getElementById('appMenuAbout');
     const exitBtn = document.getElementById('appMenuExit');
+    const exportConfigBtn = document.getElementById('appMenuExportConfig');
+    const importConfigBtn = document.getElementById('appMenuImportConfig');
+    const importConfigInput = document.getElementById('importConfigInput');
 
     if (trigger && dropdown) {
         // Toggle dropdown
@@ -172,6 +175,113 @@ document.addEventListener('DOMContentLoaded', () => {
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') closeAboutModal();
         });
+
+        // Export Library Config
+        if (exportConfigBtn) {
+            exportConfigBtn.addEventListener('click', () => {
+                dropdown.classList.remove('active');
+                window.location.href = 'http://localhost:3000/api/export-structure';
+            });
+        }
+
+        // Import Library Config
+        if (importConfigBtn && importConfigInput) {
+            importConfigBtn.addEventListener('click', () => {
+                dropdown.classList.remove('active');
+                importConfigInput.click();
+            });
+
+            importConfigInput.addEventListener('change', async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                try {
+                    const text = await file.text();
+                    const json = JSON.parse(text);
+
+                    const response = await fetch('http://localhost:3000/api/import-structure', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(json)
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || 'Failed to import structure');
+                    }
+
+                    // Show a full-screen loading overlay while the library scans
+                    const importOverlay = document.createElement('div');
+                    importOverlay.id = 'importScanOverlay';
+                    importOverlay.style.cssText = `
+                        position: fixed;
+                        top: 0; left: 0; right: 0; bottom: 0;
+                        background: rgba(15, 23, 42, 0.92);
+                        z-index: 99999;
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        justify-content: center;
+                        color: white;
+                        backdrop-filter: blur(12px);
+                    `;
+
+                    // Animated progress bar
+                    importOverlay.innerHTML = `
+                        <div style="font-size: 52px; color: #22d3ee; margin-bottom: 28px;">
+                            <i class="fas fa-compact-disc fa-spin"></i>
+                        </div>
+                        <h2 style="margin: 0 0 8px 0; font-weight: 700; font-size: 26px; color: white; letter-spacing: -0.5px;">Importing Library...</h2>
+                        <p style="color: #94a3b8; margin: 0 0 32px 0; font-size: 15px;">Scanning your music folders. Please wait.</p>
+                        <div style="width: 340px; height: 6px; background: rgba(255,255,255,0.1); border-radius: 99px; overflow: hidden;">
+                            <div id="importProgressBar" style="height: 100%; width: 0%; background: linear-gradient(90deg, #22d3ee, #a78bfa); border-radius: 99px; transition: width 0.4s ease;"></div>
+                        </div>
+                        <p id="importProgressLabel" style="color: #64748b; font-size: 13px; margin-top: 12px;">Connecting to server...</p>
+                    `;
+                    document.body.appendChild(importOverlay);
+
+                    // Animate the progress bar while scanning
+                    const progressBar = importOverlay.querySelector('#importProgressBar');
+                    const progressLabel = importOverlay.querySelector('#importProgressLabel');
+                    let fakeProgress = 0;
+                    const progressMessages = [
+                        'Reading folder structure...',
+                        'Scanning music files...',
+                        'Extracting metadata...',
+                        'Building library cache...',
+                        'Organizing playlists...',
+                        'Finalizing...'
+                    ];
+                    let msgIndex = 0;
+                    const progressTimer = setInterval(() => {
+                        if (fakeProgress < 88) {
+                            fakeProgress += Math.random() * 6;
+                            if (progressBar) progressBar.style.width = Math.min(88, fakeProgress) + '%';
+                            msgIndex = Math.min(progressMessages.length - 1, Math.floor(fakeProgress / 16));
+                            if (progressLabel) progressLabel.textContent = progressMessages[msgIndex];
+                        }
+                    }, 500);
+
+                    try {
+                        await fetch('http://localhost:3000/api/library?forceRescan=true');
+                    } catch (_) { /* ignore, reload anyway */ }
+
+                    clearInterval(progressTimer);
+                    if (progressBar) progressBar.style.width = '100%';
+                    if (progressLabel) progressLabel.textContent = 'Done! Refreshing...';
+
+                    setTimeout(() => { window.location.reload(); }, 600);
+
+                } catch (err) {
+                    console.error('Import Error:', err);
+                    const existingOverlay = document.getElementById('importScanOverlay');
+                    if (existingOverlay) existingOverlay.remove();
+                    showNotification('Import Failed', err.message || 'Invalid JSON format', 'error');
+                } finally {
+                    e.target.value = '';
+                }
+            });
+        }
 
         // Exit Button
         if (exitBtn) {
