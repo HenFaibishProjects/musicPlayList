@@ -23,11 +23,11 @@ function filterBySearch(items, isGenre = false) {
     if (!searchQuery) return items;
     return items.filter(item => {
         if (isGenre) {
-            return item.name.toLowerCase().includes(searchQuery) ||
-                   item.description.toLowerCase().includes(searchQuery);
+            return (item.name || '').toLowerCase().includes(searchQuery) ||
+                   (item.description || '').toLowerCase().includes(searchQuery);
         } else {
-            return item.name.toLowerCase().includes(searchQuery) ||
-                   item.artists.toLowerCase().includes(searchQuery);
+            return (item.name || '').toLowerCase().includes(searchQuery) ||
+                   (item.artists || '').toLowerCase().includes(searchQuery);
         }
     });
 }
@@ -63,6 +63,7 @@ function refreshLibraryUI() {
     }
 
     updateWorkspaceStatus();
+    if (typeof updateSearchPlaceholder === 'function') updateSearchPlaceholder();
 }
 
 function updateWorkspaceStatus() {

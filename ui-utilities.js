@@ -3,112 +3,71 @@
 // Search functionality (searchQuery is declared in app.js)
 let searchTimeout = null;
 
+/**
+ * performSearch — update the global searchQuery and re-render the current view.
+ *
+ * IMPORTANT: Do NOT call refreshLibraryUI() here — that triggers
+ * showAllGenres/showFavorites/showGenre which each call performSearch()
+ * when searchQuery is set, causing infinite recursion.
+ *
+ * Instead, call the leaf render functions directly. filterBySearch() in
+ * playlists.js reads the global searchQuery automatically.
+ */
 function performSearch(query) {
-    searchQuery = query.trim().toLowerCase();
-    
-    if (!searchQuery) {
-        // Clear search - show all
-        document.getElementById('clearSearch').classList.remove('visible');
-        refreshLibraryUI();
-        return;
+    // Allow calling without argument — use the already-set global searchQuery
+    if (query !== undefined) {
+        searchQuery = query.trim().toLowerCase();
     }
-    
-    // Show clear button
-    document.getElementById('clearSearch').classList.add('visible');
-    
-    // Filter playlists
-    const filteredPlaylists = [];
-    
-    (libraryData?.library?.folders || []).forEach(genre => {
-        (genre?.subfolders || []).forEach(playlist => {
-            const matches = (
-                (playlist.name && playlist.name.toLowerCase().includes(searchQuery)) ||
-                (playlist.artists && playlist.artists.toLowerCase().includes(searchQuery)) ||
-                (playlist.tracks && playlist.tracks.some(track => 
-                    (track.title && track.title.toLowerCase().includes(searchQuery)) ||
-                    (track.artist && track.artist.toLowerCase().includes(searchQuery))
-                ))
-            );
-            
-            if (matches) {
-                filteredPlaylists.push({
-                    genre,
-                    playlist
-                });
-            }
-        });
-    });
-    
-    // Render search results
-    renderSearchResults(filteredPlaylists);
-}
 
-function renderSearchResults(results) {
-    const container = document.getElementById('playlistContainer');
-    if (!container) return;
-    
-    if (results.length === 0) {
-        container.innerHTML = `
-            <div class="search-empty-state">
-                <i class="fas fa-search"></i>
-                <h4>No matches found</h4>
-                <p>Try a different search term or browse the library.</p>
-            </div>
-        `;
-        return;
-    }
-    
-    // Group by genre
-    const grouped = {};
-    results.forEach(({ genre, playlist }) => {
-        if (!grouped[genre.id]) {
-            grouped[genre.id] = {
-                genre,
-                playlists: []
-            };
-        }
-        grouped[genre.id].playlists.push(playlist);
-    });
-    
-    // Render grouped results
-    container.innerHTML = Object.values(grouped).map(({ genre, playlists }) => `
-        <div class="genre-section">
-            <div class="genre-header">
-                <div class="genre-icon" style="background-color: ${genre.color || '#6366f1'}">
-                    <i class="${resolveFontAwesomeIconClass(genre.icon)}"></i>
-                </div>
-                <div class="genre-info">
-                    <h3>${genre.name}</h3>
-                    <p>${playlists.length} playlist${playlists.length === 1 ? '' : 's'} found</p>
-                </div>
-            </div>
-            <div class="playlist-grid">
-                ${playlists.map(playlist => renderPlaylistCard(playlist, genre)).join('')}
-            </div>
-        </div>
-    `).join('');
-}
+    const clearBtn = document.getElementById('clearSearch');
+    if (clearBtn) clearBtn.classList.toggle('visible', searchQuery.length > 0);
 
-function handleSearchInput(e) {
-    const query = e.target.value;
-    
-    if (searchTimeout) {
-        clearTimeout(searchTimeout);
+    // Call leaf render functions directly — avoids infinite recursion that
+    // would occur if we called refreshLibraryUI(), which calls showAllGenres()
+    // etc., which in turn call performSearch() when searchQuery is non-empty.
+    updateWorkspaceStatus();
+    updateSearchPlaceholder();
+    if (currentView === 'favorites') {
+        renderFavoritesPlaylists();
+        updateStatsForFavorites();
+    } else if (currentView === 'genre' && selectedGenre) {
+        renderGenrePlaylists(selectedGenre);
+        updateStatsForGenre(selectedGenre);
+    } else if (currentView === 'recent') {
+        renderRecentlyPlayed();
+    } else {
+        // 'all' view — filter genres
+        renderAllGenres();
+        updateStats();
     }
-    
-    searchTimeout = setTimeout(() => {
-        performSearch(query);
-    }, 300);
 }
 
 function clearSearch() {
     const searchInput = document.getElementById('searchInput');
-    if (searchInput) {
-        searchInput.value = '';
-    }
-    document.getElementById('clearSearch').classList.remove('visible');
+    if (searchInput) searchInput.value = '';
     searchQuery = '';
+    const clearBtn = document.getElementById('clearSearch');
+    if (clearBtn) clearBtn.classList.remove('visible');
     refreshLibraryUI();
+}
+
+function updateSearchPlaceholder() {
+    const input = document.getElementById('searchInput');
+    if (!input) return;
+
+    let placeholder;
+    if (currentView === 'genre' && selectedGenre) {
+        const name = selectedGenre.name || 'Genre';
+        placeholder = `Filter playlists in "${name}"...`;
+    } else if (currentView === 'favorites') {
+        placeholder = 'Filter favorite playlists...';
+    } else if (currentView === 'recent') {
+        placeholder = 'Filter recently played tracks...';
+    } else {
+        placeholder = 'Filter genres & playlists in current view...';
+    }
+
+    input.placeholder = placeholder;
 }
 
 // Sorting functionality (currentSort is declared in app.js)
@@ -227,9 +186,9 @@ function updateViewModeUI() {
     `;
     
     // Update container class
-    const container = document.getElementById('playlistContainer');
+    const container = document.getElementById('folderGrid');
     if (container) {
-        container.className = `playlist-container ${currentViewMode}-view`;
+        container.className = `folder-grid ${currentViewMode}-view`;
     }
 }
 
