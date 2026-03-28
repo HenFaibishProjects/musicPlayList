@@ -18,7 +18,7 @@ function loadTrack(track) {
     document.getElementById('playerArtist').textContent = track.artist;
     const playerCover = document.getElementById('playerCover');
     if (playerCover) {
-        playerCover.src = track.cover || DEFAULT_COVER;
+        playerCover.src = track.cover || currentPlaylistContext?.playlistCover || DEFAULT_COVER;
     }
     initializeProgressWaveform();
     
@@ -516,7 +516,8 @@ function loadPlaylist(playlist, genreName = '') {
 
     currentPlaylistContext = {
         playlistName: playlist?.name || '',
-        genreName: genreName || selectedGenre?.name || playlist?.__genreName || ''
+        genreName: genreName || selectedGenre?.name || playlist?.__genreName || '',
+        playlistCover: playlist?.coverImage || playlist?.imageUrl || playlist?.images?.[0] || null
     };
     
     currentPlaylist = playlist.tracks;

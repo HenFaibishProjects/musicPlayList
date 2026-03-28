@@ -39,6 +39,7 @@ function refreshLibraryUI() {
     }
 
     renderGenreList();
+    updateFavoritesNavBadge();
 
     if (currentView === 'genre' && selectedGenre) {
         const updatedGenre = (libraryData.library.folders || []).find(folder => folder.id === selectedGenre.id);
@@ -670,7 +671,7 @@ function createPlaylistCard(playlist, color, index, genreName = '') {
     if (favoriteBtn) {
         favoriteBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            togglePlaylistFavoriteFromUI(playlist);
+            togglePlaylistFavoriteFromUI(playlist, favoriteBtn);
         });
     }
     
@@ -685,7 +686,7 @@ function createPlaylistCard(playlist, color, index, genreName = '') {
     return card;
 }
 
-async function togglePlaylistFavoriteFromUI(playlist) {
+async function togglePlaylistFavoriteFromUI(playlist, favoriteBtn) {
     if (!apiAvailable) {
         showNotification('API Offline', 'Start the server first (npm start) to edit playlists.', 'warning');
         return;
@@ -693,20 +694,47 @@ async function togglePlaylistFavoriteFromUI(playlist) {
 
     if (!playlist?.id) return;
 
+    const newFavorite = !Boolean(playlist.isFavorite);
+
+    // ── Optimistic UI update: flip the star immediately ──────────────────────
+    if (favoriteBtn) {
+        favoriteBtn.classList.toggle('active', newFavorite);
+        const icon = favoriteBtn.querySelector('i');
+        if (icon) icon.className = newFavorite ? 'fas fa-star' : 'far fa-star';
+    }
+
+    // ── Optimistic in-memory update: update libraryData directly ─────────────
+    // This avoids a slow GET /api/library (which can trigger a full disk scan)
+    const folders = libraryData?.library?.folders || [];
+    let localPlaylist = null;
+    for (const folder of folders) {
+        const found = (folder.subfolders || []).find(pl => pl.id === playlist.id);
+        if (found) { localPlaylist = found; break; }
+    }
+    if (localPlaylist) localPlaylist.isFavorite = newFavorite;
+    playlist.isFavorite = newFavorite; // update the reference passed in too
+
     try {
-        await apiRequest(`http://localhost:3000/api/playlists/${encodeURIComponent(playlist.id)}`, {
+        await apiRequest(`http://localhost:3950/api/playlists/${encodeURIComponent(playlist.id)}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                isFavorite: !Boolean(playlist.isFavorite)
-            })
+            body: JSON.stringify({ isFavorite: newFavorite })
         });
 
-        libraryData = await fetchLibraryData({ forceRescan: true });
+        // No need to re-fetch the entire library — we already updated in-memory above.
+        // Just re-render the current view so Favorites panel reflects the change.
         apiAvailable = true;
         setRescanButtonState();
         refreshLibraryUI();
     } catch (error) {
+        // Revert both optimistic updates on failure
+        if (localPlaylist) localPlaylist.isFavorite = !newFavorite;
+        playlist.isFavorite = !newFavorite;
+        if (favoriteBtn) {
+            favoriteBtn.classList.toggle('active', !newFavorite);
+            const icon = favoriteBtn.querySelector('i');
+            if (icon) icon.className = !newFavorite ? 'fas fa-star' : 'far fa-star';
+        }
         console.error('Failed to toggle playlist favorite:', error);
         showNotification('Update Failed', error.message || 'Unable to update favorite status right now.', 'error');
     }
@@ -911,6 +939,27 @@ function setActiveMainNav(navId) {
     document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
     if (navId) {
         document.getElementById(navId)?.classList.add('active');
+    }
+}
+
+function updateFavoritesNavBadge() {
+    const navEl = document.getElementById('favoritesNav');
+    if (!navEl) return;
+
+    const count = (libraryData?.library?.folders || []).reduce((sum, folder) =>
+        sum + (folder.subfolders || []).filter(pl => Boolean(pl.isFavorite)).length, 0
+    );
+
+    let badge = navEl.querySelector('.nav-fav-badge');
+    if (count > 0) {
+        if (!badge) {
+            badge = document.createElement('span');
+            badge.className = 'nav-fav-badge';
+            navEl.appendChild(badge);
+        }
+        badge.textContent = `(${count})`;
+    } else {
+        badge?.remove();
     }
 }
 

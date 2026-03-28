@@ -180,7 +180,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (exportConfigBtn) {
             exportConfigBtn.addEventListener('click', () => {
                 dropdown.classList.remove('active');
-                window.location.href = 'http://localhost:3000/api/export-structure';
+                window.location.href = 'http://localhost:3950/api/export-structure';
             });
         }
 
@@ -199,7 +199,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const text = await file.text();
                     const json = JSON.parse(text);
 
-                    const response = await fetch('http://localhost:3000/api/import-structure', {
+                    const response = await fetch('http://localhost:3950/api/import-structure', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(json)
@@ -263,7 +263,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }, 500);
 
                     try {
-                        await fetch('http://localhost:3000/api/library?forceRescan=true');
+                        await fetch('http://localhost:3950/api/library?forceRescan=true');
                     } catch (_) { /* ignore, reload anyway */ }
 
                     clearInterval(progressTimer);

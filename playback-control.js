@@ -197,7 +197,7 @@ function startCrossfade() {
         document.getElementById('playerArtist').textContent = nextTrack.artist;
         const playerCover = document.getElementById('playerCover');
         if (playerCover) {
-            playerCover.src = nextTrack.cover || DEFAULT_COVER;
+            playerCover.src = nextTrack.cover || currentPlaylistContext?.playlistCover || DEFAULT_COVER;
         }
         
         addTrackToListeningHistory(nextTrack, currentPlaylistContext);
@@ -353,7 +353,7 @@ function renderQueuePanel() {
     container.innerHTML = currentPlaylist.map((track, index) => `
         <div class="queue-track-item ${index === currentTrackIndex ? 'active' : ''}" data-index="${index}">
             <div class="queue-track-number">${index + 1}</div>
-            <img src="${track.cover || DEFAULT_COVER}" alt="${track.title}" class="queue-track-cover">
+            <img src="${track.cover || currentPlaylistContext?.playlistCover || DEFAULT_COVER}" alt="${track.title}" class="queue-track-cover">
             <div class="queue-track-info">
                 <h5>${track.title}</h5>
                 <p>${track.artist}</p>

@@ -14,7 +14,7 @@ let selectedM3UFilePath = null;
  */
 async function readM3UFileByPath(filePath) {
     const response = await fetch(
-        `http://localhost:3000/api/read-m3u?path=${encodeURIComponent(filePath)}`
+        `http://localhost:3950/api/read-m3u?path=${encodeURIComponent(filePath)}`
     );
     if (!response.ok) {
         let errMsg = 'Failed to read M3U file';
@@ -148,7 +148,7 @@ async function loadImportedPlaylistRecords() {
         }
 
         // Use API endpoint
-        const response = await apiRequest('http://localhost:3000/api/imported-playlists');
+        const response = await apiRequest('http://localhost:3950/api/imported-playlists');
         const playlists = response?.playlists || [];
         
         // Convert API format to internal format
@@ -202,7 +202,7 @@ async function saveImportedPlaylistRecords(records = []) {
             if (!playlist) continue;
             
             // Send ONE playlist per request with name, tracks, and genre info
-            await apiRequest('http://localhost:3000/api/imported-playlists', {
+            await apiRequest('http://localhost:3950/api/imported-playlists', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -732,7 +732,7 @@ async function createGenreForImport(genreName, color) {
     }
     
     // Create via API
-    const payload = await apiRequest('http://localhost:3000/api/genres', {
+    const payload = await apiRequest('http://localhost:3950/api/genres', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

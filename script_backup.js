@@ -552,7 +552,7 @@
 // }
 
 // async function fetchLibraryData({ forceRescan = false } = {}) {
-//     const endpoint = forceRescan ? 'http://localhost:3000/api/rescan' : 'http://localhost:3000/api/library';
+//     const endpoint = forceRescan ? 'http://localhost:3950/api/rescan' : 'http://localhost:3950/api/library';
 //     const method = forceRescan ? 'POST' : 'GET';
 //     const payload = await apiRequest(endpoint, { method });
 //     return normalizeLibraryPayload(payload);
@@ -974,7 +974,7 @@
 //     }
 
 //     try {
-//         const payload = await apiRequest('http://localhost:3000/api/genres');
+//         const payload = await apiRequest('http://localhost:3950/api/genres');
 //         const genres = Array.isArray(payload?.genres) ? payload.genres : [];
 //         populatePlaylistGenreSelect(genres, preferredGenreId);
 //     } catch (error) {
@@ -1001,7 +1001,7 @@
 //     }
 
 //     try {
-//         const payload = await apiRequest('http://localhost:3000/api/genres', {
+//         const payload = await apiRequest('http://localhost:3950/api/genres', {
 //             method: 'POST',
 //             headers: { 'Content-Type': 'application/json' },
 //             body: JSON.stringify({
@@ -1069,7 +1069,7 @@
 //     }
 
 //     try {
-//         await apiRequest('http://localhost:3000/api/playlists', {
+//         await apiRequest('http://localhost:3950/api/playlists', {
 //             method: 'POST',
 //             headers: { 'Content-Type': 'application/json' },
 //             body: JSON.stringify({
@@ -1148,7 +1148,7 @@
 //     }
 
 //     try {
-//         await apiRequest(`http://localhost:3000/api/playlists/${encodeURIComponent(playlistId)}`, {
+//         await apiRequest(`http://localhost:3950/api/playlists/${encodeURIComponent(playlistId)}`, {
 //             method: 'PATCH',
 //             headers: { 'Content-Type': 'application/json' },
 //             body: JSON.stringify({
@@ -1186,7 +1186,7 @@
 //     }
 
 //     try {
-//         await apiRequest(`http://localhost:3000/api/playlists/${encodeURIComponent(playlist.id)}`, {
+//         await apiRequest(`http://localhost:3950/api/playlists/${encodeURIComponent(playlist.id)}`, {
 //             method: 'DELETE'
 //         });
 
@@ -1224,7 +1224,7 @@
 //     }
 
 //     try {
-//         await apiRequest(`http://localhost:3000/api/genres/${encodeURIComponent(genreId)}`, {
+//         await apiRequest(`http://localhost:3950/api/genres/${encodeURIComponent(genreId)}`, {
 //             method: 'PATCH',
 //             headers: { 'Content-Type': 'application/json' },
 //             body: JSON.stringify({
@@ -1315,7 +1315,7 @@
 //     `;
 
 //     try {
-//         const data = await apiRequest(`http://localhost:3000/api/browse-directories?path=${encodeURIComponent(path)}`);
+//         const data = await apiRequest(`http://localhost:3950/api/browse-directories?path=${encodeURIComponent(path)}`);
         
 //         folderBrowserState.currentPath = data.path || '';
 //         pathInput.value = data.path || 'Select a drive or folder';
@@ -1411,7 +1411,7 @@
 //     if (!container) return;
 
 //     try {
-//         const data = await apiRequest(`http://localhost:3000/api/browse-directories?path=${encodeURIComponent(folderBrowserState.currentPath)}`);
+//         const data = await apiRequest(`http://localhost:3950/api/browse-directories?path=${encodeURIComponent(folderBrowserState.currentPath)}`);
         
 //         if (data.parent !== null && data.parent !== undefined) {
 //             await loadFolderBrowserDirectory(data.parent);
@@ -1809,7 +1809,7 @@
 //     }
     
 //     // Create via API
-//     const payload = await apiRequest('http://localhost:3000/api/genres', {
+//     const payload = await apiRequest('http://localhost:3950/api/genres', {
 //         method: 'POST',
 //         headers: { 'Content-Type': 'application/json' },
 //         body: JSON.stringify({
@@ -2628,7 +2628,7 @@
 // async function fetchSystemVolume() {
 //     if (!systemVolumeSyncSupported) return null;
 
-//     const response = await fetch('http://localhost:3000/api/system-volume');
+//     const response = await fetch('http://localhost:3950/api/system-volume');
 //     const data = await response.json().catch(() => ({}));
 
 //     if (!response.ok || data?.supported === false) {
@@ -2647,7 +2647,7 @@
 // async function pushSystemVolume(volume) {
 //     if (!systemVolumeSyncSupported) return null;
 
-//     const response = await fetch('http://localhost:3000/api/system-volume', {
+//     const response = await fetch('http://localhost:3950/api/system-volume', {
 //         method: 'POST',
 //         headers: { 'Content-Type': 'application/json' },
 //         body: JSON.stringify({ volume })
@@ -4359,7 +4359,7 @@
 //     if (!playlist?.id) return;
 
 //     try {
-//         await apiRequest(`http://localhost:3000/api/playlists/${encodeURIComponent(playlist.id)}`, {
+//         await apiRequest(`http://localhost:3950/api/playlists/${encodeURIComponent(playlist.id)}`, {
 //             method: 'PATCH',
 //             headers: { 'Content-Type': 'application/json' },
 //             body: JSON.stringify({

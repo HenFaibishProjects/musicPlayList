@@ -112,7 +112,7 @@ async function updateSystemVolume(volume) {
     if (!apiAvailable) return;
     
     try {
-        await apiRequest('http://localhost:3000/api/system-volume', {
+        await apiRequest('http://localhost:3950/api/system-volume', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ volume })
@@ -126,7 +126,7 @@ async function syncSystemVolume() {
     if (!apiAvailable) return;
     
     try {
-        const response = await apiRequest('http://localhost:3000/api/system-volume');
+        const response = await apiRequest('http://localhost:3950/api/system-volume');
         const systemVolume = response?.volume;
         
         if (typeof systemVolume === 'number' && !isNaN(systemVolume)) {
@@ -233,7 +233,7 @@ async function syncVolumeFromSystem({ silent = false } = {}) {
 
     try {
         isSyncingSystemVolume = true;
-        const response = await fetch('http://localhost:3000/api/system-volume');
+        const response = await fetch('http://localhost:3950/api/system-volume');
         if (!response.ok) { systemVolumeSyncSupported = false; return; }
 
         const data = await response.json();

@@ -471,7 +471,7 @@ async function loadGenreOptionsForPlaylistSelect(preferredGenreId = '') {
     }
 
     try {
-        const payload = await apiRequest('http://localhost:3000/api/genres');
+        const payload = await apiRequest('http://localhost:3950/api/genres');
         const genres = Array.isArray(payload?.genres) ? payload.genres : [];
         populatePlaylistGenreSelect(genres, preferredGenreId);
     } catch (error) {
@@ -500,7 +500,7 @@ async function addGenreFromUI(event) {
     }
 
     try {
-        const payload = await apiRequest('http://localhost:3000/api/genres', {
+        const payload = await apiRequest('http://localhost:3950/api/genres', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -570,7 +570,7 @@ async function addPlaylistFromUI(event) {
         }
 
         try {
-            const payload = await apiRequest('http://localhost:3000/api/genres', {
+            const payload = await apiRequest('http://localhost:3950/api/genres', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -602,7 +602,7 @@ async function addPlaylistFromUI(event) {
     }
 
     try {
-        await apiRequest('http://localhost:3000/api/playlists', {
+        await apiRequest('http://localhost:3950/api/playlists', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -678,7 +678,7 @@ async function submitEditPlaylistFromUI(event) {
     }
 
     try {
-        await apiRequest(`http://localhost:3000/api/playlists/${encodeURIComponent(playlistId)}`, {
+        await apiRequest(`http://localhost:3950/api/playlists/${encodeURIComponent(playlistId)}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -716,7 +716,7 @@ async function confirmDeletePlaylistFromUI() {
     }
 
     try {
-        await apiRequest(`http://localhost:3000/api/playlists/${encodeURIComponent(playlist.id)}`, {
+        await apiRequest(`http://localhost:3950/api/playlists/${encodeURIComponent(playlist.id)}`, {
             method: 'DELETE'
         });
 
@@ -754,7 +754,7 @@ async function submitEditGenreFromUI(event) {
     }
 
     try {
-        await apiRequest(`http://localhost:3000/api/genres/${encodeURIComponent(genreId)}`, {
+        await apiRequest(`http://localhost:3950/api/genres/${encodeURIComponent(genreId)}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -810,7 +810,7 @@ async function confirmDeleteGenreFromUI() {
     }
 
     try {
-        await apiRequest(`http://localhost:3000/api/genres/${encodeURIComponent(genre.id)}`, {
+        await apiRequest(`http://localhost:3950/api/genres/${encodeURIComponent(genre.id)}`, {
             method: 'DELETE'
         });
 
@@ -932,7 +932,7 @@ async function loadFolderBrowserDirectory(dirPath) {
 
     try {
         // Build API URL — include files when in file-selection mode
-        let apiUrl = `http://localhost:3000/api/browse-directories?path=${encodeURIComponent(dirPath)}`;
+        let apiUrl = `http://localhost:3950/api/browse-directories?path=${encodeURIComponent(dirPath)}`;
         if (isFileMode) {
             apiUrl += '&includeFiles=true';
             if (folderBrowserState.fileExtensions.length) {
@@ -1048,7 +1048,7 @@ async function folderBrowserGoUp() {
     if (!container) return;
 
     try {
-        const data = await apiRequest(`http://localhost:3000/api/browse-directories?path=${encodeURIComponent(folderBrowserState.currentPath)}`);
+        const data = await apiRequest(`http://localhost:3950/api/browse-directories?path=${encodeURIComponent(folderBrowserState.currentPath)}`);
         
         if (data.parent !== null && data.parent !== undefined) {
             await loadFolderBrowserDirectory(data.parent);

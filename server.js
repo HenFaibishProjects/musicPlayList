@@ -7,7 +7,7 @@ const { promisify } = require('util');
 const { Readable } = require('stream');
 
 const app = express();
-const PORT = 3000;
+const PORT = 3950;
 const hasExistingServerInstance = Boolean(global.__LIDAMIXPLAY_SERVER_INSTANCE__);
 
 if (hasExistingServerInstance) {

@@ -1,5 +1,5 @@
 // Data Management & API
-const DEFAULT_COVER = 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=400&fit=crop';
+const DEFAULT_COVER = 'https://www.lidasoftware.online/logo.png';
 const SESSION_STORAGE_KEY = 'lidaplay_listening_session_v1';
 const PINNED_PLAYLISTS_STORAGE_KEY = 'lidaplay_pinned_playlists_v1';
 const PLAYBACK_SPEED_STORAGE_KEY = 'lidaplay_playback_speed_v1';
@@ -64,7 +64,7 @@ async function apiRequest(url, options = {}) {
 }
 
 async function fetchLibraryData({ forceRescan = false } = {}) {
-    const endpoint = forceRescan ? 'http://localhost:3000/api/rescan' : 'http://localhost:3000/api/library';
+    const endpoint = forceRescan ? 'http://localhost:3950/api/rescan' : 'http://localhost:3950/api/library';
     const method = forceRescan ? 'POST' : 'GET';
     const payload = await apiRequest(endpoint, { method });
     return normalizeLibraryPayload(payload);

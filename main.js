@@ -3,7 +3,7 @@ const path = require('path');
 const http = require('http');
 
 const SERVER_HOST = 'localhost';
-const SERVER_PORT = 3000;
+const SERVER_PORT = 3950;
 const FRONTEND_URL = `http://${SERVER_HOST}:${SERVER_PORT}/playlist.html`;
 
 let backendStarted = false;
