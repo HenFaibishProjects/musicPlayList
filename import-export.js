@@ -201,11 +201,12 @@ async function saveImportedPlaylistRecords(records = []) {
             const playlist = record.playlist;
             if (!playlist) continue;
             
-            // Send ONE playlist per request with name, tracks, and genre info
+            // Send ONE playlist per request with ID, name, tracks, and genre info
             await apiRequest('http://localhost:3950/api/imported-playlists', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
+                    id: playlist.id,
                     name: playlist.name || 'Imported Playlist',
                     tracks: playlist.tracks || [],
                     genreId: record.genreId || '',
@@ -674,28 +675,26 @@ async function importM3UPlaylist(event) {
         progressText.textContent = 'Import complete!';
         
         // Success
-        setTimeout(() => {
-            closeImportM3UModal();
-            showNotification(
-                'Import Successful',
-                `Imported ${tracks.length} tracks into "${playlistName}"`,
-                'success'
-            );
+        closeImportM3UModal();
+        showNotification(
+            'Import Successful',
+            `Imported ${tracks.length} tracks into "${playlistName}"`,
+            'success'
+        );
 
-            // Clear search and navigate to target genre so the imported playlist is immediately visible
-            searchQuery = '';
-            const searchInput = document.getElementById('searchInput');
-            const clearSearch = document.getElementById('clearSearch');
-            if (searchInput) searchInput.value = '';
-            if (clearSearch) clearSearch.classList.remove('visible');
+        // Clear search and navigate to target genre so the imported playlist is immediately visible
+        searchQuery = '';
+        const searchInput = document.getElementById('searchInput');
+        const clearSearch = document.getElementById('clearSearch');
+        if (searchInput) searchInput.value = '';
+        if (clearSearch) clearSearch.classList.remove('visible');
 
-            const targetGenre = (libraryData?.library?.folders || []).find(folder => folder.id === targetGenreId);
-            if (targetGenre) {
-                showGenre(targetGenre);
-            } else {
-                refreshLibraryUI();
-            }
-        }, 1000);
+        const targetGenre = (libraryData?.library?.folders || []).find(folder => folder.id === targetGenreId);
+        if (targetGenre) {
+            showGenre(targetGenre);
+        } else {
+            refreshLibraryUI();
+        }
         
     } catch (error) {
         console.error('Import failed:', error);
@@ -806,6 +805,9 @@ async function addImportedPlaylistToLibrary(genreId, playlistName, tracks) {
             console.warn('Failed to merge imported playlists:', mergeError);
         }
     }
+    
+    // Refresh the UI to update genre counts and sidebar
+    refreshLibraryUI();
 }
 
 function calculateTotalDuration(tracks) {

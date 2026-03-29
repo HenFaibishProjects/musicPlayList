@@ -716,7 +716,11 @@ async function confirmDeletePlaylistFromUI() {
     }
 
     try {
-        await apiRequest(`http://localhost:3950/api/playlists/${encodeURIComponent(playlist.id)}`, {
+        const endpoint = playlist.isImported
+            ? `http://localhost:3950/api/imported-playlists/${encodeURIComponent(playlist.id)}`
+            : `http://localhost:3950/api/playlists/${encodeURIComponent(playlist.id)}`;
+
+        await apiRequest(endpoint, {
             method: 'DELETE'
         });
 
@@ -724,6 +728,9 @@ async function confirmDeletePlaylistFromUI() {
         libraryData = await fetchLibraryData({ forceRescan: false });
         apiAvailable = true;
         setRescanButtonState();
+        
+        // Merge remaining imported playlists
+        libraryData = await mergeImportedPlaylistsIntoLibrary(libraryData);
         refreshLibraryUI();
 
         showNotification('Playlist Deleted', `Playlist "${playlist.name}" was deleted.`, 'success');

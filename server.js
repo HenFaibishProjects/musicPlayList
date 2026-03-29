@@ -115,7 +115,17 @@ process.on('unhandledRejection', (reason) => {
 
 // Enable CORS
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+
+// Global error handler for body-parser (entity too large)
+app.use((err, req, res, next) => {
+  if (err && (err.type === 'entity.too.large' || err.status === 413)) {
+    return res.status(413).json({ 
+      error: 'Playlist file is too large to process. Please try importing a smaller M3U file or split it into multiple parts.' 
+    });
+  }
+  next(err);
+});
 
 // Serve static files from the same location as server.js
 // (works in dev and packaged app.asar runtime)
@@ -1919,8 +1929,7 @@ app.get('/api/imported-playlists', async (req, res) => {
 // API: Create imported playlist
 app.post('/api/imported-playlists', async (req, res) => {
     try {
-        console.log('POST /api/imported-playlists req.body:', req.body);
-        const { name, tracks, genreId, genreName } = req.body || {};
+        const { id, name, tracks, genreId, genreName } = req.body || {};
         if (!name || typeof name !== 'string' || !name.trim()) {
             return res.status(400).json({ error: 'Playlist name is required' });
         }
@@ -1929,8 +1938,26 @@ app.post('/api/imported-playlists', async (req, res) => {
         }
 
         const playlists = await loadImportedPlaylists();
+        const existingIndex = id ? playlists.findIndex(p => p.id === id) : -1;
+
+        if (existingIndex !== -1) {
+            // Update existing record
+            playlists[existingIndex] = {
+                ...playlists[existingIndex],
+                name: name.trim(),
+                tracks: tracks,
+                genreId: genreId || playlists[existingIndex].genreId,
+                genreName: genreName || playlists[existingIndex].genreName,
+                updatedAt: Date.now()
+            };
+            
+            await saveImportedPlaylists(playlists);
+            return res.json({ message: 'Playlist updated', playlist: playlists[existingIndex] });
+        }
+
+        // Create new record
         const newPlaylist = {
-            id: `pl_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 7)}`,
+            id: id || `pl_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 7)}`,
             name: name.trim(),
             source: 'm3u',
             createdAt: Date.now(),
@@ -1950,7 +1977,7 @@ app.post('/api/imported-playlists', async (req, res) => {
 
         res.status(201).json({ message: 'Playlist imported', playlist: newPlaylist });
     } catch (error) {
-        console.error('Error creating imported playlist:', error);
+        console.error('Error creating/updating imported playlist:', error);
         res.status(500).json({ error: error.message });
     }
 });
