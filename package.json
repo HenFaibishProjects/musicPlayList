@@ -1,6 +1,6 @@
 {
   "name": "lidamixplay",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "LidaMixPlay with automatic folder scanning and metadata extraction",
   "main": "main.js",
   "scripts": {
