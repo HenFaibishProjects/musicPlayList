@@ -1853,12 +1853,12 @@ app.get('/api/stream-proxy', async (req, res) => {
         const upstreamResponse = await fetch(parsedUrl.toString(), {
             method: 'GET',
             redirect: 'follow',
+            referrerPolicy: 'no-referrer',
             headers: {
-                'User-Agent': req.get('user-agent') || 'LidaPlay/1.0',
-                'Accept': req.get('accept') || '*/*',
-                'Accept-Language': req.get('accept-language') || 'en-US,en;q=0.9',
-                'Range': req.get('range') || '',
-                'Icy-MetaData': req.get('icy-metadata') || '1'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'audio/*, */*;q=0.9',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Icy-MetaData': '1'
             }
         });
 

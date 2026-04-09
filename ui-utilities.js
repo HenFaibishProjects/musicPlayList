@@ -755,29 +755,79 @@ function setupEventListeners() {
 
     // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
-        if (e.key === '/' && document.activeElement !== searchInput) {
-            e.preventDefault();
-            searchInput.focus();
-        }
-        if (e.key.toLowerCase() === 'q' && document.activeElement.tagName !== 'INPUT') {
-            e.preventDefault();
-            toggleQueuePanel();
-        }
-        if (e.key === 'Escape' && isQueuePanelOpen) {
-            closeQueuePanel();
-        }
-        if (e.key === 'Escape' && document.activeElement === searchInput) {
-            searchInput.blur();
-        }
-        if (e.key === 'Escape') {
-            document.getElementById('genreDropdown')?.classList.remove('open');
-
-            // Keep library-manager modal flows locked unless explicitly closed by UI controls.
-            if (isLockedLibraryModalOpen()) {
-                return;
+        // Skip if user is typing in an input or textarea
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
+            // Still allow escape to blur search
+            if (e.key === 'Escape' && document.activeElement === searchInput) {
+                searchInput.blur();
             }
+            return;
+        }
 
-            closeDeletePlaylistModal();
+        switch (e.key) {
+            case ' ':
+            case 'Spacebar':
+            case 'Space':
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                if (typeof togglePlay === 'function') {
+                    togglePlay();
+                } else {
+                    const btn = document.getElementById('playBtn');
+                    if (btn) btn.click();
+                }
+                break;
+            case 'ArrowRight': // Next track (with Shift)
+                if (e.shiftKey) {
+                    e.preventDefault();
+                    if (typeof moveToNextTrack === 'function') moveToNextTrack();
+                }
+                break;
+            case 'ArrowLeft': // Previous track (with Shift)
+                if (e.shiftKey) {
+                    e.preventDefault();
+                    if (typeof moveToPreviousTrack === 'function') moveToPreviousTrack();
+                }
+                break;
+            case 'ArrowUp': // Volume up (with Shift)
+                if (e.shiftKey) {
+                    e.preventDefault();
+                    if (typeof setVolume === 'function') setVolume(currentVolume + 0.05);
+                }
+                break;
+            case 'ArrowDown': // Volume down (with Shift)
+                if (e.shiftKey) {
+                    e.preventDefault();
+                    if (typeof setVolume === 'function') setVolume(currentVolume - 0.05);
+                }
+                break;
+            case 'm':
+            case 'M': // Mute
+                e.preventDefault();
+                if (typeof toggleMute === 'function') toggleMute();
+                break;
+            case '/': // Focus search
+                if (document.activeElement !== searchInput) {
+                    e.preventDefault();
+                    searchInput.focus();
+                }
+                break;
+            case 'q':
+            case 'Q': // Toggle queue
+                e.preventDefault();
+                if (typeof toggleQueuePanel === 'function') toggleQueuePanel();
+                break;
+            case 'Escape': // Close modals/dropdowns
+                if (isQueuePanelOpen) {
+                    closeQueuePanel();
+                }
+                document.getElementById('genreDropdown')?.classList.remove('open');
+                // Handle library modals
+                if (typeof isLockedLibraryModalOpen === 'function' && isLockedLibraryModalOpen()) {
+                    return;
+                }
+                if (typeof closeDeletePlaylistModal === 'function') closeDeletePlaylistModal();
+                break;
         }
     });
 }

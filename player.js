@@ -12,7 +12,10 @@ function loadTrack(track) {
     audioPlayer.volume = currentVolume; audioPlayerB.volume = currentVolume;
     audioPlayer.playbackRate = currentPlaybackSpeed;
     audioPlayerB.playbackRate = currentPlaybackSpeed;
-    audioPlayer.src = track.file;
+    const finalSrc = (track.isStream || track.duration === 'Live') 
+        ? `${track.file}${track.file.includes('?') ? '&' : '?'}_t=${Date.now()}` 
+        : track.file;
+    audioPlayer.src = finalSrc;
     activePlayer = 'A';
     document.getElementById('playerTitle').textContent = track.title;
     document.getElementById('playerArtist').textContent = track.artist;
@@ -35,13 +38,20 @@ function loadTrack(track) {
         
         // Disable seeking for streams
         const progressBar = document.getElementById('progressBar');
-        if (progressBar) progressBar.style.pointerEvents = 'none';
+        if (progressBar) {
+            progressBar.style.pointerEvents = 'none';
+            progressBar.style.opacity = '0.5';
+        }
     } else {
         if (totalTimeEl) totalTimeEl.textContent = track.duration || '0:00';
         if (progressHandle) progressHandle.style.display = 'block';
         
         const progressBar = document.getElementById('progressBar');
-        if (progressBar) progressBar.style.pointerEvents = 'auto';
+        if (progressBar) {
+            progressBar.style.pointerEvents = 'auto';
+            progressBar.style.opacity = '1';
+            progressBar.style.display = 'block'; // Ensure it's never set to none
+        }
     }
 
     initializeProgressWaveform();
@@ -172,18 +182,32 @@ function setupStreamMetadataMonitoring(track) {
     }, 30000);
 }
 
-function playTrack() {
+async function playTrack() {
     const currentPlayer = getActivePlayer();
-    currentPlayer.play().catch(err => console.error('Error playing audio:', err));
-    isPlaying = true;
-    const currentTrack = currentPlaylist[currentTrackIndex];
-    if (currentTrack) {
-        // Track in listening history calendar
-        if (typeof trackPlayInHistory === 'function') {
-            trackPlayInHistory(currentTrack, currentPlaylistContext);
+    if (!currentPlayer || !currentPlayer.src) return;
+
+    try {
+        isPlaying = true;
+        updatePlayButton();
+        
+        await currentPlayer.play();
+        
+        const currentTrack = currentPlaylist[currentTrackIndex];
+        if (currentTrack) {
+            // Track in listening history calendar
+            if (typeof trackPlayInHistory === 'function') {
+                trackPlayInHistory(currentTrack, currentPlaylistContext);
+            }
         }
+    } catch (err) {
+        if (err.name === 'AbortError') {
+            // Safe to ignore: playback was interrupted by another operation
+            return;
+        }
+        console.error('Error playing audio:', err);
+        isPlaying = false;
+        updatePlayButton();
     }
-    updatePlayButton();
 }
 
 function pauseTrack() {
@@ -202,6 +226,28 @@ function updatePlayButton() {
     const icon = playBtn.querySelector('i');
     icon.className = isPlaying ? 'fas fa-pause' : 'fas fa-play';
     document.body.classList.toggle('is-playing', isPlaying);
+}
+
+// Global audio error handling
+audioPlayer.addEventListener('error', handleAudioError);
+audioPlayerB.addEventListener('error', handleAudioError);
+
+function handleAudioError(e) {
+    const player = e.target;
+    const error = player.error;
+    console.error('Audio player error:', error);
+    
+    const currentTrack = currentPlaylist[currentTrackIndex];
+    if (currentTrack && (currentTrack.isStream || currentTrack.duration === 'Live')) {
+        const totalTimeEl = document.getElementById('totalTime');
+        if (totalTimeEl) totalTimeEl.textContent = 'ERROR';
+        
+        showNotification(
+            'Radio Stream Error',
+            `Failed to play "${currentTrack.title}". The station might be offline or the format is unsupported.`,
+            'error'
+        );
+    }
 }
 
 function toggleCrossfade() {

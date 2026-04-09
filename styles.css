@@ -2194,6 +2194,7 @@ body.is-playing .player-cover {
     align-items: center;
     gap: 14px;
     flex: 2;
+    min-width: 200px;
     max-width: 700px;
 }
 
@@ -4627,6 +4628,47 @@ input[type="color"]#editGenreColorInput {
 .about-link-sub   { font-size: 11.5px; color: rgba(236,234,245,0.42); margin-top: 2px; }
 .about-link-arrow { font-size: 15px; color: rgba(236,234,245,0.18); transition: color 0.2s; }
 .about-link-btn:hover .about-link-arrow { color: #c9a84c; }
+
+/* Shortcuts Guide */
+.shortcuts-guide {
+    padding: 22px 44px;
+    background: rgba(255, 255, 255, 0.015);
+}
+.shortcuts-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #c9a84c;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+.shortcuts-list {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px 24px;
+}
+.shortcut-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: rgba(236, 234, 245, 0.7);
+}
+.shortcut-item kbd {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-family: inherit;
+    font-size: 11px;
+    color: #fff;
+    min-width: 24px;
+    text-align: center;
+    box-shadow: 0 2px 0 rgba(0, 0, 0, 0.3);
+}
 
 /* footer */
 .about-footer {
@@ -7395,6 +7437,29 @@ body.light-theme .about-made-by a:hover {
         min-width: 0;
         width: 100%;
     }
+
+@media (max-width: 400px) {
+    .player-progress {
+        gap: 6px !important;
+    }
+    .time {
+        min-width: 30px !important;
+        font-size: 11px !important;
+    }
+    .player-track-info {
+        gap: 8px !important;
+    }
+    .player-cover-container {
+        width: 36px !important;
+        height: 36px !important;
+    }
+    .player-title {
+        font-size: 14px !important;
+    }
+    .player-artist {
+        font-size: 11px !important;
+    }
+}
 
     .calendar-grid,
     .calendar-days,

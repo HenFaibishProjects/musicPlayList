@@ -404,6 +404,8 @@ function openImportM3UModal() {
     document.getElementById('fileInputDisplay').innerHTML = '<i class="fas fa-file-audio"></i><span>Choose a file...</span>';
     document.getElementById('fileInputDisplay').classList.remove('has-file');
     document.getElementById('importProgress').classList.add('hidden');
+    const submitBtn = document.getElementById('importM3USubmitBtn');
+    if (submitBtn) submitBtn.disabled = false;
     
     // Load genres into dropdown
     populateImportGenreSelect();
@@ -602,6 +604,20 @@ async function importM3UPlaylist(event) {
         progressFill.style.width = '10%';
         progressText.textContent = 'Reading playlist...';
         
+        // Collect form values early to avoid redeclaration issues
+        const playlistName = document.getElementById('importPlaylistName').value.trim();
+        const coverUrl = document.getElementById('importPlaylistCover') ? document.getElementById('importPlaylistCover').value.trim() : '';
+        const genreSelect = document.getElementById('importGenreSelect');
+        const genreValue = genreSelect.value;
+        const artistsName = currentImportMethod === 'stream' ? 'Internet Radio' : 'Imported Playlist';
+
+        if (!playlistName) {
+            throw new Error('Please enter a playlist name');
+        }
+        if (!genreValue) {
+            throw new Error('Please select a genre');
+        }
+
         // Parse M3U or Stream
         let tracks = [];
         if (currentImportMethod === 'file') {
@@ -629,7 +645,6 @@ async function importM3UPlaylist(event) {
         } else if (currentImportMethod === 'stream') {
             const urlInput = document.getElementById('m3uUrlInput');
             const url = urlInput.value.trim();
-            const playlistName = document.getElementById('importPlaylistName').value.trim();
             
             if (!url) {
                 throw new Error('Please enter a stream URL');
@@ -639,6 +654,7 @@ async function importM3UPlaylist(event) {
             tracks = [{
                 id: 1,
                 file: url,
+                originalFile: url,
                 title: playlistName || extractTitleFromUrl(url),
                 artist: 'Internet Radio',
                 album: 'Live Stream',
@@ -656,21 +672,6 @@ async function importM3UPlaylist(event) {
         
         progressFill.style.width = '40%';
         progressText.textContent = `Found ${tracks.length} tracks...`;
-        
-        // Get genre selection
-        const genreSelect = document.getElementById('importGenreSelect');
-        const genreValue = genreSelect.value;
-        const playlistName = document.getElementById('importPlaylistName').value.trim();
-        const coverUrl = document.getElementById('importPlaylistCover').value.trim();
-        const artistsName = currentImportMethod === 'stream' ? 'Internet Radio' : 'Imported Playlist';
-        
-        if (!genreValue) {
-            throw new Error('Please select a genre');
-        }
-        
-        if (!playlistName) {
-            throw new Error('Please enter a playlist name');
-        }
         
         // Handle new genre creation
         let targetGenreId = genreValue;
@@ -726,6 +727,9 @@ async function importM3UPlaylist(event) {
         } else {
             refreshLibraryUI();
         }
+        
+        // Re-enable button for future use
+        submitBtn.disabled = false;
         
     } catch (error) {
         console.error('Import failed:', error);

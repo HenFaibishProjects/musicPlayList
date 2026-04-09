@@ -38,17 +38,26 @@ function updateVolumeIcon() {
 function setVolume(value, updateSystem = true) {
     const clamped = Math.max(0, Math.min(1, value));
     
-    if (clamped === currentVolume) return;
+    if (clamped === currentVolume && !arguments[2]) { // arguments[2] as force update
+        return;
+    }
     
     currentVolume = clamped;
     
     // Update audio players
-    audioPlayer.volume = currentVolume;
-    audioPlayerB.volume = currentVolume;
+    if (audioPlayer) audioPlayer.volume = currentVolume;
+    if (audioPlayerB) audioPlayerB.volume = currentVolume;
     
-    // Update UI
+    // Update UI Elements
     updateVolumeSlider(currentVolume);
     updateVolumeIcon();
+    if (typeof updateVolumePercent === 'function') updateVolumePercent(currentVolume);
+    
+    // Sync noUiSlider if it exists
+    const volumeBar = document.getElementById('volumeBar');
+    if (volumeBar && volumeBar.noUiSlider) {
+        volumeBar.noUiSlider.set(currentVolume * 100, false);
+    }
     
     // Save to localStorage
     localStorage.setItem('playerVolume', currentVolume.toString());
