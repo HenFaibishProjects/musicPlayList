@@ -462,8 +462,9 @@ function toggleImportMethod(method) {
     // Toggle input visibility and disable the inactive input
     const fileRow = document.getElementById('fileInputRow');
     const urlRow = document.getElementById('urlInputRow');
-    const fileInput = document.getElementById('m3uFileInput');
+    const urlLabel = document.getElementById('urlInputLabel');
     const urlInput = document.getElementById('m3uUrlInput');
+    const fileInput = document.getElementById('m3uFileInput');
     
     if (method === 'file') {
         fileRow.classList.remove('hidden');
@@ -474,7 +475,16 @@ function toggleImportMethod(method) {
         fileRow.classList.add('hidden');
         urlRow.classList.remove('hidden');
         if (fileInput) { fileInput.disabled = true; fileInput.value = ''; }
-        if (urlInput) urlInput.disabled = false;
+        if (urlInput) {
+            urlInput.disabled = false;
+            if (method === 'stream') {
+                urlLabel.textContent = 'Station Stream URL *';
+                urlInput.placeholder = 'https://stream.example.com/live';
+            } else {
+                urlLabel.textContent = 'M3U Playlist URL *';
+                urlInput.placeholder = 'https://example.com/playlist.m3u8';
+            }
+        }
         // Clear the server-side file path and reset display
         selectedM3UFilePath = null;
         const display = document.getElementById('fileInputDisplay');
@@ -592,7 +602,7 @@ async function importM3UPlaylist(event) {
         progressFill.style.width = '10%';
         progressText.textContent = 'Reading playlist...';
         
-        // Parse M3U
+        // Parse M3U or Stream
         let tracks = [];
         if (currentImportMethod === 'file') {
             if (selectedM3UFilePath) {
@@ -607,7 +617,7 @@ async function importM3UPlaylist(event) {
                 }
                 tracks = await readM3UFile(file);
             }
-        } else {
+        } else if (currentImportMethod === 'url') {
             const urlInput = document.getElementById('m3uUrlInput');
             const url = urlInput.value.trim();
             
@@ -616,6 +626,25 @@ async function importM3UPlaylist(event) {
             }
             
             tracks = await fetchM3U(url);
+        } else if (currentImportMethod === 'stream') {
+            const urlInput = document.getElementById('m3uUrlInput');
+            const url = urlInput.value.trim();
+            const playlistName = document.getElementById('importPlaylistName').value.trim();
+            
+            if (!url) {
+                throw new Error('Please enter a stream URL');
+            }
+            
+            // Create a single-track "playlist" for the radio stream
+            tracks = [{
+                id: 1,
+                file: url,
+                title: playlistName || extractTitleFromUrl(url),
+                artist: 'Internet Radio',
+                album: 'Live Stream',
+                duration: 'Live',
+                isStream: true
+            }];
         }
 
         // Normalize source URLs/paths so imported local tracks can play via backend proxy
@@ -632,6 +661,8 @@ async function importM3UPlaylist(event) {
         const genreSelect = document.getElementById('importGenreSelect');
         const genreValue = genreSelect.value;
         const playlistName = document.getElementById('importPlaylistName').value.trim();
+        const coverUrl = document.getElementById('importPlaylistCover').value.trim();
+        const artistsName = currentImportMethod === 'stream' ? 'Internet Radio' : 'Imported Playlist';
         
         if (!genreValue) {
             throw new Error('Please select a genre');
@@ -669,7 +700,7 @@ async function importM3UPlaylist(event) {
         progressText.textContent = 'Saving playlist...';
         
         // Add playlist to library
-        await addImportedPlaylistToLibrary(targetGenreId, playlistName, tracks);
+        await addImportedPlaylistToLibrary(targetGenreId, playlistName, tracks, artistsName, coverUrl);
         
         progressFill.style.width = '100%';
         progressText.textContent = 'Import complete!';
@@ -753,7 +784,7 @@ async function createGenreForImport(genreName, color) {
     return payload.genre.id;
 }
 
-async function addImportedPlaylistToLibrary(genreId, playlistName, tracks) {
+async function addImportedPlaylistToLibrary(genreId, playlistName, tracks, artistsName = 'Imported from M3U', coverUrl = null) {
     // Find the genre
     const genre = libraryData.library.folders.find(f => f.id === genreId);
     if (!genre) {
@@ -764,10 +795,11 @@ async function addImportedPlaylistToLibrary(genreId, playlistName, tracks) {
     const newPlaylist = {
         id: `m3u-import-${Date.now()}`,
         name: playlistName,
-        artists: 'Imported from M3U',
+        artists: artistsName,
         trackCount: tracks.length,
         duration: calculateTotalDuration(tracks),
-        images: extractCovers(tracks),
+        images: coverUrl ? [coverUrl] : extractCovers(tracks),
+        coverImage: coverUrl || null,
         link: `imported://m3u/${playlistName}`,
         tracks: tracks,
         isImported: true,

@@ -859,8 +859,12 @@
                                 <span>Local File</span>
                             </button>
                             <button type="button" class="method-btn" data-method="url">
-                                <i class="fas fa-link"></i>
-                                <span>URL</span>
+                                <i class="fas fa-list-ul"></i>
+                                <span>M3U URL</span>
+                            </button>
+                            <button type="button" class="method-btn" data-method="stream">
+                                <i class="fas fa-broadcast-tower"></i>
+                                <span>Radio Stream</span>
                             </button>
                         </div>
                     </div>
@@ -875,7 +879,7 @@
                     </div>
                     
                     <div class="library-form-row hidden" id="urlInputRow">
-                        <label for="m3uUrlInput">Playlist URL *</label>
+                        <label for="m3uUrlInput" id="urlInputLabel">Playlist URL *</label>
                         <input type="url" id="m3uUrlInput" placeholder="https://example.com/playlist.m3u8">
                         <div class="library-field-status" id="urlInputStatus"></div>
                     </div>
@@ -919,6 +923,11 @@
                     <div class="library-form-row">
                         <label for="importPlaylistName">Playlist Name *</label>
                         <input type="text" id="importPlaylistName" placeholder="e.g., My Radio Stations" required>
+                    </div>
+
+                    <div class="library-form-row">
+                        <label for="importPlaylistCover">Cover Image URL (optional)</label>
+                        <input type="url" id="importPlaylistCover" placeholder="https://example.com/cover.jpg">
                     </div>
                     
                     <div class="library-form-row library-checkbox-row">
@@ -1151,7 +1160,7 @@
         </div>
         <div class="about-app-name">LidaMixPlay</div>
         <div class="about-tagline">Music Collection &amp; Playlist Manager</div>
-        <div class="about-version-badge">▶ Version 2.0.0</div>
+        <div class="about-version-badge">▶ Version 3.0.0</div>
       </div>
 
       <div class="about-divider"></div>

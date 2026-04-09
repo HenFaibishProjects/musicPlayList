@@ -20,6 +20,30 @@ function loadTrack(track) {
     if (playerCover) {
         playerCover.src = track.cover || currentPlaylistContext?.playlistCover || DEFAULT_COVER;
     }
+    
+    // Reset individual UI elements for streams
+    const totalTimeEl = document.getElementById('totalTime');
+    const currentTimeEl = document.getElementById('currentTime');
+    const progressFill = document.getElementById('progressFill');
+    const progressHandle = document.getElementById('progressHandle');
+    
+    if (track.isStream || track.duration === 'Live') {
+        if (totalTimeEl) totalTimeEl.textContent = 'LIVE';
+        if (currentTimeEl) currentTimeEl.textContent = '0:00';
+        if (progressFill) progressFill.style.width = '100%';
+        if (progressHandle) progressHandle.style.display = 'none';
+        
+        // Disable seeking for streams
+        const progressBar = document.getElementById('progressBar');
+        if (progressBar) progressBar.style.pointerEvents = 'none';
+    } else {
+        if (totalTimeEl) totalTimeEl.textContent = track.duration || '0:00';
+        if (progressHandle) progressHandle.style.display = 'block';
+        
+        const progressBar = document.getElementById('progressBar');
+        if (progressBar) progressBar.style.pointerEvents = 'auto';
+    }
+
     initializeProgressWaveform();
     
     // For streaming URLs, set up metadata monitoring
@@ -444,13 +468,21 @@ function toggleRepeat() {
 
 function updateProgress() {
     const currentPlayer = getActivePlayer();
-    if (!currentPlayer || !currentPlayer.duration || !isFinite(currentPlayer.duration)) return;
-    
-    const percent = Math.min(100, Math.max(0, (currentPlayer.currentTime / currentPlayer.duration) * 100));
+    const currentTrack = currentPlaylist[currentTrackIndex];
     
     const progressFill = document.getElementById('progressFill');
     const progressHandle = document.getElementById('progressHandle');
     const currentTime = document.getElementById('currentTime');
+
+    if (currentTrack?.isStream || currentTrack?.duration === 'Live') {
+        if (currentTime) currentTime.textContent = '0:00';
+        if (progressFill) progressFill.style.width = '100%';
+        return;
+    }
+
+    if (!currentPlayer || !currentPlayer.duration || !isFinite(currentPlayer.duration)) return;
+
+    const percent = Math.min(100, Math.max(0, (currentPlayer.currentTime / currentPlayer.duration) * 100));
     
     if (progressFill) progressFill.style.width = percent + '%';
     if (progressHandle) progressHandle.style.left = percent + '%';
@@ -464,10 +496,17 @@ function updateProgress() {
 
 function updateDuration() {
     const currentPlayer = getActivePlayer();
-    const formatted = formatTime(currentPlayer.duration);
-    document.getElementById('totalTime').textContent = formatted;
-
     const currentTrack = currentPlaylist[currentTrackIndex];
+    const totalTimeEl = document.getElementById('totalTime');
+    
+    if (currentTrack?.isStream || currentTrack?.duration === 'Live') {
+        if (totalTimeEl) totalTimeEl.textContent = 'LIVE';
+        return;
+    }
+
+    const formatted = formatTime(currentPlayer.duration);
+    if (totalTimeEl) totalTimeEl.textContent = formatted;
+
     if (currentTrack && isFinite(currentPlayer.duration)) {
         currentTrack.duration = formatted;
 
