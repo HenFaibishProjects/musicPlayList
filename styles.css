@@ -36,7 +36,7 @@
     --shadow-glow: 0 0 40px rgba(96, 165, 250, 0.3);
     
     /* Layout */
-    --queue-panel-width: 420px;
+    --queue-panel-width: 950px;
     --border-radius: 20px;
     --border-radius-sm: 12px;
     
@@ -2682,11 +2682,11 @@ body.light-theme.is-playing .visualizer-container {
 }
 
 body.queue-panel-open .main-content {
-    padding-right: calc(60px + min(var(--queue-panel-width), 40vw));
+    padding-right: calc(60px + min(var(--queue-panel-width), 50vw));
 }
 
 body.queue-panel-open .music-player {
-    padding-right: calc(40px + min(var(--queue-panel-width), 40vw));
+    padding-right: calc(40px + min(var(--queue-panel-width), 50vw));
 }
 
 .queue-panel-header {
