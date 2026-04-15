@@ -258,6 +258,7 @@ function openQueuePanel() {
     document.getElementById('queuePanelOverlay').classList.add('show');
     document.getElementById('playlistBtn').classList.add('active');
     document.body.classList.add('queue-panel-open');
+    updateNowPlayingFocus();
     renderQueuePanel();
 }
 
@@ -266,6 +267,91 @@ function closeQueuePanel() {
     document.getElementById('queuePanelOverlay').classList.remove('show');
     document.getElementById('playlistBtn').classList.remove('active');
     document.body.classList.remove('queue-panel-open');
+}
+
+/**
+ * exitNowPlayingMode — resets ALL "now playing" state:
+ *   • Stops audio
+ *   • Clears the in-memory playlist and track index
+ *   • Resets the player bar UI (title, artist, cover, progress)
+ *   • Removes the glowing .is-playing card and .has-playing-card dimming
+ *   • Closes the queue panel / focus overlay
+ *   • Hides the Exit Playlist button
+ */
+function exitNowPlayingMode() {
+    // 1. Stop audio
+    if (audioPlayer)  { audioPlayer.pause();  audioPlayer.removeAttribute('src');  audioPlayer.load(); }
+    if (audioPlayerB) { audioPlayerB.pause(); audioPlayerB.removeAttribute('src'); audioPlayerB.load(); }
+    isPlaying = false;
+    if (crossfadeTimer) { clearTimeout(crossfadeTimer); crossfadeTimer = null; }
+    if (fadeIntervals.A) { clearInterval(fadeIntervals.A); fadeIntervals.A = null; }
+    if (fadeIntervals.B) { clearInterval(fadeIntervals.B); fadeIntervals.B = null; }
+
+    // 2. Clear playlist state
+    currentPlaylist = [];
+    currentTrackIndex = 0;
+    playbackOrder = [];
+    playbackOrderPosition = 0;
+    currentPlaylistContext = {};
+
+    // 3. Reset player bar UI
+    const titleEl   = document.getElementById('playerTitle');
+    const artistEl  = document.getElementById('playerArtist');
+    const coverEl   = document.getElementById('playerCover');
+    const fillEl    = document.getElementById('progressFill');
+    const handleEl  = document.getElementById('progressHandle');
+    const currTime  = document.getElementById('currentTime');
+    const totalTime = document.getElementById('totalTime');
+    if (titleEl)   titleEl.textContent  = 'No track selected';
+    if (artistEl)  artistEl.textContent = 'Select a track to start';
+    if (coverEl)   coverEl.src          = DEFAULT_COVER;
+    if (fillEl)    fillEl.style.width   = '0%';
+    if (handleEl)  handleEl.style.left  = '0%';
+    if (currTime)  currTime.textContent  = '0:00';
+    if (totalTime) totalTime.textContent = '0:00';
+
+    // 4. Update play button icon
+    updatePlayButton();
+
+    // 5. Remove now-playing card highlight and dimming
+    if (typeof markPlayingCard === 'function') {
+        markPlayingCard(null);
+    }
+
+    // 6. Close queue panel and focus overlay
+    if (isQueuePanelOpen) closeQueuePanel();
+
+    // 7. Remove the body flag that shows the Exit button
+    document.body.classList.remove('has-active-playlist');
+
+    // 8. Clear localStorage last-played state so it doesn't restore on reload
+    try { localStorage.removeItem('lidaplay_last_played_state'); } catch (_) {}
+}
+
+/**
+ * updateNowPlayingFocus — keeps the album-art focus overlay in sync with
+ * the currently playing track. Safe to call at any time; does nothing when
+ * no track is loaded.
+ */
+function updateNowPlayingFocus() {
+    const cover      = document.getElementById('npFocusCover');
+    const bg         = document.getElementById('npFocusBg');
+    const playlist   = document.getElementById('npFocusPlaylist');
+    const trackEl    = document.getElementById('npFocusTrack');
+    const artistEl   = document.getElementById('npFocusArtist');
+    if (!cover || !bg) return;
+
+    const track       = currentPlaylist[currentTrackIndex];
+    const coverSrc    = track?.cover || currentPlaylistContext?.playlistCover || DEFAULT_COVER;
+    const playlistName = currentPlaylistContext?.playlistName || '';
+    const trackTitle   = track?.title   || '';
+    const trackArtist  = track?.artist  || '';
+
+    cover.src = coverSrc;
+    bg.style.backgroundImage = `url('${coverSrc}')`;
+    if (playlist) playlist.textContent = playlistName;
+    if (trackEl)  trackEl.textContent  = trackTitle;
+    if (artistEl) artistEl.textContent = trackArtist;
 }
 
 function parseTrackDurationToSeconds(duration) {

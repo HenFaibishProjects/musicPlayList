@@ -187,6 +187,7 @@ function initializePlayer() {
     document.getElementById('crossfadeBtn').addEventListener('click', toggleCrossfade);
     document.getElementById('speedBtn').addEventListener('click', openSpeedModal);
     document.getElementById('playlistBtn').addEventListener('click', toggleQueuePanel);
+    document.getElementById('exitNowPlayingBtn').addEventListener('click', exitNowPlayingMode);
     document.getElementById('queueCloseBtn').addEventListener('click', closeQueuePanel);
     document.getElementById('queuePlayAllBtn').addEventListener('click', playQueueFromTop);
     document.getElementById('queueShuffleNowBtn').addEventListener('click', shuffleCurrentQueue);
@@ -215,7 +216,7 @@ function initializePlayer() {
     });
     
     audioPlayer.addEventListener('play', () => {
-        // Keep visualizer running when playback starts
+        // Restart visualizer when playback starts (or resumes)
         startVisualizerPlayback().then(() => {
             if (typeof updateVisualizerToggleButton === 'function') {
                 updateVisualizerToggleButton(true);
@@ -223,7 +224,14 @@ function initializePlayer() {
         }).catch(() => {});
     });
     audioPlayer.addEventListener('pause', () => {
-        // Keep visualizer running even when paused
+        // Stop the visualizer when music is truly paused/stopped.
+        // During crossfade the inactive player is paused but isPlaying stays true — skip those.
+        if (!isPlaying && typeof visualizer !== 'undefined' && visualizer && !visualizer.isStopped) {
+            visualizer.stopVisualization();
+            if (typeof updateVisualizerToggleButton === 'function') {
+                updateVisualizerToggleButton(false);
+            }
+        }
     });
     
     // Keyboard shortcuts

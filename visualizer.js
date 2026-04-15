@@ -187,6 +187,15 @@ class AudioVisualizer {
                 case 'particles':
                     this.drawParticles(timestamp);
                     break;
+                case 'synthwave':
+                    this.drawSynthwave(timestamp);
+                    break;
+                case 'dna':
+                    this.drawDNA(timestamp);
+                    break;
+                case 'supernova':
+                    this.drawSupernova(timestamp);
+                    break;
                 case 'bars':
                 default:
                     this.drawBars(timestamp);
@@ -514,9 +523,230 @@ class AudioVisualizer {
         ctx.shadowBlur = 0;
         ctx.globalCompositeOperation = 'source-over';
     }
-    
+
+    // ─── SYNTHWAVE GRID ──────────────────────────────────────────────────────
+    drawSynthwave(timestamp) {
+        const ctx = this.canvasCtx;
+        const W = this.width, H = this.height;
+        const horizon = H * 0.5;
+        const vanishX = W / 2;
+
+        ctx.globalCompositeOperation = 'source-over';
+
+        // Perspective vertical lines
+        const cols = 14;
+        for (let c = 0; c <= cols; c++) {
+            const topX = vanishX + (c / cols - 0.5) * 24;
+            const botX = (c / cols) * W;
+            const hue = (this.hueOffset + c * 18) % 360;
+            ctx.strokeStyle = `hsla(${hue}, 100%, 65%, 0.55)`;
+            ctx.shadowBlur = 8; ctx.shadowColor = `hsla(${hue}, 100%, 65%, 0.35)`;
+            ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(topX, horizon); ctx.lineTo(botX, H + 10); ctx.stroke();
+        }
+        ctx.shadowBlur = 0;
+
+        // Scrolling horizontal lines
+        const rows = 12;
+        const speed = (timestamp * 0.04) % (H / rows);
+        for (let r = 0; r < rows; r++) {
+            const frac = (r / rows + speed / H);
+            const y = horizon + (H - horizon) * Math.pow(frac, 1.8);
+            if (y > H + 5) continue;
+            const x0 = vanishX - frac * vanishX;
+            const x1 = vanishX + frac * (W - vanishX);
+            const hue = (this.hueOffset + r * 22 + timestamp * 0.05) % 360;
+            ctx.strokeStyle = `hsla(${hue}, 100%, 65%, ${0.15 + frac * 0.55})`;
+            ctx.lineWidth = 0.8 + frac * 1.5;
+            ctx.shadowBlur = 6 * frac; ctx.shadowColor = `hsla(${hue}, 100%, 65%, 0.4)`;
+            ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke();
+        }
+        ctx.shadowBlur = 0;
+
+        // Sun orb on horizon
+        const sunR = H * 0.13 + this.energy * H * 0.04;
+        const sunHue = (this.hueOffset + 300) % 360;
+        const sunGrad = ctx.createRadialGradient(vanishX, horizon, 0, vanishX, horizon, sunR * 1.8);
+        sunGrad.addColorStop(0, `hsla(${sunHue}, 100%, 80%, 0.9)`);
+        sunGrad.addColorStop(0.4, `hsla(${(sunHue + 30) % 360}, 100%, 60%, 0.5)`);
+        sunGrad.addColorStop(1, 'transparent');
+        ctx.save();
+        ctx.beginPath(); ctx.rect(0, 0, W, horizon); ctx.clip();
+        ctx.fillStyle = sunGrad;
+        ctx.beginPath(); ctx.arc(vanishX, horizon, sunR, 0, Math.PI * 2); ctx.fill();
+        ctx.globalCompositeOperation = 'destination-out';
+        for (let i = 0; i < 8; i++) {
+            const ly = horizon - sunR + (i / 8) * sunR * 2;
+            ctx.fillStyle = `rgba(0,0,0,${0.05 + i * 0.03})`;
+            ctx.fillRect(vanishX - sunR, ly - 1.5, sunR * 2, 3);
+        }
+        ctx.restore();
+
+        // Horizon spectrum bars
+        ctx.globalCompositeOperation = 'lighter';
+        const specBars = Math.min(80, Math.floor(W / 10));
+        const barW = W / specBars;
+        for (let i = 0; i < specBars; i++) {
+            const idx = Math.floor((i / specBars) * this.bufferLength * 0.7);
+            const val = this.smoothedBins[idx] || 0;
+            const bh = val * H * 0.22;
+            const hue = (this.hueOffset + i * 4) % 360;
+            const grd = ctx.createLinearGradient(0, horizon, 0, horizon - bh);
+            grd.addColorStop(0, `hsla(${hue}, 100%, 65%, 0.8)`);
+            grd.addColorStop(1, `hsla(${(hue + 60) % 360}, 100%, 80%, 0.1)`);
+            ctx.shadowBlur = 10; ctx.shadowColor = `hsla(${hue}, 100%, 65%, 0.5)`;
+            ctx.fillStyle = grd;
+            ctx.fillRect(i * barW, horizon - bh, barW - 2, bh);
+        }
+        ctx.shadowBlur = 0;
+        ctx.globalCompositeOperation = 'source-over';
+    }
+
+    // ─── DNA HELIX ────────────────────────────────────────────────────────────
+    drawDNA(timestamp) {
+        const ctx = this.canvasCtx;
+        const W = this.width, H = this.height;
+        const cx = W / 2;
+        const numNodes = 60;
+        const amplitude = W * 0.18;
+        const nodeSpacingY = H / numNodes;
+        const scrollY = (timestamp * 0.05) % (nodeSpacingY * 2);
+        const t = timestamp * 0.0008;
+
+        ctx.globalCompositeOperation = 'lighter';
+
+        // Backbone curves
+        for (let strand = 0; strand < 2; strand++) {
+            ctx.beginPath();
+            const phaseOff = strand === 0 ? 0 : Math.PI;
+            for (let i = 0; i <= numNodes; i++) {
+                const y = (i * nodeSpacingY - scrollY + H) % H;
+                const phase = (i / numNodes) * Math.PI * 4 + t + phaseOff;
+                const idx = Math.floor((i / numNodes) * this.bufferLength * 0.6);
+                const val = this.smoothedBins[idx] || 0;
+                const x = cx + Math.sin(phase) * (amplitude + val * amplitude * 0.6);
+                i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+            }
+            const hue = (this.hueOffset + strand * 160) % 360;
+            ctx.shadowBlur = 12; ctx.shadowColor = `hsla(${hue}, 100%, 65%, 0.4)`;
+            ctx.strokeStyle = `hsla(${hue}, 100%, 65%, 0.35)`;
+            ctx.lineWidth = 2; ctx.stroke();
+        }
+
+        // Nodes & rungs
+        for (let i = 0; i < numNodes; i++) {
+            const y = (i * nodeSpacingY - scrollY + H) % H;
+            const phase = (i / numNodes) * Math.PI * 4 + t;
+            const idx = Math.floor((i / numNodes) * this.bufferLength * 0.6);
+            const val = this.smoothedBins[idx] || 0;
+            const x1 = cx + Math.sin(phase) * (amplitude + val * amplitude * 0.8);
+            const x2 = cx + Math.sin(phase + Math.PI) * (amplitude + val * amplitude * 0.8);
+            const hue1 = (this.hueOffset + i * 5) % 360;
+            const hue2 = (hue1 + 160) % 360;
+            const alpha = 0.5 + val * 0.5;
+            const nodeR = 4 + val * 8;
+
+            ctx.shadowBlur = 18 * (0.3 + val);
+            ctx.shadowColor = `hsla(${hue1}, 100%, 70%, 0.9)`;
+            ctx.fillStyle = `hsla(${hue1}, 100%, 70%, ${alpha})`;
+            ctx.beginPath(); ctx.arc(x1, y, nodeR, 0, Math.PI * 2); ctx.fill();
+
+            ctx.shadowColor = `hsla(${hue2}, 100%, 70%, 0.9)`;
+            ctx.fillStyle = `hsla(${hue2}, 100%, 70%, ${alpha})`;
+            ctx.beginPath(); ctx.arc(x2, y, nodeR, 0, Math.PI * 2); ctx.fill();
+
+            if (i % 3 === 0) {
+                const rungAlpha = 0.2 + val * 0.5;
+                const rungGrad = ctx.createLinearGradient(x1, y, x2, y);
+                rungGrad.addColorStop(0, `hsla(${hue1}, 100%, 70%, ${rungAlpha})`);
+                rungGrad.addColorStop(1, `hsla(${hue2}, 100%, 70%, ${rungAlpha})`);
+                ctx.strokeStyle = rungGrad;
+                ctx.lineWidth = 1.5 + val * 3;
+                ctx.shadowBlur = 10; ctx.shadowColor = `hsla(${hue1}, 100%, 70%, 0.3)`;
+                ctx.beginPath(); ctx.moveTo(x1, y); ctx.lineTo(x2, y); ctx.stroke();
+            }
+        }
+        ctx.shadowBlur = 0;
+        ctx.globalCompositeOperation = 'source-over';
+    }
+
+    // ─── SUPERNOVA BURST ──────────────────────────────────────────────────────
+    drawSupernova(timestamp) {
+        const ctx = this.canvasCtx;
+        const W = this.width, H = this.height;
+        const cx = W / 2, cy = H / 2;
+        if (!this._shards) { this._shards = []; this._lastBass = 0; }
+
+        ctx.globalCompositeOperation = 'lighter';
+
+        // Pulsing core
+        const coreR = 12 + this.energy * 60;
+        const ch = this.hueOffset % 360;
+        const coreGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR * 2.5);
+        coreGrad.addColorStop(0, `hsla(${ch}, 100%, 98%, ${0.8 + this.energy * 0.2})`);
+        coreGrad.addColorStop(0.2, `hsla(${ch}, 100%, 75%, 0.6)`);
+        coreGrad.addColorStop(1, 'transparent');
+        ctx.shadowBlur = 40 * this.energy; ctx.shadowColor = `hsla(${ch}, 100%, 80%, 0.8)`;
+        ctx.fillStyle = coreGrad;
+        ctx.beginPath(); ctx.arc(cx, cy, coreR * 2.5, 0, Math.PI * 2); ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // Spectrum rays
+        const rays = 128;
+        for (let i = 0; i < rays; i++) {
+            const angle = (i / rays) * Math.PI * 2;
+            const idx = Math.floor((i / rays) * this.bufferLength * 0.85);
+            const val = this.smoothedBins[idx] || 0;
+            const len = 20 + Math.pow(val, 1.3) * Math.min(W, H) * 0.42;
+            const hue = (this.hueOffset + i * (360 / rays)) % 360;
+            const x1 = cx + Math.cos(angle) * coreR * 0.8;
+            const y1 = cy + Math.sin(angle) * coreR * 0.8;
+            const x2 = cx + Math.cos(angle) * (coreR * 0.8 + len);
+            const y2 = cy + Math.sin(angle) * (coreR * 0.8 + len);
+            const rayGrad = ctx.createLinearGradient(x1, y1, x2, y2);
+            rayGrad.addColorStop(0, `hsla(${hue}, 100%, 85%, ${0.7 + val * 0.3})`);
+            rayGrad.addColorStop(1, `hsla(${(hue + 40) % 360}, 100%, 65%, 0)`);
+            ctx.shadowBlur = 8 * val; ctx.shadowColor = `hsla(${hue}, 100%, 80%, 0.6)`;
+            ctx.strokeStyle = rayGrad;
+            ctx.lineWidth = 1 + val * 5;
+            ctx.lineCap = 'round';
+            ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+        }
+        ctx.shadowBlur = 0;
+
+        // Bass-triggered shards
+        const bassVal = this.smoothedBins[2] || 0;
+        if (bassVal > 0.55 && bassVal - this._lastBass > 0.08 && this._shards.length < 60) {
+            for (let s = 0; s < 6; s++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 2 + bassVal * 6 + Math.random() * 4;
+                this._shards.push({
+                    x: cx, y: cy,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    hue: (this.hueOffset + Math.random() * 120) % 360,
+                    life: 1.0, size: 2 + Math.random() * 5
+                });
+            }
+        }
+        this._lastBass = bassVal;
+
+        for (let i = this._shards.length - 1; i >= 0; i--) {
+            const s = this._shards[i];
+            s.x += s.vx; s.y += s.vy;
+            s.vx *= 0.96; s.vy *= 0.96;
+            s.life -= 0.018;
+            if (s.life <= 0) { this._shards.splice(i, 1); continue; }
+            ctx.fillStyle = `hsla(${s.hue}, 100%, 75%, ${s.life * 0.9})`;
+            ctx.shadowBlur = 12; ctx.shadowColor = `hsla(${s.hue}, 100%, 75%, 0.7)`;
+            ctx.beginPath(); ctx.arc(s.x, s.y, s.size * s.life, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.shadowBlur = 0;
+        ctx.globalCompositeOperation = 'source-over';
+    }
+
     setVisualizationType(type) {
-        const allowed = new Set(['bars', 'wave', 'circular', 'particles']);
+        const allowed = new Set(['bars', 'wave', 'circular', 'particles', 'synthwave', 'dna', 'supernova']);
         if (!allowed.has(type)) return;
         this.visualizationType = type;
     }

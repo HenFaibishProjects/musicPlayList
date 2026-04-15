@@ -408,6 +408,11 @@ function renderFavoritesPlaylists() {
         );
         grid.appendChild(card);
     });
+
+    // Re-apply now-playing highlight after re-render
+    if (typeof markPlayingCard === 'function') {
+        markPlayingCard(currentPlaylistContext?.playlistId || null);
+    }
 }
 
 function renderAllGenres() {
@@ -456,6 +461,11 @@ function renderGenrePlaylists(folder) {
         const card = createPlaylistCard(playlist, folder.color, index, folder.name);
         grid.appendChild(card);
     });
+
+    // Re-apply now-playing highlight after re-render
+    if (typeof markPlayingCard === 'function') {
+        markPlayingCard(currentPlaylistContext?.playlistId || null);
+    }
 }
 
 function showPlaylistTracks(playlist, genreColor, genreName = '') {
@@ -605,6 +615,7 @@ function createPlaylistCard(playlist, color, index, genreName = '') {
     card.className = 'playlist-card fade-in';
     card.style.animationDelay = `${index * 0.1}s`;
     card.style.setProperty('--card-color', color);
+    if (playlist.id) card.dataset.playlistId = playlist.id;
 
     // Check if playlist has a custom cover image URL
     const hasPlaylistImage = Boolean(String(playlist.imageUrl || playlist.coverImage || '').trim());
@@ -650,6 +661,7 @@ function createPlaylistCard(playlist, color, index, genreName = '') {
     playOverlay.addEventListener('click', (e) => {
         e.stopPropagation();
         loadPlaylist(playlist, genreName);
+        markPlayingCard(playlist.id);
     });
 
     const editBtn = card.querySelector('.edit-playlist-btn');
@@ -685,6 +697,48 @@ function createPlaylistCard(playlist, color, index, genreName = '') {
     });
     
     return card;
+}
+
+/**
+ * markPlayingCard — adds .is-playing to the matching card and removes it from
+ * all others. Also injects/removes the animated "Now Playing" badge.
+ * Safe to call with null/undefined to clear all markers.
+ */
+function markPlayingCard(playlistId) {
+    const grid = document.getElementById('folderGrid');
+    if (!grid) return;
+
+    // Remove stale state from every card
+    grid.querySelectorAll('.playlist-card').forEach(c => {
+        c.classList.remove('is-playing');
+        const badge = c.querySelector('.now-playing-badge');
+        if (badge) badge.remove();
+    });
+
+    if (!playlistId) {
+        grid.classList.remove('has-playing-card');
+        return;
+    }
+
+    const target = grid.querySelector(`.playlist-card[data-playlist-id="${CSS.escape(playlistId)}"]`);
+    if (!target) {
+        grid.classList.remove('has-playing-card');
+        return;
+    }
+
+    target.classList.add('is-playing');
+    grid.classList.add('has-playing-card');
+
+    // Inject "Now Playing" badge
+    const badge = document.createElement('div');
+    badge.className = 'now-playing-badge';
+    badge.innerHTML = `
+        <div class="np-wave">
+            <span></span><span></span><span></span><span></span>
+        </div>
+        Now Playing
+    `;
+    target.appendChild(badge);
 }
 
 async function togglePlaylistFavoriteFromUI(playlist, favoriteBtn) {

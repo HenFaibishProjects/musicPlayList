@@ -60,6 +60,11 @@ function loadTrack(track) {
     if (track.file && track.file.startsWith('http')) {
         setupStreamMetadataMonitoring(track);
     }
+
+    // Update the now-playing focus overlay if queue panel is open
+    if (typeof updateNowPlayingFocus === 'function') {
+        updateNowPlayingFocus();
+    }
     
     saveLastPlayedTrack();
 
@@ -600,6 +605,7 @@ function loadPlaylist(playlist, genreName = '') {
     }
 
     currentPlaylistContext = {
+        playlistId: playlist?.id || null,
         playlistName: playlist?.name || '',
         genreName: genreName || selectedGenre?.name || playlist?.__genreName || '',
         playlistCover: playlist?.coverImage || playlist?.imageUrl || playlist?.images?.[0] || null
@@ -611,6 +617,7 @@ function loadPlaylist(playlist, genreName = '') {
     renderQueuePanel();
     loadTrack(currentPlaylist[currentTrackIndex]);
     playTrack();
+    document.body.classList.add('has-active-playlist');
 }
 
 function updateVolumeUI(volume) {

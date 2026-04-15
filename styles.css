@@ -353,6 +353,30 @@ body.light-theme .nav-item.active {
 /* Genre List */
 .genre-list {
     margin-top: 12px;
+    max-height: 40vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 4px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(96, 165, 250, 0.35) transparent;
+}
+
+.genre-list::-webkit-scrollbar {
+    width: 4px;
+}
+
+.genre-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.genre-list::-webkit-scrollbar-thumb {
+    background: rgba(96, 165, 250, 0.35);
+    border-radius: 4px;
+    transition: background 0.3s ease;
+}
+
+.genre-list::-webkit-scrollbar-thumb:hover {
+    background: rgba(96, 165, 250, 0.65);
 }
 
 .genre-item {
@@ -867,6 +891,7 @@ body.light-theme .nav-item.active {
     padding: clamp(20px, 3vw, 40px) clamp(16px, 4vw, 60px) 140px;
     max-width: min(1800px, 100%);
     margin: 0 auto;
+    position: relative;
 }
 
 .main-content.history-mode .statusnvisu,
@@ -1813,6 +1838,124 @@ display: grid;
     margin-left: 4px;
 }
 
+/* ── Now Playing card state ───────────────────────────────────────────────── */
+
+/* When any card in a grid is playing, gently dim the others */
+.folder-grid.has-playing-card .playlist-card:not(.is-playing) {
+    opacity: 0.42;
+    filter: saturate(0.4);
+    transform: scale(0.97);
+    transition: opacity 0.5s ease, filter 0.5s ease, transform 0.5s ease;
+}
+
+.folder-grid.has-playing-card .playlist-card:not(.is-playing):hover {
+    opacity: 0.75;
+    filter: saturate(0.8);
+    transform: scale(0.99);
+}
+
+/* The active / now-playing card */
+.playlist-card.is-playing {
+    border-color: rgba(96, 165, 250, 0.7);
+    box-shadow:
+        0 0 0 2px rgba(96, 165, 250, 0.35),
+        0 12px 48px rgba(96, 165, 250, 0.3),
+        0 0 60px rgba(192, 132, 252, 0.15);
+    transform: translateY(-6px) scale(1.03);
+    transition: all 0.5s var(--ease-smooth);
+    z-index: 2;
+}
+
+.playlist-card.is-playing::before {
+    transform: scaleX(1);
+    background: linear-gradient(90deg, #60a5fa, #c084fc, #f472b6, #60a5fa);
+    background-size: 200% 100%;
+    animation: nowPlayingBar 3s linear infinite;
+}
+
+@keyframes nowPlayingBar {
+    0%   { background-position: 0% 50%; }
+    100% { background-position: 200% 50%; }
+}
+
+/* Pulsing ring around the card */
+.playlist-card.is-playing::after {
+    opacity: 1;
+    background: radial-gradient(circle at 50% 50%, rgba(96, 165, 250, 0.12), transparent 70%);
+    animation: nowPlayingGlow 2.5s ease-in-out infinite;
+}
+
+@keyframes nowPlayingGlow {
+    0%, 100% { opacity: 0.6; }
+    50%       { opacity: 1; }
+}
+
+/* "Now Playing" badge */
+.now-playing-badge {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    z-index: 11;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 10px 5px 8px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, rgba(96, 165, 250, 0.25), rgba(192, 132, 252, 0.2));
+    border: 1px solid rgba(96, 165, 250, 0.45);
+    backdrop-filter: blur(12px);
+    font-size: 11px;
+    font-weight: 700;
+    color: #a5c8ff;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    box-shadow: 0 2px 12px rgba(96, 165, 250, 0.25);
+    animation: badgeFadeIn 0.4s var(--ease-bounce);
+    pointer-events: none;
+}
+
+@keyframes badgeFadeIn {
+    from { opacity: 0; transform: translateY(-6px) scale(0.9); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Animated mini wave bars inside badge */
+.now-playing-badge .np-wave {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 14px;
+}
+
+.now-playing-badge .np-wave span {
+    display: block;
+    width: 3px;
+    background: #60a5fa;
+    border-radius: 2px;
+    animation: npWaveBar 1s ease-in-out infinite;
+}
+
+.now-playing-badge .np-wave span:nth-child(1) { animation-delay: 0s;    height: 8px; }
+.now-playing-badge .np-wave span:nth-child(2) { animation-delay: 0.15s;  height: 14px; }
+.now-playing-badge .np-wave span:nth-child(3) { animation-delay: 0.3s;   height: 6px; }
+.now-playing-badge .np-wave span:nth-child(4) { animation-delay: 0.1s;   height: 12px; }
+
+@keyframes npWaveBar {
+    0%, 100% { transform: scaleY(0.4); }
+    50%       { transform: scaleY(1); }
+}
+
+/* In light theme, adjust badge colours */
+body.light-theme .now-playing-badge {
+    background: rgba(99, 102, 241, 0.12);
+    border-color: rgba(99, 102, 241, 0.35);
+    color: #4f46e5;
+}
+
+body.light-theme .now-playing-badge .np-wave span {
+    background: #4f46e5;
+}
+
 .card-icon {
     width: 64px;
     height: 64px;
@@ -2688,6 +2831,234 @@ body.queue-panel-open .main-content {
 body.queue-panel-open .music-player {
     padding-right: calc(40px + min(var(--queue-panel-width), 50vw));
 }
+
+/* ── Now Playing Focus Overlay (shown when queue panel is open) ───────────── */
+/* Hidden by default — no position set so it takes no space */
+.np-focus-overlay {
+    display: none;
+    pointer-events: none;
+}
+
+/* When queue panel opens: fixed to the exact gap between sidebar, queue panel, and player */
+body.queue-panel-open .np-focus-overlay {
+    display: flex;
+    position: fixed;
+    /* Left edge = sidebar width */
+    left: clamp(240px, 22vw, 300px);
+    /* Right edge = queue panel width (same calc used by padding-right) */
+    right: min(var(--queue-panel-width), 50vw);
+    /* Fill top-to-bottom minus the player bar (~100px) */
+    top: 0;
+    bottom: 100px;
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    animation: npFocusFadeIn 0.45s var(--ease-smooth);
+}
+
+@keyframes npFocusFadeIn {
+    from { opacity: 0; transform: scale(0.97); }
+    to   { opacity: 1; transform: scale(1); }
+}
+
+/* Blurred album art as background fill */
+.np-focus-bg {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    filter: blur(60px) saturate(1.4) brightness(0.35);
+    transform: scale(1.1);
+    pointer-events: none;
+}
+
+/* Central card */
+.np-focus-card {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: clamp(16px, 2.5vh, 28px);
+    text-align: center;
+    padding: 0 16px;
+    max-width: clamp(200px, calc(50vw - 260px), 440px);
+    width: 100%;
+}
+
+/* Album art wrapper — sized to fit the available fixed region */
+.np-focus-art-wrap {
+    position: relative;
+    /* Use viewport-relative units that account for sidebar + queue panel */
+    width:  clamp(140px, calc(50vw - 280px), 260px);
+    height: clamp(140px, calc(50vw - 280px), 260px);
+    /* Also respect viewport height (overlay is full height minus player) */
+    max-width:  clamp(140px, 38vh, 260px);
+    max-height: clamp(140px, 38vh, 260px);
+    flex-shrink: 0;
+}
+
+/* The cover image */
+.np-focus-art {
+    width: 100%;
+    height: 100%;
+    border-radius: 24px;
+    object-fit: cover;
+    object-position: center;
+    box-shadow:
+        0 0 0 4px rgba(255,255,255,0.08),
+        0 24px 80px rgba(0,0,0,0.6),
+        0 0 80px rgba(96,165,250,0.2);
+    display: block;
+    transition: src 0.4s ease;
+    animation: npArtFloat 6s ease-in-out infinite;
+}
+
+@keyframes npArtFloat {
+    0%, 100% { transform: translateY(0px);  }
+    50%       { transform: translateY(-10px); }
+}
+
+/* Vinyl ring that slowly spins behind the art */
+.np-focus-vinyl {
+    position: absolute;
+    inset: -14px;
+    border-radius: 50%;
+    border: 2px solid rgba(96,165,250,0.2);
+    border-top-color: rgba(96,165,250,0.6);
+    animation: npVinylSpin 8s linear infinite;
+    pointer-events: none;
+}
+
+@keyframes npVinylSpin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+
+/* Glow pulse ring */
+.np-focus-wave-ring {
+    position: absolute;
+    inset: -28px;
+    border-radius: 50%;
+    border: 2px solid rgba(192,132,252,0.15);
+    animation: npRingPulse 3s ease-in-out infinite;
+    pointer-events: none;
+}
+
+@keyframes npRingPulse {
+    0%, 100% { opacity: 0.4; transform: scale(1); }
+    50%       { opacity: 0.9; transform: scale(1.04); }
+}
+
+/* Info text block */
+.np-focus-info {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+/* "Now Playing" badge with wave bars */
+.np-focus-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px 6px 10px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, rgba(96,165,250,0.2), rgba(192,132,252,0.15));
+    border: 1px solid rgba(96,165,250,0.4);
+    backdrop-filter: blur(12px);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: #a5c8ff;
+}
+
+.np-focus-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 14px;
+}
+
+.np-focus-bars span {
+    display: block;
+    width: 3px;
+    background: #60a5fa;
+    border-radius: 2px;
+    animation: npFocusWaveBar 0.9s ease-in-out infinite;
+}
+
+.np-focus-bars span:nth-child(1) { height: 8px;  animation-delay: 0s; }
+.np-focus-bars span:nth-child(2) { height: 14px; animation-delay: 0.18s; }
+.np-focus-bars span:nth-child(3) { height: 6px;  animation-delay: 0.35s; }
+.np-focus-bars span:nth-child(4) { height: 11px; animation-delay: 0.12s; }
+
+@keyframes npFocusWaveBar {
+    0%, 100% { transform: scaleY(0.35); }
+    50%       { transform: scaleY(1); }
+}
+
+/* Playlist name */
+.np-focus-playlist-name {
+    font-size: clamp(18px, 3vw, 26px);
+    font-weight: 800;
+    color: white;
+    letter-spacing: -0.5px;
+    line-height: 1.2;
+    margin: 0;
+    text-shadow: 0 2px 16px rgba(0,0,0,0.5);
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Current track name */
+.np-focus-track-name {
+    font-size: clamp(13px, 2vw, 16px);
+    font-weight: 500;
+    color: rgba(255,255,255,0.75);
+    margin: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Artist name */
+.np-focus-artist-name {
+    font-size: clamp(12px, 1.6vw, 14px);
+    font-weight: 400;
+    color: rgba(255,255,255,0.45);
+    margin: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Pause bars when music is paused */
+body:not(.is-playing) .np-focus-bars span,
+body:not(.is-playing) .np-focus-vinyl {
+    animation-play-state: paused;
+}
+
+/* Light theme adjustments */
+body.light-theme .np-focus-bg {
+    filter: blur(60px) saturate(1.2) brightness(0.6);
+}
+
+body.light-theme .np-focus-playlist-name {
+    color: #1e293b;
+    text-shadow: none;
+}
+
+body.light-theme .np-focus-track-name { color: rgba(30,41,59,0.75); }
+body.light-theme .np-focus-artist-name { color: rgba(30,41,59,0.5); }
 
 .queue-panel-header {
     display: flex;
@@ -7834,3 +8205,66 @@ body.light-theme .lyrics-pill-btn.lyrics-active {
 }
 
 
+/* ── Exit Now Playing button ─────────────────────────────────────────────── */
+/* Hidden by default; shown only when a playlist is loaded (body.has-active-playlist) */
+.exit-np-btn {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 13px;
+    border-radius: 99px;
+    border: 1px solid rgba(248, 113, 113, 0.35);
+    background: rgba(239, 68, 68, 0.08);
+    color: rgba(248, 113, 113, 0.8);
+    font-size: 12px;
+    font-weight: 700;
+    font-family: inherit;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    animation: exitBtnSlideIn 0.35s var(--ease-bounce);
+}
+
+body.has-active-playlist .exit-np-btn {
+    display: inline-flex;
+}
+
+@keyframes exitBtnSlideIn {
+    from { opacity: 0; transform: translateX(10px) scale(0.9); }
+    to   { opacity: 1; transform: translateX(0)   scale(1); }
+}
+
+.exit-np-btn i {
+    font-size: 13px;
+    transition: transform 0.3s ease;
+}
+
+.exit-np-btn:hover {
+    background: linear-gradient(135deg, rgba(239,68,68,0.85), rgba(220,38,38,0.85));
+    border-color: transparent;
+    color: #fff;
+    box-shadow: 0 0 18px rgba(239, 68, 68, 0.4);
+    transform: scale(1.05);
+}
+
+.exit-np-btn:hover i {
+    transform: rotate(-20deg) scale(1.2);
+}
+
+.exit-np-btn:active {
+    transform: scale(0.97);
+}
+
+/* Light theme */
+body.light-theme .exit-np-btn {
+    border-color: rgba(220, 38, 38, 0.3);
+    background: rgba(220, 38, 38, 0.07);
+    color: #dc2626;
+}
+
+body.light-theme .exit-np-btn:hover {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    color: #fff;
+    border-color: transparent;
+}

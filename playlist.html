@@ -171,6 +171,15 @@
                         <button class="viz-type-btn" data-viz-type="particles" title="Pulse Particles">
                             <i class="fas fa-fire"></i>
                         </button>
+                        <button class="viz-type-btn" data-viz-type="synthwave" title="Synthwave Grid">
+                            <i class="fas fa-table-cells"></i>
+                        </button>
+                        <button class="viz-type-btn" data-viz-type="dna" title="DNA Helix">
+                            <i class="fas fa-dna"></i>
+                        </button>
+                        <button class="viz-type-btn" data-viz-type="supernova" title="Supernova Burst">
+                            <i class="fas fa-burst"></i>
+                        </button>
                     </div>
                     <button class="viz-close-btn" id="vizToggleBtn" title="Stop Visualizer">
                         <i class="fas fa-pause"></i>
@@ -288,6 +297,29 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Now Playing Focus — shown when queue panel is open -->
+            <div id="nowPlayingFocus" class="np-focus-overlay" aria-hidden="true">
+                <div class="np-focus-bg" id="npFocusBg"></div>
+                <div class="np-focus-card">
+                    <div class="np-focus-art-wrap">
+                        <img id="npFocusCover" src="" alt="Album art" class="np-focus-art">
+                        <div class="np-focus-vinyl"></div>
+                        <div class="np-focus-wave-ring"></div>
+                    </div>
+                    <div class="np-focus-info">
+                        <div class="np-focus-badge">
+                            <div class="np-focus-bars">
+                                <span></span><span></span><span></span><span></span>
+                            </div>
+                            Now Playing
+                        </div>
+                        <h2 id="npFocusPlaylist" class="np-focus-playlist-name"></h2>
+                        <p id="npFocusTrack" class="np-focus-track-name"></p>
+                        <p id="npFocusArtist" class="np-focus-artist-name"></p>
+                    </div>
+                </div>
+            </div>
         </main>
     </div>
 
@@ -377,6 +409,10 @@
             </button>
             <button class="control-btn" id="playlistBtn" title="Current Playlist">
                 <i class="fas fa-list-ul"></i>
+            </button>
+            <button class="exit-np-btn" id="exitNowPlayingBtn" title="Exit Now Playing — clear playlist & remove highlights" aria-label="Exit Now Playing">
+                <i class="fas fa-eject"></i>
+                <span class="exit-np-label">Exit Playlist</span>
             </button>
             <button class="lyrics-pill-btn" id="lyricsBtn" title="Show Lyrics">
                 <i class="fas fa-microphone-lines"></i>
