@@ -8268,3 +8268,454 @@ body.light-theme .exit-np-btn:hover {
     color: #fff;
     border-color: transparent;
 }
+
+
+/* ══════════════════════════════════════════════════════════════
+   ── Display Mode System ─────────────────────────────────────
+   Safe, additive overrides only.
+   Default mode = zero changes (body with no data-display-mode).
+   TV mode      = body[data-display-mode="tv"]
+   Compact mode = body[data-display-mode="compact"]
+   Auto         = JS sets "tv" when conditions are detected.
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── TV / Large Screen / High-DPI Mode ────────────────────── */
+body[data-display-mode="tv"] {
+    /* Scale up base font so everything breathes at distance */
+    font-size: 17px;
+}
+
+/* Sidebar: tighter max-width, prevent stretching on ultrawides */
+body[data-display-mode="tv"] .sidebar {
+    flex: 0 0 clamp(260px, 18vw, 320px);
+    width: clamp(260px, 18vw, 320px);
+    padding: 28px 18px;
+}
+
+/* Main content: cap width tightly, never let it stretch wall-to-wall */
+body[data-display-mode="tv"] .main-content {
+    max-width: 1400px;
+    padding: clamp(24px, 2.5vw, 48px) clamp(20px, 3vw, 56px) 160px;
+}
+
+/* Bottom player: taller so controls don't feel cramped; guaranteed visible */
+body[data-display-mode="tv"] .music-player {
+    height: 120px;
+    padding: 0 clamp(24px, 3vw, 60px);
+    gap: 28px;
+}
+
+/* Larger album art */
+body[data-display-mode="tv"] .album-art-wrapper,
+body[data-display-mode="tv"] .player-cover {
+    width: 76px;
+    height: 76px;
+}
+
+/* Track info wider to avoid truncation */
+body[data-display-mode="tv"] .player-track-info {
+    min-width: 320px;
+}
+
+/* Player text sizing */
+body[data-display-mode="tv"] .player-title {
+    font-size: 17px;
+}
+body[data-display-mode="tv"] .player-artist {
+    font-size: 14px;
+}
+
+/* Bigger control buttons */
+body[data-display-mode="tv"] .control-btn {
+    width: 46px;
+    height: 46px;
+    font-size: 19px;
+}
+body[data-display-mode="tv"] .play-btn-main {
+    width: 58px;
+    height: 58px;
+    font-size: 24px;
+}
+
+/* Bottom push to match taller player */
+body[data-display-mode="tv"] .folder-grid.history-grid {
+    margin-bottom: 140px;
+}
+
+/* Toolbar buttons */
+body[data-display-mode="tv"] .btn,
+body[data-display-mode="tv"] .btn-genre,
+body[data-display-mode="tv"] .btn-playlist {
+    padding: 10px 18px;
+    font-size: 14px;
+    min-height: 40px;
+}
+
+/* Nav items larger for far-away viewing */
+body[data-display-mode="tv"] .nav-item {
+    padding: 14px 18px;
+    font-size: 16px;
+}
+body[data-display-mode="tv"] .nav-item i {
+    font-size: 19px;
+}
+
+/* Logo text */
+body[data-display-mode="tv"] .logo-app-name {
+    font-size: 22px;
+}
+
+/* Genre items */
+body[data-display-mode="tv"] .genre-item {
+    padding: 12px 18px;
+    font-size: 15px;
+}
+
+/* Stats bar and header */
+body[data-display-mode="tv"] .header {
+    padding-bottom: 4px;
+}
+
+/* Cards / folder grid — slightly larger gaps */
+body[data-display-mode="tv"] .folder-grid:not(.list-view) {
+    gap: 22px;
+}
+
+/* Workspace strip — slightly taller */
+body[data-display-mode="tv"] .workspace-strip {
+    height: 44px;
+}
+
+/* Prevent horizontal overflow at very wide viewports.
+   (body already has overflow-x:hidden; this reinforces it for the flex container) */
+body[data-display-mode="tv"] .app-container {
+    overflow-x: hidden;
+}
+
+/* ── Compact Mode ──────────────────────────────────────────── */
+body[data-display-mode="compact"] {
+    font-size: 13px;
+}
+
+body[data-display-mode="compact"] .sidebar {
+    flex: 0 0 clamp(200px, 16vw, 240px);
+    width: clamp(200px, 16vw, 240px);
+    padding: 20px 14px;
+    /* Sidebar scroll container must end at the player bar top.
+       Compact player = 80px fixed. Without this, the last 80px of
+       sidebar content is permanently hidden behind the player. */
+    height: calc(100vh - 80px);
+}
+
+
+body[data-display-mode="compact"] .main-content {
+    padding: clamp(12px, 2vw, 28px) clamp(12px, 2vw, 32px) 110px;
+}
+
+body[data-display-mode="compact"] .music-player {
+    height: 80px;
+    padding: 0 24px;
+    gap: 20px;
+}
+
+body[data-display-mode="compact"] .album-art-wrapper,
+body[data-display-mode="compact"] .player-cover {
+    width: 52px;
+    height: 52px;
+}
+
+body[data-display-mode="compact"] .player-track-info {
+    min-width: 200px;
+}
+
+body[data-display-mode="compact"] .control-btn {
+    width: 34px;
+    height: 34px;
+    font-size: 14px;
+}
+body[data-display-mode="compact"] .play-btn-main {
+    width: 44px;
+    height: 44px;
+    font-size: 18px;
+}
+
+body[data-display-mode="compact"] .nav-item {
+    padding: 9px 12px;
+    font-size: 13px;
+}
+
+body[data-display-mode="compact"] .nav-item i {
+    font-size: 14px;
+    width: 18px;
+}
+
+body[data-display-mode="compact"] .workspace-strip {
+    height: 32px;
+    margin-bottom: 16px;
+}
+
+/* ── Compact: Sidebar interior ──────────────────────────────── */
+
+/* Logo — tighter so it doesn't eat vertical space */
+body[data-display-mode="compact"] .logo {
+    padding: 10px 12px;
+    margin-bottom: 20px;
+    gap: 10px;
+}
+
+body[data-display-mode="compact"] .logo-icon-wrap,
+body[data-display-mode="compact"] .logo-img {
+    width: 38px;
+    height: 38px;
+}
+
+body[data-display-mode="compact"] .logo-app-name {
+    font-size: 16px;
+}
+
+body[data-display-mode="compact"] .logo-by-line {
+    font-size: 9.5px;
+}
+
+/* Nav sections — less gap between groups */
+body[data-display-mode="compact"] .nav-section {
+    margin-bottom: 16px;
+}
+
+body[data-display-mode="compact"] .nav-title {
+    font-size: 10px;
+    margin-bottom: 8px;
+    padding: 0 10px;
+}
+
+/* Genre list — properly scrollable, not cramped */
+body[data-display-mode="compact"] .genre-list {
+    max-height: 36vh;   /* shorter cap so it doesn't overflow the sidebar */
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* Genre items — tighter but still readable */
+body[data-display-mode="compact"] .genre-item {
+    padding: 7px 12px;
+    font-size: 12.5px;
+    margin: 2px 0;
+    border-radius: 9px;
+}
+
+body[data-display-mode="compact"] .genre-item .genre-icon {
+    font-size: 13px;
+    margin-right: 7px;
+}
+
+body[data-display-mode="compact"] .genre-count {
+    font-size: 10px;
+    padding: 1px 6px;
+}
+
+/* Pinned playlists section */
+body[data-display-mode="compact"] #pinnedPlaylistsSection {
+    padding: 10px 8px;
+    margin-bottom: 12px;
+}
+
+body[data-display-mode="compact"] .pinned-playlist-item {
+    padding: 7px 10px;
+    font-size: 12px;
+}
+
+/* ── Compact: Queue panel ────────────────────────────────────── */
+
+/* Overlay: cap at a sensible width — 400px is enough for a compact queue */
+body[data-display-mode="compact"] .queue-panel-overlay {
+    width: min(400px, 90vw);
+    bottom: 80px; /* matches compact player height */
+}
+
+/* Main content push: smaller offset to match narrower queue.
+   Both classes live on <body> simultaneously → compound selector. */
+body[data-display-mode="compact"].queue-panel-open .main-content {
+    padding-right: calc(20px + min(400px, 90vw));
+}
+body[data-display-mode="compact"].queue-panel-open .music-player {
+    padding-right: calc(16px + min(400px, 90vw));
+}
+
+/* Panel itself: ensure overflow is contained so inner scroll works */
+body[data-display-mode="compact"] .queue-panel {
+    overflow: hidden;
+}
+
+/* Header: tighter padding */
+body[data-display-mode="compact"] .queue-panel-header {
+    padding: 14px 16px;
+    flex-shrink: 0;
+}
+
+body[data-display-mode="compact"] .queue-panel-header h3 {
+    font-size: 18px;
+}
+
+body[data-display-mode="compact"] .queue-label {
+    font-size: 10px;
+    margin-bottom: 4px;
+}
+
+body[data-display-mode="compact"] .queue-close-btn {
+    width: 36px;
+    height: 36px;
+}
+
+/* Meta cards: less padding, smaller text, single-column layout */
+body[data-display-mode="compact"] .queue-panel-meta {
+    padding: 12px 14px;
+    gap: 8px;
+    grid-template-columns: 1fr; /* stack instead of side-by-side */
+    flex-shrink: 0;
+}
+
+body[data-display-mode="compact"] .queue-meta-card {
+    padding: 10px 12px;
+}
+
+body[data-display-mode="compact"] .queue-meta-card h4 {
+    font-size: 14px;
+}
+
+body[data-display-mode="compact"] .queue-meta-card p {
+    font-size: 10px;
+    margin-bottom: 4px;
+}
+
+/* Toolbar actions: tighter */
+body[data-display-mode="compact"] .queue-panel-actions {
+    padding: 10px 12px;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+body[data-display-mode="compact"] .queue-toolbar-btn {
+    padding: 8px 6px;
+    font-size: 11px;
+}
+
+/* Track container: THIS is the scrollable region.
+   flex: 1 + min-height: 0 forces the container to
+   shrink and scroll rather than overflow the panel.  */
+body[data-display-mode="compact"] .queue-track-container {
+    flex: 1;
+    min-height: 0;       /* ← the key fix: allows flex child to shrink & scroll */
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 4px 4px 16px;
+}
+
+/* Track rows: slightly narrower grid to fit 400px panel */
+body[data-display-mode="compact"] .queue-track-item {
+    grid-template-columns: 28px 40px 1fr 44px 30px 30px;
+    gap: 7px;
+    margin: 4px 8px;
+    padding: 9px 10px;
+    border-radius: 10px;
+}
+
+body[data-display-mode="compact"] .queue-track-cover {
+    width: 40px;
+    height: 40px;
+}
+
+body[data-display-mode="compact"] .queue-track-info h5 {
+    font-size: 12.5px;
+}
+
+body[data-display-mode="compact"] .queue-track-info p {
+    font-size: 11px;
+}
+
+body[data-display-mode="compact"] .queue-track-duration {
+    font-size: 10px;
+}
+
+body[data-display-mode="compact"] .queue-row-btn {
+    width: 28px;
+    height: 28px;
+}
+
+/* Now-playing focus overlay: matches narrower queue */
+body[data-display-mode="compact"].queue-panel-open .np-focus-overlay {
+    right: min(400px, 90vw);
+    bottom: 80px;
+}
+
+
+/* ── Display Mode Settings UI ─────────────────────────────── */
+.display-mode-section {
+    padding: 10px 0 4px;
+}
+
+.display-mode-section .app-menu-section-label {
+    display: block;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    padding: 4px 16px 8px;
+    pointer-events: none;
+}
+
+.display-mode-options {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 0 8px;
+}
+
+.display-mode-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    background: transparent;
+    border: 1px solid transparent;
+    transition: all 0.2s ease;
+    width: 100%;
+    text-align: left;
+}
+
+.display-mode-btn i {
+    width: 18px;
+    text-align: center;
+    font-size: 13px;
+    flex-shrink: 0;
+}
+
+.display-mode-btn:hover {
+    background: rgba(96, 165, 250, 0.1);
+    color: var(--text-primary);
+}
+
+.display-mode-btn.active {
+    background: linear-gradient(135deg, rgba(96, 165, 250, 0.18), rgba(192, 132, 252, 0.12));
+    border-color: rgba(96, 165, 250, 0.3);
+    color: white;
+    font-weight: 600;
+}
+
+.display-mode-btn .dm-check {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--accent-cyan);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.display-mode-btn.active .dm-check {
+    opacity: 1;
+}
+

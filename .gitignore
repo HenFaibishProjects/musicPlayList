@@ -51,3 +51,4 @@ build/
 # Temp files
 tmp/
 temp/
+dist.zip

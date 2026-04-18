@@ -298,3 +298,107 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 });
+
+// ── Display Mode System ──────────────────────────────────────────────────────
+// Storage key — consistent with the project's "lidaplay_*" namespace
+const DM_STORAGE_KEY = 'lidaplay_display_mode';
+
+/**
+ * Auto-detect heuristic for large TV / high-DPI setups.
+ * Returns true when:
+ *   - devicePixelRatio >= 2 (Windows scale 200%+ or Retina)
+ *   - AND either the CSS logical viewport is very wide (≥1800px)
+ *     OR the raw screen physical width suggests a 4K panel (≥2560px)
+ */
+function _dmShouldUseTv() {
+    const dpr = window.devicePixelRatio || 1;
+    const cssW = window.innerWidth;
+    const physW = window.screen && window.screen.width ? window.screen.width : 0;
+    return dpr >= 2 && (cssW >= 1800 || physW >= 2560);
+}
+
+/**
+ * Write the resolved data-display-mode attribute to <body>.
+ * Safe to call before DOMContentLoaded — only touches body, not child elements.
+ * "default" → removes the attribute (zero CSS override).
+ * "auto"    → resolves to "tv" or removes the attribute.
+ * "tv" / "compact" → sets the attribute.
+ */
+function _dmApplyAttribute(mode) {
+    const body = document.body;
+    const resolved = mode === 'auto'
+        ? (_dmShouldUseTv() ? 'tv' : 'default')
+        : mode;
+
+    if (resolved === 'default') {
+        body.removeAttribute('data-display-mode');
+    } else {
+        body.setAttribute('data-display-mode', resolved);
+    }
+}
+
+/**
+ * Sync the active/inactive state on the four Display Mode menu buttons.
+ * Must only be called after DOMContentLoaded.
+ */
+function _dmUpdateButtons(savedMode) {
+    document.querySelectorAll('.display-mode-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.mode === savedMode);
+    });
+}
+
+/**
+ * Full apply: write attribute + update buttons.
+ * Safe to call at any time after DOMContentLoaded.
+ */
+function applyDisplayMode(mode) {
+    _dmApplyAttribute(mode);
+    _dmUpdateButtons(mode);
+}
+
+/** Persist and apply a new mode. */
+function setDisplayMode(mode) {
+    try { localStorage.setItem(DM_STORAGE_KEY, mode); } catch (_) {}
+    applyDisplayMode(mode);
+}
+
+/** Read saved mode from localStorage (defaults to 'default'). */
+function getSavedDisplayMode() {
+    try {
+        return localStorage.getItem(DM_STORAGE_KEY) || 'default';
+    } catch (_) {
+        return 'default';
+    }
+}
+
+// ── Apply body attribute IMMEDIATELY (before DOMContentLoaded)
+// This prevents any flash of unstyled layout on page load.
+// _dmUpdateButtons is NOT called here — the menu buttons don't exist yet.
+_dmApplyAttribute(getSavedDisplayMode());
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Now that the DOM is ready, sync button highlight to the saved mode.
+    _dmUpdateButtons(getSavedDisplayMode());
+
+    // Wire up the four Display Mode buttons in the app menu.
+    document.querySelectorAll('.display-mode-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            setDisplayMode(btn.dataset.mode);
+            // Close the dropdown after selecting.
+            const dd = document.getElementById('appMenuDropdown');
+            if (dd) dd.classList.remove('active');
+        });
+    });
+
+    // Debounced resize handler — only relevant when mode is "auto".
+    // Debounce prevents setAttribute being called hundreds of times per second
+    // during a window drag.
+    let _dmResizeTimer = null;
+    window.addEventListener('resize', () => {
+        if (getSavedDisplayMode() !== 'auto') return;
+        clearTimeout(_dmResizeTimer);
+        _dmResizeTimer = setTimeout(() => {
+            _dmApplyAttribute('auto'); // attribute only; no button re-render needed
+        }, 150);
+    });
+});
