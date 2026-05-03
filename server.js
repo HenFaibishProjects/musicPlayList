@@ -18,6 +18,7 @@ const DATA_DIR = process.env.LIDAMIXPLAY_DATA_DIR || process.cwd();
 
 const LIBRARY_STRUCTURE_FILE = path.join(DATA_DIR, 'library-structure.json');
 const IMPORTED_PLAYLISTS_FILE = path.join(DATA_DIR, 'imported-playlists.json');
+const CACHED_LIBRARY_FILE = path.join(DATA_DIR, 'cached-library.json');
 const execFileAsync = promisify(execFile);
 
 const LISTENING_HISTORY_FILE = path.join(DATA_DIR, 'listening-history.json');
@@ -404,6 +405,21 @@ function invalidateScannedCache() {
     libraryCache = null;
     lastScanTime = null;
     metadataCache = {};
+    fs.unlink(CACHED_LIBRARY_FILE).catch(() => {});
+}
+
+
+async function persistLibraryCache() {
+    if (libraryCache && lastScanTime) {
+        try {
+            await fs.writeFile(CACHED_LIBRARY_FILE, JSON.stringify({
+                library: libraryCache,
+                lastScan: lastScanTime
+            }, null, 2), 'utf-8');
+        } catch (error) {
+            console.error('Failed to save library cache to disk:', error);
+        }
+    }
 }
 
 function summarizeLibrary(library) {
@@ -763,6 +779,19 @@ async function buildLibraryFromScan() {
 }
 
 async function getScannedLibrary(forceRescan = false) {
+    if (!forceRescan && !libraryCache) {
+        try {
+            const rawCache = await fs.readFile(CACHED_LIBRARY_FILE, 'utf-8');
+            const parsedCache = JSON.parse(rawCache);
+            if (parsedCache.library && parsedCache.lastScan) {
+                libraryCache = parsedCache.library;
+                lastScanTime = new Date(parsedCache.lastScan);
+            }
+        } catch (error) {
+            // Ignore if file doesn't exist or is invalid
+        }
+    }
+
     if (!forceRescan && libraryCache) {
         return {
             library: libraryCache,
@@ -778,12 +807,22 @@ async function getScannedLibrary(forceRescan = false) {
 
     if (forceRescan) {
         invalidateScannedCache();
-    }
+        }
+        persistLibraryCache().catch(console.error);
 
     scanInProgressPromise = (async () => {
         const scannedLibrary = await buildLibraryFromScan();
         libraryCache = scannedLibrary;
         lastScanTime = new Date();
+
+        try {
+            await fs.writeFile(CACHED_LIBRARY_FILE, JSON.stringify({
+                library: libraryCache,
+                lastScan: lastScanTime
+            }, null, 2), 'utf-8');
+        } catch (error) {
+            console.error('Failed to save library cache to disk:', error);
+        }
 
         return {
             library: libraryCache,
@@ -1254,6 +1293,7 @@ app.post('/api/genres', async (req, res) => {
         } else {
             invalidateScannedCache();
         }
+        persistLibraryCache().catch(console.error);
 
         res.status(201).json({ message: 'Genre created', genre: newGenre });
     } catch (error) {
@@ -1343,6 +1383,7 @@ app.patch('/api/genres/:id', async (req, res) => {
         } else {
             invalidateScannedCache();
         }
+        persistLibraryCache().catch(console.error);
 
         return res.json({
             message: 'Genre updated',
@@ -1385,6 +1426,7 @@ app.delete('/api/genres/:id', async (req, res) => {
         } else {
             invalidateScannedCache();
         }
+        persistLibraryCache().catch(console.error);
 
         return res.json({
             message: 'Genre deleted',
@@ -1508,6 +1550,7 @@ app.post('/api/playlists', async (req, res) => {
         } else {
             invalidateScannedCache();
         }
+        persistLibraryCache().catch(console.error);
 
         res.status(201).json({ message: 'Playlist mapping created', playlist: newPlaylist });
     } catch (error) {
@@ -1632,6 +1675,7 @@ app.patch('/api/playlists/:id', async (req, res) => {
         } else {
             invalidateScannedCache();
         }
+        persistLibraryCache().catch(console.error);
 
         return res.json({
             message: 'Playlist updated',
@@ -1674,6 +1718,7 @@ app.delete('/api/playlists/:id', async (req, res) => {
         } else {
             invalidateScannedCache();
         }
+        persistLibraryCache().catch(console.error);
 
         return res.json({
             message: 'Playlist deleted',
